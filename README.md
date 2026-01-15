@@ -1,12 +1,12 @@
-# 🎚️ RED TEAM COMMAND & CONTROL v19.0
+# (✿◕‿◕) RED TEAM COMMAND & CONTROL v20.0 (◕‿◕✿)
 
 <p align="center">
   <img src="https://neovim.io/logos/neovim-logo.png" width="250" alt="Neovim Logo">
 </p>
 
 <p align="center">
-  <strong>"I use Neovim, BTW."</strong><br>
-  <em>An elitist, Lua-based identity config built for field operations.</em>
+  <strong>"I use Neovim, BTW... nyaa~!"</strong><br>
+  <em>An elitist, Lua-based identity config built for field operations and headpats.</em>
 </p>
 
 <p align="center">
@@ -19,21 +19,31 @@
 
 ---
 
-## ⚡ The Manifesto
-This isn't a text editor configuration; it's a **Tactical Command Center**. Built by a Gentoo/Guix snob for the sole purpose of maximizing efficiency while minimizing Electron-based brain rot. If you're looking for telemetry, "AI-driven" suggestions, or buttons you can click with a mouse, you've wandered into the wrong repository.
+## ⚡ The Manifesto (UwU Edition)
+Hewwo! This isn't just a text editow, it's a **Tactical Command Centew** for the bestest wittle opewatow! *nuzzles your kernel* 
 
-> **Status:** Optimized for Termux / Mobile C2 / Hardened Gentoo environments.
+Built by a Gentoo/Guix snob to minimize Ewetwon-based bwain wot while maximizing comfy vibes. If you're looking for telemetry or buttons you can click with a mousey-wousey, you've wandewed into the wwong wepositowy! (◕‿◕✿)
+
+> **Status:** Optimized for Termux / Mobile C2 / Hardened Gentoo environments. Rawr.
 
 ---
 
-## 🛠️ The Dashboard (Identity Module)
-The custom dashboard is designed for high-speed reconnaissance and system management. 
+## 🛠️ The Dashboard (Praise Module)
+The custom dashboard is designed for high-speed reconnaissance and receiving headpats. 
 
-- `[f]` **Fuzzy Finder** — Locate targets in the filesystem at light speed.
-- `[g]` **The Lab (Git)** — Direct bridge to `lazygit` for version persistence.
-- `[l]` **LFS Book** — Instant access to the Linux From Scratch manual via `lynx`.
-- `[c]` **Identity Config** — Self-modification of the `init.lua` source.
-- `[n]` **Scan Network** — Launches an `nmap` terminal buffer for active reconnaissance.
+- `[f]` **Fuzzy Findew** — Wocate targets in the filesystem at light speed!
+- `[g]` **The Lab (Git)** — Diwect bridge to `lazygit` for vewsion pewsistence.
+- `[l]` **LFS Book** — Instant access to the Linux Fwom Scwatch manual via `w3m`.
+- `[c]` **Identity Config** — Self-modification of the `init.lua` souwce.
+- `[n]` **Scan Netwowk** — *notices your open ports* Launches an `nmap` buffer.
+
+---
+
+## ❤️ The Praise Protocol
+Integrated with `fwdekker/mommy` because evewy wittle operator needs positive weinfowcement after a successful `git push`. 
+
+- **Custom Rootless Bootstrapper:** `install_mommy.sh` handles Arch and Termux flawlessly.
+- **Randomized Affiwmations:** Because mommy is so pwoud of your 105M tokens, Legend~
 
 ---
 
@@ -42,17 +52,18 @@ The custom dashboard is designed for high-speed reconnaissance and system manage
 +-----------------------+
 |       F U C K         |
 |      V S  C O D E     |
+|       (◡‿◡✿)         |
 +-----------------------+
 ```
-If your editor requires more than 50MB of RAM to display a "Hello World" program, it doesn't belong on my hardware.
+If your editow takes up mowe than 50MB of RAM, you're a b-b-baka! 
 
 ---
 
 ## 🚀 Deployment
-If you think you're worthy of this config, you probably already know how to clone it. If not, stick to your IDE.
+If you think you'we wowthy of this config, you pwobably alweady know how to cwone it. If not, stick to your bwoatwawe! *pounces on your terminal*
 
 ```bash
 git clone https://github.com/legendarymsr/legenddots.git ~/.config/nvim
 ```
 
-*Note: Relative numbers are enabled. If you can't calculate line jumps in your head, don't open the editor.*
+*Note: Relative numbews are enabled. If you can't calculate wine jumps in your head, don't open the editow! (◕ᴥ◕)*
