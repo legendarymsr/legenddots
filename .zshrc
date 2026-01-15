@@ -238,3 +238,11 @@ precmd() {
         echo -e "\e[38;5;203mOh no, did my puppy make a mistake? Mommy knows you can do better~\e[0m"
     fi
 }
+if [[ -d /data/data/com.termux ]]; then
+    # STUFF ONLY FOR YOUR PHONE
+    alias ls='ls --color=auto -F'
+else
+    # STUFF ONLY FOR YOUR ARCH/GENTOO MACHINE
+    alias ls='ls --color=auto --group-directories-first'
+    alias nmap='sudo nmap'
+fi
