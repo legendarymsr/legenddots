@@ -1,12 +1,20 @@
 # 🎚️ RED TEAM COMMAND & CONTROL v19.0
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/neovim/neovim.github.io/master/logos/neovim-logo.svg" width="300" alt="Neovim Logo">
+  <img src="https://neovim.io/logos/neovim-logo.png" width="250" alt="Neovim Logo">
 </p>
 
 <p align="center">
   <strong>"I use Neovim, BTW."</strong><br>
   <em>An elitist, Lua-based identity config built for field operations.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Gentoo-purple?style=for-the-badge&logo=gentoo&logoColor=white">
+  <img src="https://img.shields.io/badge/Guix-white?style=for-the-badge&logo=gnu&logoColor=black">
+  <img src="https://img.shields.io/badge/Neovim-06b6d4?style=for-the-badge&logo=neovim&logoColor=white">
+  <img src="https://img.shields.io/badge/Lua-2c2d72?style=for-the-badge&logo=lua&logoColor=white">
+  <img src="https://img.shields.io/badge/Alacritty-FF4F00?style=for-the-badge&logo=alacritty&logoColor=white">
 </p>
 
 ---
@@ -21,21 +29,11 @@ This isn't a text editor configuration; it's a **Tactical Command Center**. Buil
 ## 🛠️ The Dashboard (Identity Module)
 The custom dashboard is designed for high-speed reconnaissance and system management. 
 
-| Key | Action | Description |
-| :--- | :--- | :--- |
-| `[f]` | **Fuzzy Finder** | Locate targets in the filesystem at light speed. |
-| `[g]` | **The Lab (Git)** | Direct bridge to `lazygit` for version persistence. |
-| `[l]` | **LFS Book** | Instant access to the Linux From Scratch manual via `lynx`. |
-| `[c]` | **Identity Config** | Self-modification of the `init.lua` source. |
-| `[n]` | **Scan Network** | Launches an `nmap` terminal buffer for active reconnaissance. |
-
----
-
-## 🛡️ Technical Specs
-- **Engine:** Neovim v0.10+ (Lua-powered)
-- **Plugin Manager:** `lazy.nvim` (Minimalist & transactional)
-- **Theme:** TokyoNight-Night (Transparent for maximum hacker aesthetic)
-- **Mobile Optimization:** Dashboard switches to `doom` theme for stability in high-latency mobile environments.
+- `[f]` **Fuzzy Finder** — Locate targets in the filesystem at light speed.
+- `[g]` **The Lab (Git)** — Direct bridge to `lazygit` for version persistence.
+- `[l]` **LFS Book** — Instant access to the Linux From Scratch manual via `lynx`.
+- `[c]` **Identity Config** — Self-modification of the `init.lua` source.
+- `[n]` **Scan Network** — Launches an `nmap` terminal buffer for active reconnaissance.
 
 ---
 
