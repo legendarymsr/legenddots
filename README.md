@@ -52,7 +52,7 @@ If your editor requires more than 50MB of RAM to display a "Hello World" program
 If you think you're worthy of this config, you probably already know how to clone it. If not, stick to your IDE.
 
 ```bash
-git clone https://github.com/legendarymsr/nvim-dotfiles.git ~/.config/nvim
+git clone https://github.com/legendarymsr/legenddots.git ~/.config/nvim
 ```
 
 *Note: Relative numbers are enabled. If you can't calculate line jumps in your head, don't open the editor.*
