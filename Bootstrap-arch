@@ -1,0 +1,132 @@
+1 #!/bin/bash
+     2
+     3 # LEGENDDOTS MINIMAL ARCH BOOTSTRAP SCRIPT
+     4 # Installs only the packages needed for your dotfiles setup
+     5
+     6 set -e  # Exit on any error
+     7
+     8 echo "🚀 LEGENDDOTS MINIMAL ARCH BOOTSTRAP INITIATED"
+     9
+    10 # Check if running as root (should not be)
+    11 if [[ $EUID -eq 0 ]]; then
+    12    echo "❌ This script should NOT be run as root"
+    13    exit 1
+    14 fi
+    15
+    16 # Check if yay or paru is installed, install if not
+    17 if ! command -v yay &> /dev/null && ! command -v paru &>
+       /dev/null; then
+    18     echo "📦 Installing yay AUR helper..."
+    19
+    20     # Install git and base-devel if not present
+    21     sudo pacman -S --needed git base-devel
+    22
+    23     # Clone and build yay
+    24     temp_dir=$(mktemp -d)
+    25     cd "$temp_dir"
+    26     git clone https://aur.archlinux.org/yay.git
+    27     cd yay
+    28     makepkg -si --noconfirm
+    29     cd ~
+    30     rm -rf "$temp_dir"
+    31 fi
+    32
+    33 # Determine AUR helper
+    34 if command -v yay &> /dev/null; then
+    35     AUR_HELPER="yay"
+    36 elif command -v paru &> /dev/null; then
+    37     AUR_HELPER="paru"
+    38 else
+    39     echo "❌ Could not determine AUR helper"
+    40     exit 1
+    41 fi
+    42
+    43 echo "✅ Using $AUR_HELPER as AUR helper"
+    44
+    45 # Install packages needed for your dotfiles
+    46 echo "📦 Installing packages needed for your dotfiles..."
+    47
+    48 # Core packages
+    49 sudo pacman -S --needed --noconfirm \
+    50     neovim \
+    51     zsh \
+    52     alacritty \
+    53     git \
+    54     curl \
+    55     wget \
+    56     ripgrep \
+    57     fd \
+    58     fzf \
+    59     python \
+    60     python-pip \
+    61     nodejs \
+    62     npm \
+    63     rust \
+    64     cargo \
+    65     w3m \
+    66     mpv \
+    67     firefox
+    68
+    69 # AUR packages needed for your setup
+    70 $AUR_HELPER -S --needed --noconfirm \
+    71     lazygit \
+    72     ttf-jetbrains-mono-nerd
+    73
+    74 # Install Python packages needed for your scripts
+    75 pip install --user \
+    76     textual \
+    77     httpx \
+    78     beautifulsoup4 \
+    79     html2text \
+    80     PyQt6 \
+    81     PyQt6-WebEngine
+    82
+    83 # Install Node packages needed for Neovim
+    84 sudo npm install -g \
+    85     neovim
+    86
+    87 # Setup directories
+    88 mkdir -p ~/.config/{nvim,zsh,alacritty}
+    89
+    90 # Copy configuration files
+    91 echo "📝 Setting up configuration files..."
+    92
+    93 # Backup existing configs if they exist
+    94 [[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.backup.$(date +%s)
+    95 [[ -f ~/.config/nvim/init.lua ]] && mv
+       ~/.config/nvim/init.lua ~/.config/nvim/init.lua.backup.$(
+       date +%s)
+    96 [[ -f ~/.config/alacritty/alacritty.toml ]] && mv
+       ~/.config/alacritty/alacritty.toml
+       ~/.config/alacritty/alacritty.toml.backup.$(date +%s)
+    97
+    98 # Link config files
+    99 ln -sf $(pwd)/init.lua ~/.config/nvim/init.lua
+   100 ln -sf $(pwd)/.zshrc ~/.zshrc
+   101 ln -sf $(pwd)/alacritty.toml
+       ~/.config/alacritty/alacritty.toml
+   102
+   103 # Create scripts directory and copy scripts
+   104 mkdir -p ~/.local/bin
+   105 cp ./scripts/* ~/.local/bin/
+   106 chmod +x ~/.local/bin/*
+   107
+   108 # Install the mommy praise engine
+   109 if ! command -v mommy &> /dev/null; then
+   110     echo " installing mommy..."
+   111     ./install_mommy.sh
+   112 fi
+   113
+   114 # Setup Zsh as default shell if not already
+   115 if [[ "$SHELL" != *"zsh"* ]]; then
+   116     echo "셸 Changing default shell to zsh..."
+   117     chsh -s $(which zsh)
+   118 fi
+   119
+   120 echo "🎉 LEGENDDOTS MINIMAL SETUP COMPLETE!"
+   121 echo ""
+   122 echo "🔧 Next steps:"
+   123 echo "   1. Restart your shell or run: exec zsh"
+   124 echo "   2. Launch nvim and run ':Lazy sync' to install
+       plugins"
+   125 echo "   3. Launch LazyGit once to accept its license" 
