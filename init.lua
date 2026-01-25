@@ -37,13 +37,13 @@ require("lazy").setup({
   -- THE HUD
   { "folke/which-key.nvim", event = "VeryLazy", config = function() require("which-key").setup() end },
 
-  -- THE DASHBOARD (Switching to Doom for mobile stability)
+  -- THE DASHBOARD
   {
     'nvimdev/dashboard-nvim',
     event = 'VimEnter',
     config = function()
       require('dashboard').setup({
-        theme = 'doom', -- GHOST "A" IS OFFICIALLY DELETED
+        theme = 'doom',
         config = {
           header = {
             [[                                                       ]],
@@ -63,6 +63,7 @@ require("lazy").setup({
           },
           center = {
             { icon = '󰊄 ', desc = '105M Tokens      ', action = 'Telescope find_files', key = 'f' },
+            { icon = '󱂬 ', desc = 'Ignite WM         ', action = 'lua require("nwm").start()', key = 'w' },
             { icon = ' ', desc = 'LFS Book         ', action = 'vsplit | terminal w3m https://www.linuxfromscratch.org/lfs/view/stable/', key = 'l' },
             { icon = ' ', desc = 'The Lab (Git)    ', action = 'LazyGit', key = 'g' },
             { icon = ' ', desc = 'Identity Config  ', action = 'e $MYVIMRC', key = 'c' },
@@ -73,6 +74,18 @@ require("lazy").setup({
       })
     end,
     dependencies = { {'nvim-tree/nvim-web-devicons'}}
+  },
+
+  -- THE WINDOW MANAGER (nwm)
+  {
+    "altermo/nwm",
+    branch = "x11", -- Required for X11 support
+    config = function()
+      require("nwm").setup({
+        autofocus = true,
+        verbal = false,
+      })
+    end,
   },
 
   -- WEAPONRY
@@ -91,11 +104,12 @@ vim.api.nvim_create_user_command("ReconLocal", function()
 end, {})
 
 -- 5. THE TOKYO OVERRIDES (The Glow)
-vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) -- Tokyo Pink
-vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   -- Tokyo Blue
-vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    -- Tokyo Green
-vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })   -- Tokyo Text
-vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" }) -- Comment Gray
+vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) 
+vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   
+vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    
+vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })   
+vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" }) 
 
 -- 6. KEYMAPS
 vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Edit Config" })
+vim.keymap.set("n", "<leader>wm", function() require("nwm").start() end, { desc = "Initialize NWM" })
