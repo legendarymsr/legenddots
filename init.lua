@@ -1,5 +1,5 @@
 -- ==========================================================================
--- Legend@Yuki // RED TEAM COMMAND & CONTROL v19.0 [THE ULTIMATE FIX]
+-- Legend@Yuki // RED TEAM COMMAND & CONTROL v20.0 [THE FIX THAT WORKS]
 -- ==========================================================================
 
 -- 1. BOOTSTRAP LAZY.NVIM
@@ -63,7 +63,7 @@ require("lazy").setup({
           },
           center = {
             { icon = '󰊄 ', desc = '105M Tokens      ', action = 'Telescope find_files', key = 'f' },
-            { icon = '󱂬 ', desc = 'Ignite WM         ', action = 'lua require("nwm").start()', key = 'w' },
+            { icon = '󱂬 ', desc = 'Ignite WM         ', action = 'lua require("nxwm").start()', key = 'w' },
             { icon = ' ', desc = 'LFS Book         ', action = 'vsplit | terminal w3m https://www.linuxfromscratch.org/lfs/view/stable/', key = 'l' },
             { icon = ' ', desc = 'The Lab (Git)    ', action = 'LazyGit', key = 'g' },
             { icon = ' ', desc = 'Identity Config  ', action = 'e $MYVIMRC', key = 'c' },
@@ -76,12 +76,12 @@ require("lazy").setup({
     dependencies = { {'nvim-tree/nvim-web-devicons'}}
   },
 
-  -- THE WINDOW MANAGER (nwm)
+  -- THE WINDOW MANAGER (The culprit fixed)
   {
-    "altermo/nwm",
-    branch = "x11", -- Required for X11 support
+    "altermo/nxwm",
+    branch = "x11",
     config = function()
-      require("nwm").setup({
+      require("nxwm").setup({
         autofocus = true,
         verbal = false,
       })
@@ -103,7 +103,7 @@ vim.api.nvim_create_user_command("ReconLocal", function()
   vim.cmd("vsplit | terminal nmap -sn 192.168.10.0/24")
 end, {})
 
--- 5. THE TOKYO OVERRIDES (The Glow)
+-- 5. THE TOKYO OVERRIDES
 vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) 
 vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   
 vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    
@@ -112,4 +112,5 @@ vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" })
 
 -- 6. KEYMAPS
 vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Edit Config" })
-vim.keymap.set("n", "<leader>wm", function() require("nwm").start() end, { desc = "Initialize NWM" })
+-- Fixed launch command
+vim.keymap.set("n", "<leader>wm", function() require("nxwm").start() end, { desc = "Initialize NXWM" })
