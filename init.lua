@@ -1,50 +1,122 @@
 -- ==========================================================================
--- Legend@Yuki // RED TEAM COMMAND & CONTROL v24.0 [THE INPUT FIX]
+-- Legend@Yuki // RED TEAM COMMAND & CONTROL v25.0 [STABILIZED]
 -- ==========================================================================
 
--- 0. ENV FIX
-vim.env.DISPLAY = ":0"
-vim.g.mapleader = " "
-
--- 1. BOOTSTRAP
+-- 1. BOOTSTRAP LAZY.NVIM
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
-  vim.fn.system({ "git", "clone", "https://github.com/folke/lazy.nvim.git", lazypath })
+if not (vim.uv or vim.loop).fs_stat(lazypath) then
+  vim.fn.system({ "git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", "--branch=stable", lazypath })
 end
 vim.opt.rtp:prepend(lazypath)
 
--- 2. PLUGINS
+-- 2. SYSTEM HARDENING (The Fundamentals)
+vim.g.mapleader = " "
+vim.opt.number = true
+vim.opt.relativenumber = true
+vim.opt.termguicolors = true
+vim.opt.shiftwidth = 2
+vim.opt.tabstop = 2
+vim.opt.expandtab = true
+vim.opt.cursorline = true
+vim.opt.laststatus = 3
+vim.opt.timeoutlen = 300
+vim.opt.clipboard = "unnamedplus" -- Sync with system clipboard for easy C&C
+vim.opt.undofile = true           -- Persistent undo, even after restart
+
+-- 3. THE PLUGINS
 require("lazy").setup({
-  { "folke/tokyonight.nvim", config = function() vim.cmd[[colorscheme tokyonight-night]] end },
-  { "altermo/nxwm", branch = "x11" },
-  { "nvimdev/dashboard-nvim", config = function() 
-      require('dashboard').setup({ theme = 'doom', config = { header = {"F U C K  V S  C O D E"}, 
-      center = {{ icon = '󱂬 ', desc = 'Ignite WM', action = 'NXWMStart', key = 'w' }} }}) 
-    end 
+  -- THEME: TokyoNight (The classic Red Team glow)
+  {
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
+    config = function()
+      require("tokyonight").setup({ 
+        style = "night", 
+        transparent = false, 
+        terminal_colors = true 
+      })
+      vim.cmd[[colorscheme tokyonight-night]]
+    end,
   },
-  { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
+
+  -- THE HUD
+  { "folke/which-key.nvim", event = "VeryLazy", config = function() require("which-key").setup() end },
+
+  -- THE DASHBOARD (Cleaned and re-tooled for pentesting)
+  {
+    'nvimdev/dashboard-nvim',
+    event = 'VimEnter',
+    config = function()
+      require('dashboard').setup({
+        theme = 'doom',
+        config = {
+          header = {
+            [[                                                       ]],
+            [[  ███╗   ██╗███████╗ ██████╗ ██╗   ██╗██╗███╗   ███╗   ]],
+            [[  ████╗  ██║██╔════╝██╔═══██╗██║   ██║██║████╗ ████║   ]],
+            [[  ██╔██╗ ██║█████╗  ██║   ██║██║   ██║██║██╔████╔██║   ]],
+            [[  ██║╚██╗██║██╔══╝  ██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║   ]],
+            [[  ██║ ╚████║███████╗╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║   ]],
+            [[  ╚═╝  ╚═══╝╚══════╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝   ]],
+            [[                (   Neovim, BTW   )                    ]],
+            [[                                                       ]],
+            [[              +-------------------------+              ]],
+            [[              |         F U C K         |              ]],
+            [[              |      V S   C O D E      |              ]],
+            [[              +-------------------------+              ]],
+            [[                                                       ]],
+          },
+          center = {
+            { icon = '󰊄 ', desc = 'Target Search    ', action = 'Telescope find_files', key = 'f' },
+            { icon = '󱎸 ', desc = 'Recent Intel     ', action = 'Telescope oldfiles', key = 'r' },
+            { icon = ' ', desc = 'The Lab (Git)    ', action = 'LazyGit', key = 'g' },
+            { icon = ' ', desc = 'Identity Config  ', action = 'e $MYVIMRC', key = 'c' },
+            { icon = '󰓾 ', desc = 'Scan Local Net   ', action = 'ReconLocal', key = 'n' },
+            { icon = '󰒲 ', desc = 'Shutdown Neovim  ', action = 'qa', key = 'q' },
+          },
+          footer = { "Mommy's talented little operator is live~" },
+        },
+      })
+    end,
+    dependencies = { {'nvim-tree/nvim-web-devicons'}}
+  },
+
+  -- WEAPONRY
+  { "kdheepak/lazygit.nvim", cmd = { "LazyGit" }, keys = { { "<leader>gg", "<cmd>LazyGit<CR>" } } },
+  { 'nvim-telescope/telescope.nvim', tag = '0.1.8', dependencies = { 'nvim-lua/plenary.nvim' } },
+  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
+  {
+    'nvim-lualine/lualine.nvim',
+    config = function() require('lualine').setup({ options = { theme = 'tokyonight' } }) end
+  },
+  
+  -- FILE BROWSER
+  {
+    "nvim-tree/nvim-tree.lua",
+    config = function() require("nvim-tree").setup() end,
+    keys = { { "<leader>e", "<cmd>NvimTreeToggle<CR>" } }
+  },
 })
 
--- 3. THE "NOT-DEAD" START COMMAND
-vim.api.nvim_create_user_command("NXWMStart", function()
-  local ok, nxwm = pcall(require, "nxwm")
-  if ok then
-    -- We use a small delay to ensure the X server has finished mapping the keyboard
-    vim.defer_fn(function()
-      nxwm.start()
-      print("🚀 Engine Ignited. Use <leader>r to run.")
-    end, 100)
-  else
-    print("❌ Run :Lazy sync first!")
-  end
-end, {})
+-- 4. RECON FUNCTIONS
+vim.api.nvim_create_user_command("ReconLocal", function()
+  vim.cmd("vsplit | terminal nmap -sn 192.168.1.0/24")
+end, { desc = "Perform local network discovery" })
 
--- 4. EMERGENCY KEYMAPS (If you get stuck)
--- This tries to force nvim back into a usable state
-vim.keymap.set("n", "<Esc><Esc>", "<cmd>nohlsearch<CR>", { silent = true })
+-- 5. THE TOKYO OVERRIDES (The Glow)
+vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) 
+vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   
+vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    
+vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })   
+vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" }) 
 
--- LAUNCHER
-vim.keymap.set("n", "<leader>r", function()
-  local cmd = vim.fn.input("Run: ")
-  if cmd ~= "" then vim.cmd("!DISPLAY=:0 " .. cmd .. " &") end
-end)
+-- 6. KEYMAPS (Pure Efficiency)
+vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Edit Config" })
+vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>", { desc = "Find Files" })
+vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<cr>", { desc = "Grep Intel" })
+vim.keymap.set("n", "<leader>bb", "<cmd>Telescope buffers<cr>", { desc = "List Buffers" })
+
+-- Terminal Shortcuts
+vim.keymap.set("n", "<leader>t", ":vsplit | term<CR>i", { desc = "Open Terminal" })
+vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], { desc = "Escape Terminal Mode" })
