@@ -1,6 +1,11 @@
+
 -- ==========================================================================
--- Legend@Yuki // RED TEAM COMMAND & CONTROL v21.0 [PRODUCTION GRADE]
+-- Legend@Yuki // RED TEAM COMMAND & CONTROL v23.0 [THE FINAL FIX]
 -- ==========================================================================
+
+-- 0. FORCE ENVIRONMENT (Fixes the "Nothing opens" bug)
+vim.env.DISPLAY = ":0"
+vim.g.mapleader = " "
 
 -- 1. BOOTSTRAP LAZY.NVIM
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -9,8 +14,7 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
--- 2. SYSTEM HARDENING (The Fundamentals)
-vim.g.mapleader = " "
+-- 2. SYSTEM HARDENING
 vim.opt.number = true
 vim.opt.relativenumber = true
 vim.opt.termguicolors = true
@@ -20,7 +24,7 @@ vim.opt.expandtab = true
 vim.opt.cursorline = true
 vim.opt.laststatus = 3
 vim.opt.timeoutlen = 300
-vim.opt.clipboard = "unnamedplus" -- Let's make copy-paste actually work
+vim.opt.clipboard = "unnamedplus"
 
 -- 3. THE PLUGINS
 require("lazy").setup({
@@ -34,9 +38,6 @@ require("lazy").setup({
       vim.cmd[[colorscheme tokyonight-night]]
     end,
   },
-
-  -- THE HUD
-  { "folke/which-key.nvim", event = "VeryLazy", config = function() require("which-key").setup() end },
 
   -- THE DASHBOARD
   {
@@ -63,7 +64,7 @@ require("lazy").setup({
             [[                                                       ]],
           },
           center = {
-            { icon = '󰊄 ', desc = '105M Tokens      ', action = 'Telescope find_files', key = 'f' },
+            { icon = '󰊄 ', desc = 'Find Files       ', action = 'Telescope find_files', key = 'f' },
             { icon = '󱂬 ', desc = 'Ignite WM         ', action = 'NXWMStart', key = 'w' },
             { icon = ' ', desc = 'LFS Book         ', action = 'vsplit | terminal w3m https://www.linuxfromscratch.org/lfs/view/stable/', key = 'l' },
             { icon = ' ', desc = 'The Lab (Git)    ', action = 'LazyGit', key = 'g' },
@@ -77,59 +78,56 @@ require("lazy").setup({
     dependencies = { {'nvim-tree/nvim-web-devicons'}}
   },
 
-  -- THE WINDOW MANAGER (Correct Repo & Branch)
+  -- THE WINDOW MANAGER (Correct Repo/Module)
   {
     "altermo/nxwm",
     branch = "x11",
     config = function()
       require("nxwm").setup({
         autofocus = true,
-        verbal = true, -- Set to true so you can see errors in :messages
+        verbal = true,
       })
     end,
   },
 
-  -- WEAPONRY
-  { "kdheepak/lazygit.nvim", cmd = { "LazyGit" }, keys = { { "<leader>gg", "<cmd>LazyGit<CR>" } } },
+  -- TOOLS
+  { "kdheepak/lazygit.nvim", cmd = { "LazyGit" } },
   { 'nvim-telescope/telescope.nvim', tag = '0.1.8', dependencies = { 'nvim-lua/plenary.nvim' } },
   { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
-  {
-    'nvim-lualine/lualine.nvim',
-    config = function() require('lualine').setup({ options = { theme = 'tokyonight' } }) end
-  },
+  { 'nvim-lualine/lualine.nvim', config = function() require('lualine').setup({ options = { theme = 'tokyonight' } }) end },
+  { "folke/which-key.nvim", event = "VeryLazy", config = function() require("which-key").setup() end },
 })
 
--- 4. CUSTOM COMMANDS
-vim.api.nvim_create_user_command("ReconLocal", function()
-  vim.cmd("vsplit | terminal nmap -sn 192.168.1.0/24") -- Changed to standard subnet
-end, {})
-
--- Command to safely start the WM
+-- 4. CUSTOM LOGIC
 vim.api.nvim_create_user_command("NXWMStart", function()
-  require("nxwm").start()
-  print("[NXWM] Engine Ignited. Use :!app & to launch.")
+  local ok, nxwm = pcall(require, "nxwm")
+  if ok then
+    nxwm.start()
+    print("🚀 [NXWM] Engine Ignited. Use <leader>r to launch programs.")
+  else
+    print("❌ [ERROR] nxwm module not found. Run :Lazy sync")
+  end
 end, {})
 
--- 5. THE TOKYO OVERRIDES
-vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) 
-vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   
-vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    
-vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })   
-vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" }) 
+vim.api.nvim_create_user_command("ReconLocal", function()
+  vim.cmd("vsplit | terminal nmap -sn 192.168.1.0/24")
+end, {})
 
--- 6. KEYMAPS (THE CRITICAL PART)
-vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Edit Config" })
-
--- Ignite the WM
+-- 5. KEYMAPS (THE FOOLPROOF ONES)
+-- Start WM
 vim.keymap.set("n", "<leader>wm", ":NXWMStart<CR>", { desc = "Start WM" })
 
--- LAUNCHER: Hit <leader>r to run an app
+-- RUN APPS (The Fix)
 vim.keymap.set("n", "<leader>r", function()
-  local cmd = vim.fn.input("🚀 Run Program: ")
+  local cmd = vim.fn.input("🔥 Launch App: ")
   if cmd ~= "" then
-    vim.cmd("!" .. cmd .. " &")
+    -- We force the DISPLAY variable into the shell command itself
+    vim.cmd("!DISPLAY=:0 " .. cmd .. " &")
   end
-end, { desc = "Launch X11 App" })
+end, { desc = "Run X11 Program" })
 
--- TERMINAL: Toggle a terminal buffer
-vim.keymap.set("n", "<leader>t", ":vsplit | term<CR>i", { desc = "Open Terminal" })
+-- EDIT CONFIG
+vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Open Config" })
+
+-- QUICK TERMINAL
+vim.keymap.set("n", "<leader>t", ":vsplit | term<CR>i", { desc = "Terminal" })
