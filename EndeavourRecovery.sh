@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================================================
-# LEGENDDOTS: ENDEAVOUR-OS RECOVERY PROTOCOL v22.1
+# LEGENDDOTS: ENDEAVOUR-OS RECOVERY PROTOCOL v22.2
 # "Target acquired. Re-establishing sovereignty."
 # ==========================================================================
 
@@ -34,17 +34,18 @@ select codium_choice in "Yes" "No"; do
     esac
 done
 
-# --- 3. PACMAN SWEEP (Core & Virtualization) ---
+# --- 3. PACMAN SWEEP (Core, Virtualization & GPU Accel) ---
 echo "🏹 SYNCING SYSTEM AND INSTALLING ARSENAL..."
 
-# We install the Python libs via Pacman to bypass the PEP 668 'Externally Managed' error
+# Added virglrenderer and libepoxy for the VM GPU passthrough
 sudo pacman -Syu --noconfirm --needed \
     neovim zsh alacritty git curl wget ripgrep fd fzf nodejs npm \
     rust python python-pip w3m mpv gcc make espeak-ng \
     qemu-desktop libvirt virt-manager dnsmasq iptables-nft \
+    edk2-ovmf virglrenderer libepoxy xz \
     python-httpx python-beautifulsoup4 python-pyqt6 python-pyqt6-webengine
 
-# --- 4. AUR HELPER (Endeavour usually has yay, but let's be sure) ---
+# --- 4. AUR HELPER ---
 if ! command -v yay &> /dev/null; then
     echo "📦 Yay missing. Compiling now..."
     git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin
@@ -64,22 +65,57 @@ yay -S --noconfirm --needed \
 echo "🛡️ CONFIGURING HYPERVISOR ACCESS..."
 sudo usermod -aG libvirt $(whoami)
 sudo systemctl enable --now libvirtd
-# Start the virtual network bridge we fixed earlier
 sudo virsh net-start default 2>/dev/null || true
 sudo virsh net-autostart default 2>/dev/null || true
 
-# --- 6. PYTHON EXTRACTION (The Fallback) ---
-echo "🐍 ENSURING TUI BROWSER DEPENDENCIES..."
-# If pacman missed any, we force them. We are the root user of this house.
-pip install --user --break-system-packages textual html2text || echo "Textual already present via system."
+# --- 6. THE OFFENSIVE BUNKER (NETHUNTER PRO AMD64) ---
+echo "📡 DEPLOYING KALI NETHUNTER PRO LAB..."
+VM_DIR="$HOME/VMs/NetHunter"
+mkdir -p "$VM_DIR"
+IMG_XZ="kali-nethunterpro-2025.4-amd64.img.xz"
+IMG_RAW="kali-nethunterpro-2025.4-amd64.img"
+# Using the verified Kali image path
+DOWNLOAD_URL="https://old.kali.org/nethunterpro-images/kali-2025.4/$IMG_XZ"
 
-# --- 7. IDENTITY PERSISTENCE (SYMLINKS) ---
+if [ ! -f "$VM_DIR/$IMG_RAW" ]; then
+    echo "📥 Downloading NetHunter Pro image (2.2GB)..."
+    wget -c "$DOWNLOAD_URL" -O "$VM_DIR/$IMG_XZ"
+    echo "📦 Decompressing (Keeping backup)..."
+    xz -dk "$VM_DIR/$IMG_XZ"
+    echo "🏗️ Expanding virtual partition (+20GB)..."
+    qemu-img resize "$VM_DIR/$IMG_RAW" +20G
+fi
+
+# Create the Yuki-certified launcher
+cat <<EOF > "$VM_DIR/start-kali.sh"
+#!/usr/bin/env bash
+# NetHunter Pro Launcher: KVM + VirGL Accel
+qemu-system-x86_64 \\
+  -enable-kvm \\
+  -cpu host \\
+  -smp 4 \\
+  -m 4G \\
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \\
+  -drive file="$VM_DIR/$IMG_RAW",format=raw,if=virtio \\
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \\
+  -device virtio-net-pci,netdev=net0 \\
+  -device virtio-vga-gl \\
+  -display gtk,gl=on \\
+  -device virtio-tablet-pci \\
+  -device virtio-keyboard-pci
+EOF
+chmod +x "$VM_DIR/start-kali.sh"
+
+# --- 7. PYTHON EXTRACTION ---
+echo "🐍 ENSURING TUI BROWSER DEPENDENCIES..."
+pip install --user --break-system-packages textual html2text || echo "Textual already present."
+
+# --- 8. IDENTITY PERSISTENCE (SYMLINKS) ---
 echo "🔗 SYNCING IDENTITY TO FILESYSTEM..."
 mkdir -p ~/.config/{nvim,alacritty,qutebrowser}
 
-# Backup any fresh install defaults
-[[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.vanilla
-[[ -f ~/.config/nvim/init.lua ]] && mv ~/.config/nvim/init.lua ~/.config/nvim/init.lua.vanilla
+[[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.vanilla 2>/dev/null || true
+[[ -f ~/.config/nvim/init.lua ]] && mv ~/.config/nvim/init.lua ~/.config/nvim/init.lua.vanilla 2>/dev/null || true
 
 # Deploy Legenddots
 ln -sf "$(pwd)/init.lua" ~/.config/nvim/init.lua
@@ -87,9 +123,9 @@ ln -sf "$(pwd)/.zshrc" ~/.zshrc
 ln -sf "$(pwd)/alacritty.toml" ~/.config/alacritty/alacritty.toml
 ln -sf "$(pwd)/legend-browsers/qute-config.py" ~/.config/qutebrowser/config.py
 
-# --- 8. THE SPITE COMPILER (RUST) ---
+# --- 9. THE SPITE COMPILER (RUST) ---
 if [[ -d "./fetch" ]]; then
-    echo "🦀 COMPILING 961-BYTE SPITE BINARY..."
+    echo "Cr COMPILING 961-BYTE SPITE BINARY..."
     cd fetch
     rustc main.rs -o fetch-rs
     mkdir -p ../legend-browsers
@@ -97,7 +133,17 @@ if [[ -d "./fetch" ]]; then
     cd ..
 fi
 
-# --- 9. FINAL HANDSHAKE ---
+# --- 10. ALIASES & PERSISTENCE ---
+echo "📝 FINALIZING SHELL CONFIGURATION..."
+# Ensure aliases for the new VM exist in ZSH
+if ! grep -q "alias kali=" ~/.zshrc; then
+    echo "" >> ~/.zshrc
+    echo "# --- Red Team Lab ---" >> ~/.zshrc
+    echo "alias kali='$VM_DIR/start-kali.sh'" >> ~/.zshrc
+    echo "alias k-ssh='ssh -p 2222 kali@localhost'" >> ~/.zshrc
+fi
+
+# --- 11. FINAL HANDSHAKE ---
 chmod +x ./legend-browsers/*
 
 if [[ "$SHELL" != *"zsh"* ]]; then
@@ -106,5 +152,5 @@ if [[ "$SHELL" != *"zsh"* ]]; then
 fi
 
 echo "🎉 RECOVERY COMPLETE, LEGEND."
-echo "💡 Restart i3 ($mod+Shift+e) to apply group changes."
+echo "💡 NetHunter Pro is startklar. Type 'kali' to launch."
 echo "💡 Run 'nvim' to trigger Lazy.nvim plugin sync."
