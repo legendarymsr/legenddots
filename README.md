@@ -71,3 +71,6 @@ git clone https://github.com/legendarymsr/legenddots.git ~/.config/legenddots
 guix system reconfigure \~/.config/legenddots/config.scm
 
 guix home reconfigure \~/.config/legenddots/home.scm
+
+sudo guix system reconfigure \~/legenddots/config.scm  
+guix home reconfigure \~/legenddots/home.scm  
