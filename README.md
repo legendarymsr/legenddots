@@ -66,11 +66,3 @@ git clone https://github.com/legendarymsr/legenddots.git ~/.config/legenddots
 ```
 
 *Operational Note: Relative line numbers are enabled. If you cannot calculate line-jumps, stick to a GUI.*
-
-
-guix system reconfigure \~/.config/legenddots/config.scm
-
-guix home reconfigure \~/.config/legenddots/home.scm
-
-sudo guix system reconfigure \~/legenddots/config.scm  
-guix home reconfigure \~/legenddots/home.scm  
