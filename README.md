@@ -48,6 +48,21 @@ legenddots/
 
 ---
 
+## Manifesto
+
+Your editor should not phone home. Your OS should not require a Microsoft account. Your tools should not need 40GB of RAM to open a text file.
+
+Every package here is auditable. Every config is version controlled. Nothing runs that wasn't explicitly put there.
+
+- Proprietary software is a liability, not a feature.
+- If you can't read the source, you don't own the tool.
+- Reproducibility is a security property.
+- Bloat is attack surface.
+
+The manifesto page lives in `manifesto/` — open `index.html` locally.
+
+---
+
 ## NixOS
 
 ```bash
