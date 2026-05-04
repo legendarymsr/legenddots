@@ -8,7 +8,7 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 
 | Config | Browser |
 |--------|---------|
-| NixOS | `brave` (nixpkgs) |
+| NixOS | `brave` (nixpkgs, stable — nightly not in nixpkgs) |
 | Guix | `icecat` (GNU, fully libre) |
 | Arch rices | `brave-origin-nightly-bin` (AUR), installed by each `install.sh` |
 
