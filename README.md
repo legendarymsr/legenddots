@@ -75,15 +75,36 @@ The manifesto page lives in `manifesto/` — open `index.html` locally.
 
 ## NixOS
 
+The NixOS setup is a fully declarative desktop. Everything — packages, services, users, kernel params, Neovim config — is described in Nix files and reproducible from scratch with one command. Nothing is installed imperatively; if it's not in the config, it doesn't exist on the system.
+
+- **WM**: Hyprland (Wayland) — animated, gesture-friendly, good hardware acceleration
+- **Editor**: Neovim via NixVim (declarative Lua config managed by home-manager)
+- **Shell**: Zsh with starship prompt
+- **Bar**: Waybar
+- **Launcher**: Fuzzel
+- **Notifications**: Dunst
+- **Lock**: Hyprlock
+- **Theme**: Tokyo Night throughout
+
 ```bash
 nixos-rebuild switch --flake .#legend-box
 ```
 
-Home-manager is integrated into the flake. NixVim handles Neovim declaratively.
+Home-manager is integrated into the flake. NixVim handles Neovim declaratively — plugins, LSPs, and keymaps are all in `home/nixvim.nix`, no manual `:PackerSync` or `:Mason` needed.
 
 ---
 
 ## Guix
+
+The Guix setup is the most minimal and principled of the three. GNU Guix enforces libre software by policy — no proprietary blobs, no non-free firmware, no nonfree package channels by default. The entire system is reproducible and rollback-able, similar to NixOS but with Scheme (Guile) instead of Nix expressions.
+
+- **WM**: Ratpoison — a keyboard-driven, zero-chrome tiling WM. No taskbar, no decorations, no mouse needed. Every window is fullscreen or split. All commands go through a prefix key (`C-t`), like Tmux for your desktop.
+- **Editor**: Emacs — configured in `init.el`, treated as the primary environment (shell, file manager, git UI, etc.)
+- **Browser**: Icecat — GNU's fully libre Firefox fork, no telemetry, no proprietary codecs
+- **Shell**: Zsh
+- **Lock**: slock (suckless, zero UI — screen goes black, type password)
+- **Security**: Hardened kernel args, AppArmor, nftables firewall, fail2ban, noexec mounts on `/tmp` and `/run`
+- **Theme**: Tokyo Night (Emacs theme, terminal colors)
 
 ```bash
 # System
@@ -93,22 +114,52 @@ guix system reconfigure config.scm
 guix home reconfigure home-configuration.scm
 ```
 
-Libre software only. Ratpoison as WM, Emacs as editor, hardened kernel arguments, AppArmor, nftables.
+Ratpoison is configured entirely through `~/.ratpoisonrc` (managed by Guix home). The Emacs config in `init.el` is standalone — no package manager bootstrapping, packages are declared in the Guix home config.
 
 ---
 
 ## Arch Rice
 
-Each WM has a self-contained install script. Requires `paru` or `yay`.
+Three self-contained Arch rices sharing the same theme and keybind philosophy. Each lives in its own directory with an `install.sh` that symlinks configs and backs up anything already in place. Requires `paru` or `yay` for AUR packages.
+
+### Niri (Wayland)
+
+A scrollable-tiling Wayland compositor. Windows tile horizontally into an infinite scrolling canvas — no fixed workspaces, just scroll left and right through open windows. Feels like a spatial desktop.
+
+- **Bar**: Waybar
+- **Launcher**: Fuzzel
+- **Notifications**: Dunst
+- **Lock**: Swaylock
 
 ```bash
-# Niri (Wayland, requires waybar-git from AUR)
 bash niri/install.sh
+```
 
-# i3 (X11)
+Requires `waybar-git` from AUR (for niri-specific workspace support).
+
+### i3 (X11)
+
+Classic manual tiling on X11. Splits windows horizontally or vertically on demand, fully keyboard-driven. The most stable and widely supported of the three — runs on any hardware, any GPU driver.
+
+- **Bar**: Polybar
+- **Launcher**: Rofi
+- **Compositor**: Picom (blur, transparency, shadows)
+- **Theme**: Tokyo Night via Xresources + Rofi theme
+
+```bash
 bash i3/install.sh
+```
 
-# Hyprland (Wayland)
+### Hyprland (Wayland)
+
+Animated dynamic tiling on Wayland. Windows tile automatically with smooth animations and workspace transitions. Supports gestures, per-window rules, and blur/shadow effects natively.
+
+- **Bar**: Waybar
+- **Launcher**: Fuzzel (via Hyprland exec)
+- **Lock**: Hyprlock
+- **Wallpaper**: Hyprpaper
+
+```bash
 bash hyprland/install.sh
 ```
 
