@@ -1,43 +1,52 @@
 #!/usr/bin/env python3
-"""Mockup screenshot generator — realistic WM + browser tiles."""
+"""
+Mockup screenshots — each WM is visually distinct.
+  Hyprland : Waybar, rounded windows, gaps, wallpaper visible
+  i3       : Polybar + powerline, SHARP windows, title bars on every window
+  Niri     : Waybar, rounded, column scroll aesthetic
+  Ratpoison: bare 14px text bar, NO chrome on windows at all, 1px divider
+Browsers:
+  Brave    : Chromium-style chrome (shield icon, curved tabs)
+  IceCat   : Firefox-style chrome (flat tabs, hamburger menu)
+"""
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-# ── Tokyo Night Storm palette ──────────────────────────────────────────────
-BG       = "#1a1b2e"
-BG2      = "#1f2335"
-BG3      = "#24283b"
-BG4      = "#292e42"
-FG       = "#c0caf5"
-FG2      = "#a9b1d6"
-DIM      = "#565f89"
-BORDER   = "#3b4261"
-ACCENT   = "#7aa2f7"
-GREEN    = "#9ece6a"
-RED      = "#f7768e"
-YELLOW   = "#e0af68"
-PURPLE   = "#bb9af7"
-CYAN     = "#7dcfff"
-ORANGE   = "#ff9e64"
-WHITE    = "#cdd6f4"
+# ── Tokyo Night Night ──────────────────────────────────────────────────────
+BG     = "#1a1b2e"
+BG2    = "#1f2335"
+BG3    = "#24283b"
+BG4    = "#292e42"
+FG     = "#c0caf5"
+FG2    = "#a9b1d6"
+DIM    = "#565f89"
+BORDER = "#3b4261"
+ACCENT = "#7aa2f7"
+GREEN  = "#9ece6a"
+RED    = "#f7768e"
+YELLOW = "#e0af68"
+PURPLE = "#bb9af7"
+CYAN   = "#7dcfff"
+ORANGE = "#ff9e64"
 
-# GitHub dark palette
-GH_BG    = "#0d1117"
-GH_BG2   = "#161b22"
-GH_BG3   = "#21262d"
-GH_FG    = "#e6edf3"
-GH_FG2   = "#8b949e"
-GH_LINK  = "#58a6ff"
-GH_GREEN = "#3fb950"
-GH_BORDER= "#30363d"
+# GitHub dark
+GH_BG  = "#0d1117"
+GH_BG2 = "#161b22"
+GH_BG3 = "#21262d"
+GH_FG  = "#e6edf3"
+GH_FG2 = "#8b949e"
+GH_LNK = "#58a6ff"
+GH_BDR = "#30363d"
 
-MONO  = "/data/data/com.termux/files/home/.fonts/MononokiNerdFont-Bold.ttf"
-MONO_R= "/data/data/com.termux/files/home/.fonts/GoMonoNerdFontMono-Regular.ttf"
-SANS  = "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans.ttf"
-SANS_B= "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"
-SANS_B= SANS_B if os.path.exists(SANS_B) else SANS
+W, H = 1280, 720
 
-def f(path, size):
+MONO   = "/data/data/com.termux/files/home/.fonts/MononokiNerdFont-Bold.ttf"
+MONO_R = "/data/data/com.termux/files/home/.fonts/GoMonoNerdFontMono-Regular.ttf"
+SANS   = "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans.ttf"
+SANS_B = "/data/data/com.termux/files/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"
+SANS_B = SANS_B if os.path.exists(SANS_B) else SANS
+
+def fnt(path, size):
     try:    return ImageFont.truetype(path, size)
     except: return ImageFont.load_default()
 
@@ -45,499 +54,640 @@ def rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-def text_w(draw, text, font):
+def tw(draw, text, font):
     bb = draw.textbbox((0,0), text, font=font)
     return bb[2] - bb[0]
 
-W, H = 1280, 720
-GAP  = 8     # window gaps
-TERM_W = 510 # terminal pane width
+def th_px(draw, text, font):
+    bb = draw.textbbox((0,0), text, font=font)
+    return bb[3] - bb[1]
 
-# ── font sizes ─────────────────────────────────────────────────────────────
-def fonts():
-    return {
-        "bar":    f(SANS,   11),
-        "bar_b":  f(SANS_B, 11),
-        "title":  f(SANS,   11),
-        "mono":   f(MONO_R, 12),
-        "mono_b": f(MONO,   12),
-        "url":    f(SANS,   11),
-        "sm":     f(SANS,   10),
-        "md":     f(SANS,   13),
-        "lg":     f(SANS_B, 15),
-        "xl":     f(SANS_B, 18),
-        "gh_sm":  f(SANS,   11),
-        "gh_md":  f(SANS,   13),
-        "gh_lg":  f(SANS_B, 16),
-        "gh_xl":  f(SANS_B, 20),
-    }
-
-# ── ASCII logos ────────────────────────────────────────────────────────────
-NIXOS_LOGO = [
-    r"  \\  //  ",
-    r"  _\\//_  ",
-    r" (_    _) ",
-    r"  _//\\_  ",
-    r"  //  \\  ",
-    r"          ",
-]
-ARCH_LOGO = [
-    r"     /\     ",
-    r"    /  \    ",
-    r"   / /\ \   ",
-    r"  / /  \ \  ",
-    r" /_/    \_\ ",
-    r"             ",
-]
-GUIX_LOGO = [
-    r" _________ ",
-    r"|  _______ |",
-    r"| |  Guix | |",
-    r"| |_______| |",
-    r"|___________|",
-    r"             ",
-]
-
-LOGOS = {
-    "NixOS":      (NIXOS_LOGO, ACCENT),
-    "Arch Linux": (ARCH_LOGO,  CYAN),
-    "GNU Guix":   (GUIX_LOGO,  GREEN),
-}
-
-COLOR_BLOCKS = [RED, GREEN, YELLOW, ACCENT, PURPLE, CYAN, FG2, DIM]
-
-# ── Waybar ─────────────────────────────────────────────────────────────────
-def draw_waybar(d, fn, y, h, active_ws, wm_color, right="  12:34  2026-05-05 "):
-    d.rectangle([0, y, W-1, y+h-1], fill=rgb(BG2))
-    # workspaces
-    wx = 8
-    for i in range(1, 6):
-        ws_str = str(i)
-        active = (i == active_ws)
-        bw = 22
-        bg = wm_color if active else BG4
-        d.rounded_rectangle([wx, y+4, wx+bw, y+h-4], radius=4, fill=rgb(bg))
-        tw = text_w(d, ws_str, fn["bar"])
-        d.text((wx + (bw-tw)//2, y+5), ws_str, font=fn["bar"],
-               fill=rgb(BG if active else DIM))
-        wx += bw + 3
-    # center title
-    title = "alacritty — fastfetch"
-    tw = text_w(d, title, fn["bar"])
-    d.text(((W-tw)//2, y+5), title, font=fn["bar"], fill=rgb(FG2))
-    # right modules
-    rw = text_w(d, right, fn["bar"])
-    d.text((W-rw-4, y+5), right, font=fn["bar"], fill=rgb(FG2))
-
-# ── Polybar ────────────────────────────────────────────────────────────────
-def draw_polybar(d, fn, y, h, active_ws, wm_color):
-    d.rectangle([0, y, W-1, y+h-1], fill=rgb(BG))
-    # powerline workspace
-    wx = 0
-    SEP = "▌"
-    for i in range(1, 6):
-        active = (i == active_ws)
-        bg = wm_color if active else BG3
-        ws_str = f"  {i}  "
-        tw = text_w(d, ws_str, fn["bar_b"])
-        d.rectangle([wx, y, wx+tw, y+h], fill=rgb(bg))
-        d.text((wx, y+4), ws_str, font=fn["bar_b"],
-               fill=rgb(BG if active else DIM))
-        wx += tw
-    # sep arrow
-    d.text((wx, y+3), SEP, font=f(SANS, 18), fill=rgb(BG3))
-    # right side
-    right_items = [
-        ("  CPU 8%", FG2), ("  MEM 4.1G", FG2), ("  Vol 65%", FG2),
-        (f"   12:34", wm_color),
-    ]
-    rx = W
-    for txt, col in reversed(right_items):
-        tw = text_w(d, txt, fn["bar"])
-        rx -= tw + 6
-        d.text((rx, y+5), txt, font=fn["bar"], fill=rgb(col))
-
-# ── Window chrome (title bar + border) ─────────────────────────────────────
-def draw_window(d, fn, x, y, w, h, title, border_col, rounded=True, titled=True):
-    r = 8 if rounded else 0
-    # border glow
-    d.rounded_rectangle([x-1, y-1, x+w, y+h], radius=r+1,
-                         outline=rgb(border_col), width=2)
-    d.rounded_rectangle([x, y, x+w-1, y+h-1], radius=r, fill=rgb(BG2))
-    if titled:
-        title_h = 26
-        d.rounded_rectangle([x, y, x+w-1, y+title_h], radius=r, fill=rgb(BG3))
-        if rounded:
-            d.rectangle([x, y+r, x+w-1, y+title_h], fill=rgb(BG3))
-        # traffic lights
-        for ci, col in enumerate([RED, YELLOW, GREEN]):
-            cx = x + 10 + ci*16
-            d.ellipse([cx-4, y+9, cx+4, y+17], fill=rgb(col))
-        tw = text_w(d, title, fn["title"])
-        d.text((x + (w-tw)//2, y+7), title, font=fn["title"], fill=rgb(DIM))
-    return (x, y + (26 if titled else 0), w, h - (26 if titled else 0))
-
-# ── Fastfetch terminal content ─────────────────────────────────────────────
-def draw_fastfetch(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
-    logo_lines, logo_col = LOGOS.get(os_name, (ARCH_LOGO, CYAN))
-    lh = 15
-    lx, ly = cx + 8, cy + 8
-    for line in logo_lines:
-        d.text((lx, ly), line, font=fn["mono_b"], fill=rgb(logo_col))
-        ly += lh
-
-    ix = cx + 120
-    iy = cy + 8
-    lh2 = 15
-
-    user = "user@legend"
-    tw = text_w(d, user, fn["mono_b"])
-    d.text((ix, iy), user, font=fn["mono_b"], fill=rgb(logo_col))
-    iy += lh2
-    sep = "─" * (tw // 8)
-    d.text((ix, iy), sep, font=fn["mono"], fill=rgb(BORDER))
-    iy += lh2
-
-    info = [
-        ("OS",      os_name,        FG),
-        ("Host",    "legend-box",   FG),
-        ("Kernel",  "6.6.30-zen1",  FG),
-        ("WM",      wm,             FG),
-        ("Pkgs",    pkgs,           FG),
-        ("Shell",   "zsh 5.9",      FG),
-        ("Term",    "Alacritty",    FG),
-        ("Font",    "MononokiNF",   FG),
-        ("Theme",   "Tokyo Night",  FG),
-    ]
-    for key, val, vcol in info:
-        d.text((ix, iy),      key, font=fn["mono_b"], fill=rgb(CYAN))
-        d.text((ix+70, iy),   val, font=fn["mono"],   fill=rgb(vcol))
-        iy += lh2
-
-    iy += 5
-    for bi, col in enumerate(COLOR_BLOCKS):
-        bx = ix + bi*16
-        d.rounded_rectangle([bx, iy, bx+12, iy+10], radius=2, fill=rgb(col))
-
-# ── Brave browser chrome ───────────────────────────────────────────────────
-BRAVE_BG     = "#1e2030"
-BRAVE_TAB_A  = "#24283b"
-BRAVE_TAB_I  = "#1a1b2e"
-BRAVE_BAR    = "#1e2030"
-BRAVE_URL    = "#292e42"
-
-def draw_brave(d, fn, x, y, w, h, url="github.com/legendarymsr/legenddots"):
-    # chrome bg
-    d.rectangle([x, y, x+w-1, y+h-1], fill=rgb(BRAVE_BG))
-    # tab bar
-    tab_h = 28
-    d.rectangle([x, y, x+w-1, y+tab_h], fill=rgb(BRAVE_TAB_I))
-    # active tab
-    tab_w = 220
-    d.rounded_rectangle([x+6, y+5, x+6+tab_w, y+tab_h], radius=5,
-                         fill=rgb(BRAVE_TAB_A))
-    d.ellipse([x+14, y+10, x+22, y+18], fill=rgb(RED))  # favicon
-    d.text((x+27, y+9), "legendarymsr/legenddots", font=fn["sm"],
-           fill=rgb(FG2))
-    # close btn
-    d.text((x+6+tab_w-14, y+9), "×", font=fn["bar"], fill=rgb(DIM))
-
-    # toolbar
-    tool_y = y + tab_h
-    tool_h = 36
-    d.rectangle([x, tool_y, x+w-1, tool_y+tool_h], fill=rgb(BRAVE_BAR))
-    # nav buttons
-    for bi, sym in enumerate(["←", "→", "↺"]):
-        d.text((x+8+bi*22, tool_y+9), sym, font=fn["bar"],
-               fill=rgb(DIM if bi < 2 else FG2))
-    # url bar
-    ux0, ux1 = x+76, x+w-80
-    d.rounded_rectangle([ux0, tool_y+6, ux1, tool_y+tool_h-6], radius=4,
-                         fill=rgb(BRAVE_URL))
-    # lock icon + url
-    d.text((ux0+8, tool_y+11), "🔒", font=fn["sm"], fill=rgb(GREEN))
-    d.text((ux0+26, tool_y+11), url, font=fn["url"], fill=rgb(FG2))
-    # brave shield icon
-    d.text((x+w-72, tool_y+9), "🦁", font=fn["sm"], fill=rgb(ORANGE))
-    # extensions + menu
-    d.text((x+w-48, tool_y+9), "⋮", font=fn["md"], fill=rgb(DIM))
-
-    return (x, tool_y+tool_h, w, h - tab_h - tool_h)
-
-# ── Icecat browser chrome ──────────────────────────────────────────────────
-ICAT_BG  = "#1c1b22"
-ICAT_TAB = "#2a2831"
-ICAT_URL = "#252329"
-
-def draw_icecat(d, fn, x, y, w, h, url="github.com/legendarymsr/legenddots"):
-    d.rectangle([x, y, x+w-1, y+h-1], fill=rgb(ICAT_BG))
-    # tab bar
-    tab_h = 30
-    d.rectangle([x, y, x+w-1, y+tab_h], fill=rgb(ICAT_BG))
-    tab_w = 220
-    d.rounded_rectangle([x+4, y+6, x+4+tab_w, y+tab_h+1], radius=6,
-                         fill=rgb(ICAT_TAB))
-    d.ellipse([x+12, y+12, x+22, y+22], fill=rgb(PURPLE))  # icecat favicon
-    d.text((x+27, y+11), "legendarymsr/legenddots", font=fn["sm"],
-           fill=rgb(FG2))
-    d.text((x+4+tab_w-14, y+11), "×", font=fn["bar"], fill=rgb(DIM))
-
-    # toolbar
-    tool_y = y + tab_h
-    tool_h = 34
-    d.rectangle([x, tool_y, x+w-1, tool_y+tool_h], fill=rgb(ICAT_BG))
-    d.line([x, tool_y+tool_h-1, x+w-1, tool_y+tool_h-1], fill=rgb(BORDER))
-    for bi, sym in enumerate(["←", "→", "↺"]):
-        d.text((x+8+bi*22, tool_y+8), sym, font=fn["bar"],
-               fill=rgb(DIM if bi < 2 else FG2))
-    ux0, ux1 = x+76, x+w-70
-    d.rounded_rectangle([ux0, tool_y+5, ux1, tool_y+tool_h-5], radius=4,
-                         fill=rgb(ICAT_URL))
-    d.text((ux0+8, tool_y+10), "🔒", font=fn["sm"], fill=rgb(GREEN))
-    d.text((ux0+26, tool_y+10), url, font=fn["url"], fill=rgb(FG2))
-    d.text((x+w-50, tool_y+8), "☰", font=fn["md"], fill=rgb(DIM))
-
-    return (x, tool_y+tool_h, w, h - tab_h - tool_h)
-
-# ── GitHub dark page content ───────────────────────────────────────────────
-FILES = [
-    ("📄", "flake.nix",              "NixOS flake entry",            "3 days ago"),
-    ("📄", "configuration.nix",      "NixOS stub",                   "3 days ago"),
-    ("📄", "home.nix",               "Home-manager entry",           "3 days ago"),
-    ("📁", "home/",                  "packages, nixvim",             "3 days ago"),
-    ("📄", "config.scm",             "Guix system config",           "1 day ago"),
-    ("📄", "home-configuration.scm", "Guix home (ratpoison, emacs)", "1 day ago"),
-    ("📄", "alacritty.toml",         "Tokyo Night, 95% opacity",     "5 days ago"),
-    ("📁", "hyprland/",              "Hyprland rice",                "2 days ago"),
-    ("📁", "i3/",                    "i3 rice",                      "2 days ago"),
-    ("📁", "niri/",                  "Niri rice",                    "2 days ago"),
-    ("📁", "screenshots/",           "Mockup screenshots",           "just now"),
-    ("📄", "README.md",              "Expand explanations",          "just now"),
-]
-
-def draw_github_page(d, fn, x, y, w, h):
-    # page bg
-    d.rectangle([x, y, x+w-1, y+h-1], fill=rgb(GH_BG))
-    px, py = x+12, y+10
-
-    # repo header
-    d.text((px, py), "legendarymsr", font=fn["gh_sm"], fill=rgb(GH_LINK))
-    tw = text_w(d, "legendarymsr", fn["gh_sm"])
-    d.text((px+tw, py), " / legenddots", font=fn["gh_lg"], fill=rgb(GH_FG))
-    py += 24
-
-    # badges
-    for badge, col in [("⭐ 0", YELLOW), ("MIT", GREEN), ("Tokyo Night", ACCENT)]:
-        bw = text_w(d, badge, fn["gh_sm"]) + 12
-        d.rounded_rectangle([px, py, px+bw, py+16], radius=3,
-                             fill=rgb(GH_BG3), outline=rgb(GH_BORDER), width=1)
-        d.text((px+6, py+2), badge, font=fn["gh_sm"], fill=rgb(col))
-        px += bw + 6
-    px = x+12
-    py += 22
-
-    # tabs (Code / Issues / PRs …)
-    tabs = ["< > Code", "Issues", "Pull requests", "Actions"]
-    for i, tab in enumerate(tabs):
-        tw = text_w(d, tab, fn["gh_sm"])
-        if i == 0:
-            d.text((px, py), tab, font=fn["gh_sm"], fill=rgb(GH_FG))
-            d.line([px, py+14, px+tw, py+14], fill=rgb(ORANGE), width=2)
-        else:
-            d.text((px, py), tab, font=fn["gh_sm"], fill=rgb(GH_FG2))
-        px += tw + 18
-    py += 22
-    px = x+12
-
-    # divider
-    d.line([x, py, x+w, py], fill=rgb(GH_BORDER))
-    py += 8
-
-    # branch info bar
-    d.rounded_rectangle([px, py, x+w-12, py+22], radius=4,
-                         fill=rgb(GH_BG2), outline=rgb(GH_BORDER), width=1)
-    d.text((px+8, py+4), "⎇  master", font=fn["gh_sm"], fill=rgb(GH_FG2))
-    d.text((px+90, py+4), "legendarymsr: Expand README with mockup screenshots",
-           font=fn["gh_sm"], fill=rgb(GH_FG))
-    d.text((x+w-60, py+4), "just now", font=fn["gh_sm"], fill=rgb(GH_FG2))
-    py += 28
-
-    # file list
-    row_h = 20
-    for icon, name, desc, age in FILES:
-        if py + row_h > y+h-8:
-            break
-        # row bg alternating subtle
-        d.rectangle([x, py-2, x+w-1, py+row_h-2], fill=rgb(GH_BG))
-        d.line([x, py+row_h-2, x+w, py+row_h-2], fill=rgb(GH_BORDER))
-        # icon + name
-        d.text((px, py), icon, font=fn["gh_sm"], fill=rgb(GH_FG2))
-        d.text((px+18, py), name, font=fn["gh_sm"], fill=rgb(GH_LINK))
-        # description (truncated)
-        desc_x = px + 200
-        d.text((desc_x, py), desc, font=fn["gh_sm"], fill=rgb(GH_FG2))
-        # age right-aligned
-        aw = text_w(d, age, fn["gh_sm"])
-        d.text((x+w-aw-12, py), age, font=fn["gh_sm"], fill=rgb(GH_FG2))
-        py += row_h
-
-# ── Wallpaper (minimal dark gradient) ─────────────────────────────────────
-def draw_wallpaper(d, x, y, w, h):
+# ── Wallpaper (dark Tokyo Night gradient) ──────────────────────────────────
+def wallpaper(img, x, y, w, h):
+    d = ImageDraw.Draw(img)
     for row in range(h):
-        t = row / h
-        r = int(26 + t*8)
-        g = int(27 + t*8)
-        b = int(46 + t*8)
+        t = row / max(h, 1)
+        r = int(0x16 + t * 0x08)
+        g = int(0x17 + t * 0x05)
+        b = int(0x2e + t * 0x08)
         d.line([x, y+row, x+w, y+row], fill=(r, g, b))
 
 # ══════════════════════════════════════════════════════════════════════════
-# Per-WM generators
+# WM bars
 # ══════════════════════════════════════════════════════════════════════════
 
-def gen_hyprland(path, os_name, wm_color, pkgs, browser_fn):
+def waybar(d, fn, active=1, accent=ACCENT, right_txt="  CPU 6%   RAM 3.4G   12:34 "):
+    """Hyprland / Niri waybar — rounded workspace pills."""
+    BAR_H = 30
+    d.rectangle([0, 0, W, BAR_H], fill=rgb(BG2))
+    # workspace pills
+    x = 10
+    for i in range(1, 6):
+        s = str(i)
+        active_ws = (i == active)
+        pill_w = 26
+        fill = accent if active_ws else BG4
+        d.rounded_rectangle([x, 5, x+pill_w, BAR_H-5], radius=5, fill=rgb(fill))
+        label_col = BG if active_ws else DIM
+        lw = tw(d, s, fn["bar"])
+        d.text((x + (pill_w-lw)//2, 8), s, font=fn["bar"], fill=rgb(label_col))
+        x += pill_w + 4
+    # center: active window title
+    title = "alacritty  —  zsh"
+    lw = tw(d, title, fn["bar"])
+    d.text(((W-lw)//2, 8), title, font=fn["bar"], fill=rgb(FG2))
+    # right modules
+    rw = tw(d, right_txt, fn["bar"])
+    d.text((W-rw-6, 8), right_txt, font=fn["bar"], fill=rgb(FG2))
+    return BAR_H
+
+def polybar(d, fn, active=1, accent=YELLOW):
+    """i3 polybar — powerline colour segments."""
+    BAR_H = 24
+    d.rectangle([0, 0, W, BAR_H], fill=rgb(BG))
+    # workspaces: solid coloured blocks
+    x = 0
+    for i in range(1, 6):
+        s = f"  {i}  "
+        lw = tw(d, s, fn["bar_b"])
+        active_ws = (i == active)
+        fill = accent if active_ws else BG3
+        d.rectangle([x, 0, x+lw, BAR_H], fill=rgb(fill))
+        d.text((x, 5), s, font=fn["bar_b"],
+               fill=rgb(BG if active_ws else DIM))
+        x += lw
+    # powerline arrow
+    sep = "▌"
+    sep_w = tw(d, sep, fn["pl"])
+    d.text((x, 0), sep, font=fn["pl"], fill=rgb(BG3))
+    x += sep_w
+    # window title
+    d.text((x+6, 5), "alacritty  —  zsh", font=fn["bar"], fill=rgb(FG2))
+    # right modules
+    mods = [
+        ("  VOL 65%", DIM),
+        ("  CPU 8% ", DIM),
+        ("  MEM 4G ", DIM),
+        (f"  12:34 ", accent),
+    ]
+    rx = W
+    for txt, col in reversed(mods):
+        rw = tw(d, txt, fn["bar"])
+        rx -= rw
+        seg_col = accent if col == accent else BG3
+        d.rectangle([rx, 0, rx+rw, BAR_H], fill=rgb(seg_col))
+        d.text((rx, 5), txt, font=fn["bar"],
+               fill=rgb(BG if col == accent else FG2))
+    return BAR_H
+
+def ratpoison_bar(d, fn):
+    """Ratpoison status bar — 14px plain text, completely minimal."""
+    BAR_H = 14
+    d.rectangle([0, 0, W, BAR_H], fill=rgb(BG3))
+    d.text((4, 1), "ratpoison 1.4.9", font=fn["tiny"], fill=rgb(DIM))
+    d.text((W-52, 1), "12:34", font=fn["tiny"], fill=rgb(FG2))
+    return BAR_H
+
+# ══════════════════════════════════════════════════════════════════════════
+# Window frames
+# ══════════════════════════════════════════════════════════════════════════
+
+def hyprland_window(d, fn, x, y, w, h, title, accent):
+    """Rounded corners, 2px coloured border, 24px title bar with traffic lights."""
+    r = 10
+    # border (drawn as outline)
+    d.rounded_rectangle([x, y, x+w, y+h], radius=r,
+                         outline=rgb(accent), width=2, fill=rgb(BG2))
+    # title bar area
+    TITLE_H = 24
+    d.rounded_rectangle([x+2, y+2, x+w-2, y+TITLE_H+2], radius=r-1, fill=rgb(BG3))
+    d.rectangle([x+2, y+TITLE_H//2, x+w-2, y+TITLE_H+2], fill=rgb(BG3))
+    # traffic lights
+    for ci, col in enumerate([RED, YELLOW, GREEN]):
+        cx = x + 14 + ci*16
+        d.ellipse([cx-5, y+7, cx+5, y+17], fill=rgb(col))
+    # title text
+    lw = tw(d, title, fn["title"])
+    d.text((x + (w-lw)//2, y+6), title, font=fn["title"], fill=rgb(DIM))
+    # content area (clear to BG)
+    d.rectangle([x+2, y+TITLE_H+2, x+w-2, y+h-2], fill=rgb(BG))
+    return x+4, y+TITLE_H+4, w-8, h-TITLE_H-6
+
+def i3_window(d, fn, x, y, w, h, title, accent, active=True):
+    """Sharp corners, solid 2px border, 22px title bar with title text."""
+    TITLE_H = 22
+    border_col = accent if active else BORDER
+    # outer border
+    d.rectangle([x, y, x+w, y+h], outline=rgb(border_col), width=2, fill=rgb(BG2))
+    # title bar
+    title_bg = BG3 if active else BG2
+    d.rectangle([x+2, y+2, x+w-2, y+TITLE_H], fill=rgb(title_bg))
+    # 3px accent line at top of title
+    d.rectangle([x+2, y+2, x+w-2, y+4], fill=rgb(border_col))
+    # title text centred
+    lw = tw(d, title, fn["title"])
+    d.text((x + (w-lw)//2, y+7), title, font=fn["title"],
+           fill=rgb(FG2 if active else DIM))
+    # content area
+    d.rectangle([x+2, y+TITLE_H, x+w-2, y+h-2], fill=rgb(BG))
+    return x+4, y+TITLE_H+2, w-8, h-TITLE_H-4
+
+def ratpoison_window(d, x, y, w, h):
+    """No chrome at all — content fills the rectangle."""
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+    return x+2, y+2, w-4, h-4
+
+# ══════════════════════════════════════════════════════════════════════════
+# Terminal content — fastfetch + ls output
+# ══════════════════════════════════════════════════════════════════════════
+
+NIXOS_ART = [
+    r"  \\  //  ",
+    r"  _\\//_  ",
+    r" /  \\/  \\ ",
+    r"|   /  \   |",
+    r" \  \\//  / ",
+    r"  ¯\\/¯   ",
+    r"  //  \\  ",
+]
+ARCH_ART = [
+    r"      /\      ",
+    r"     /  \     ",
+    r"    / /\ \    ",
+    r"   / /  \ \   ",
+    r"  / / /\ \ \  ",
+    r" /_/_/  \_\_\ ",
+    r"              ",
+]
+GUIX_ART = [
+    r"  _________  ",
+    r" /  _______ \ ",
+    r"| | GNU     | |",
+    r"| | Guix    | |",
+    r"| |_________| |",
+    r" \_________/  ",
+    r"              ",
+]
+
+LS_OUTPUT = [
+    ("flake.nix",            GREEN),
+    ("configuration.nix",    GREEN),
+    ("home.nix",             GREEN),
+    ("config.scm",           GREEN),
+    ("alacritty.toml",       GREEN),
+    ("home/",                CYAN),
+    ("hyprland/",            CYAN),
+    ("i3/",                  CYAN),
+    ("niri/",                CYAN),
+    ("screenshots/",         CYAN),
+    ("README.md",            FG2),
+    ("manifesto/",           CYAN),
+]
+COLOR_BLOCKS = [RED, GREEN, YELLOW, ACCENT, PURPLE, CYAN, FG2, DIM]
+
+def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
+    art_map   = {"NixOS": (NIXOS_ART, ACCENT),
+                 "GNU Guix": (GUIX_ART, GREEN),
+                 "Arch Linux": (ARCH_ART, CYAN)}
+    logo, col = art_map.get(os_name, (ARCH_ART, CYAN))
+
+    lh = 14   # line height
+    x, y = cx, cy
+
+    # logo
+    for line in logo:
+        d.text((x, y), line, font=fn["mono_b"], fill=rgb(col))
+        y += lh
+
+    # info block starts at logo top
+    ix = cx + 125
+    iy = cy
+    def iline(key, val, kc=CYAN, vc=FG):
+        nonlocal iy
+        d.text((ix,    iy), key, font=fn["mono_b"], fill=rgb(kc))
+        d.text((ix+68, iy), val, font=fn["mono_r"], fill=rgb(vc))
+        iy += lh
+
+    d.text((ix, iy), "user@legend", font=fn["mono_b"], fill=rgb(col)); iy += lh
+    d.text((ix, iy), "──────────────────", font=fn["mono_r"], fill=rgb(BORDER)); iy += lh
+    iline("OS",     os_name)
+    iline("Host",   "legend-box")
+    iline("Kernel", "6.6.30-zen1")
+    iline("WM",     wm)
+    iline("Pkgs",   pkgs)
+    iline("Shell",  "zsh 5.9")
+    iline("Term",   "Alacritty")
+    iline("Font",   "MononokiNF 12")
+    iline("Theme",  "Tokyo Night")
+    iy += 4
+    for bi, bc in enumerate(COLOR_BLOCKS):
+        bx = ix + bi*15
+        d.rounded_rectangle([bx, iy, bx+11, iy+9], radius=2, fill=rgb(bc))
+    iy += 18
+
+    # shell prompt
+    prompt = "user@legend"
+    path   = " ~/legenddots"
+    git    = " git:(master)"
+    cur    = " ❯ "
+    px = cx
+    d.text((px, iy), prompt, font=fn["mono_b"], fill=rgb(GREEN)); px += tw(d,prompt,fn["mono_b"])
+    d.text((px, iy), path,   font=fn["mono_b"], fill=rgb(CYAN));  px += tw(d,path,  fn["mono_b"])
+    d.text((px, iy), git,    font=fn["mono_b"], fill=rgb(PURPLE));px += tw(d,git,   fn["mono_b"])
+    d.text((px, iy), cur,    font=fn["mono_b"], fill=rgb(FG2));   px += tw(d,cur,   fn["mono_b"])
+    d.text((px, iy), "ls",   font=fn["mono_r"], fill=rgb(FG))
+    iy += lh + 3
+
+    # ls output in 2 columns
+    col_w = (cw - cx - 4) // 2
+    lx1 = cx
+    lx2 = cx + col_w
+    for i, (name, fc) in enumerate(LS_OUTPUT):
+        if iy > cy + ch - lh:
+            break
+        lx = lx1 if i % 2 == 0 else lx2
+        if i % 2 == 1:
+            d.text((lx, iy - lh), name, font=fn["mono_r"], fill=rgb(fc))
+        else:
+            d.text((lx, iy), name, font=fn["mono_r"], fill=rgb(fc))
+            if i % 2 == 0 and i + 1 >= len(LS_OUTPUT):
+                iy += lh
+        if i % 2 == 1:
+            pass
+        else:
+            iy += lh
+
+    iy += 4
+    # second prompt (blinking cursor)
+    if iy < cy + ch - lh:
+        px = cx
+        d.text((px, iy), prompt, font=fn["mono_b"], fill=rgb(GREEN)); px += tw(d,prompt,fn["mono_b"])
+        d.text((px, iy), path,   font=fn["mono_b"], fill=rgb(CYAN));  px += tw(d,path,  fn["mono_b"])
+        d.text((px, iy), git,    font=fn["mono_b"], fill=rgb(PURPLE));px += tw(d,git,   fn["mono_b"])
+        d.text((px, iy), cur,    font=fn["mono_b"], fill=rgb(FG2))
+        iy += lh
+        # blinking block cursor
+        d.rectangle([px + tw(d,cur,fn["mono_b"]), iy-lh+2,
+                     px + tw(d,cur,fn["mono_b"])+8, iy-2], fill=rgb(FG))
+
+# ══════════════════════════════════════════════════════════════════════════
+# Brave browser (Chromium-style)
+# ══════════════════════════════════════════════════════════════════════════
+BRAVE_CHR = "#1e2030"   # chrome bg
+BRAVE_TAB = "#24283b"   # active tab
+BRAVE_URL = "#292e42"   # url bar
+
+def draw_brave(d, fn, x, y, w, h):
+    # full chrome bg
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BRAVE_CHR))
+
+    # ── tab bar (28px) ────────────────────────────────────────────────────
+    TB_H = 28
+    # inactive tab area bg
+    d.rectangle([x, y, x+w, y+TB_H], fill=rgb(BRAVE_CHR))
+
+    # active tab — Chrome-style: flat top, rounded bottom corners meeting bar
+    tab_w = 210
+    tx0, tx1 = x+6, x+6+tab_w
+    ty0, ty1 = y+4, y+TB_H+2   # extends below bar boundary
+    # draw the tab shape as a rounded-top rectangle
+    d.rounded_rectangle([tx0, ty0, tx1, ty1], radius=6, fill=rgb(BRAVE_TAB))
+    # flat bottom connector (overlap with the content area)
+    d.rectangle([tx0, ty0+6, tx1, ty1], fill=rgb(BRAVE_TAB))
+
+    # favicon (red circle = brave logo placeholder)
+    d.ellipse([tx0+8, ty0+7, tx0+20, ty0+19], fill=rgb(ORANGE))
+    # tab title
+    d.text((tx0+26, ty0+8), "legendarymsr/legenddots", font=fn["sm"],
+           fill=rgb(FG2))
+    # close btn
+    d.text((tx1-16, ty0+7), "×", font=fn["bar"], fill=rgb(DIM))
+    # new tab + button
+    d.text((tx1+8, y+8), "+", font=fn["bar"], fill=rgb(DIM))
+
+    y += TB_H
+
+    # ── navigation bar (34px) ─────────────────────────────────────────────
+    NAV_H = 34
+    d.rectangle([x, y, x+w, y+NAV_H], fill=rgb(BRAVE_CHR))
+    # nav buttons: ← → ↺
+    nx = x+8
+    for sym, active in [("←", False), ("→", False), ("↺", True)]:
+        col = FG2 if active else DIM
+        d.text((nx, y+9), sym, font=fn["bar"], fill=rgb(col))
+        nx += 22
+    # url bar
+    ux0, ux1 = x+76, x+w-90
+    d.rounded_rectangle([ux0, y+6, ux1, y+NAV_H-6], radius=4,
+                         fill=rgb(BRAVE_URL))
+    d.text((ux0+10, y+11), "🔒  github.com/legendarymsr/legenddots",
+           font=fn["url"], fill=rgb(FG2))
+    # right icons: star bookmark, brave shield, extensions, menu
+    ri = x+w-84
+    for sym in ["☆", "🛡", "⊞", "⋮"]:
+        d.text((ri, y+9), sym, font=fn["bar"], fill=rgb(DIM))
+        ri += 20
+
+    y += NAV_H
+    # content area bg = GitHub dark
+    d.rectangle([x, y, x+w, y+h], fill=rgb(GH_BG))
+    return x, y, w, h - TB_H - NAV_H
+
+# ══════════════════════════════════════════════════════════════════════════
+# IceCat browser (Firefox-style)
+# ══════════════════════════════════════════════════════════════════════════
+ICAT_CHR = "#1c1b22"
+ICAT_TAB = "#2a2831"
+ICAT_URL = "#252329"
+
+def draw_icecat(d, fn, x, y, w, h):
+    d.rectangle([x, y, x+w, y+h], fill=rgb(ICAT_CHR))
+
+    # ── tab bar (30px) — Firefox-style flat tabs ──────────────────────────
+    TB_H = 30
+    d.rectangle([x, y, x+w, y+TB_H], fill=rgb(ICAT_CHR))
+    # Firefox-style: tab bar has a bottom border, tabs are more rectangular
+    tab_w = 210
+    tx0, tx1 = x+4, x+4+tab_w
+    # active tab: slightly rounded top only, flat bottom
+    d.rounded_rectangle([tx0, y+5, tx1, y+TB_H+1], radius=4, fill=rgb(ICAT_TAB))
+    d.rectangle([tx0, y+TB_H-4, tx1, y+TB_H+1], fill=rgb(ICAT_TAB))
+    # bright bottom line for active tab (Firefox Proton style)
+    d.rectangle([tx0+2, y+TB_H-1, tx1-2, y+TB_H], fill=rgb(PURPLE))
+    # favicon (icecat — purple gnu)
+    d.ellipse([tx0+8, y+9, tx0+20, y+21], fill=rgb(PURPLE))
+    d.text((tx0+26, y+10), "legendarymsr/legenddots", font=fn["sm"], fill=rgb(FG2))
+    d.text((tx1-16, y+10), "×", font=fn["bar"], fill=rgb(DIM))
+    # new tab button
+    d.text((tx1+8, y+10), "+", font=fn["bar"], fill=rgb(DIM))
+    # browser controls: on LEFT of tab bar (Firefox puts them differently)
+    # actually Firefox has the tab bar above the toolbar
+
+    y += TB_H
+
+    # ── toolbar (32px) — Firefox puts URL bar in second row ───────────────
+    TOOL_H = 32
+    d.rectangle([x, y, x+w, y+TOOL_H], fill=rgb(ICAT_CHR))
+    d.line([x, y, x+w, y], fill=rgb(BORDER))
+    # nav buttons — smaller, on left
+    nx = x+8
+    for sym, en in [("←", False), ("→", False), ("↺", True)]:
+        d.text((nx, y+8), sym, font=fn["bar"], fill=rgb(FG2 if en else DIM))
+        nx += 20
+    # URL bar — full width (Firefox style, wider than Chrome)
+    ux0, ux1 = x+72, x+w-50
+    d.rounded_rectangle([ux0, y+5, ux1, y+TOOL_H-5], radius=4,
+                         fill=rgb(ICAT_URL), outline=rgb(PURPLE), width=1)
+    d.text((ux0+10, y+10), "🔒  github.com/legendarymsr/legenddots",
+           font=fn["url"], fill=rgb(FG2))
+    # right: bookmarks, library, hamburger
+    ri = x+w-44
+    for sym in ["☆", "≡"]:
+        d.text((ri, y+9), sym, font=fn["md"], fill=rgb(DIM))
+        ri += 22
+
+    y += TOOL_H
+    d.rectangle([x, y, x+w, y+h], fill=rgb(GH_BG))
+    return x, y, w, h - TB_H - TOOL_H
+
+# ══════════════════════════════════════════════════════════════════════════
+# GitHub dark page
+# ══════════════════════════════════════════════════════════════════════════
+FILES = [
+    ("flake.nix",              "NixOS flake",            "3 days ago"),
+    ("configuration.nix",      "NixOS stub",             "3 days ago"),
+    ("home.nix",               "Home-manager entry",     "3 days ago"),
+    ("home/",                  "packages, nixvim",       "3 days ago"),
+    ("config.scm",             "Guix system config",     "1 day ago"),
+    ("home-configuration.scm", "Guix home (ratpoison)",  "1 day ago"),
+    ("alacritty.toml",         "Tokyo Night, 95% opacity","5 days ago"),
+    ("hyprland/",              "Hyprland rice",          "2 days ago"),
+    ("i3/",                    "i3 rice",                "2 days ago"),
+    ("niri/",                  "Niri rice",              "2 days ago"),
+    ("screenshots/",           "Mockup screenshots",     "just now"),
+    ("README.md",              "Expand explanations",    "just now"),
+]
+
+def draw_github(d, fn, x, y, w, h):
+    d.rectangle([x, y, x+w, y+h], fill=rgb(GH_BG))
+    px, py = x+14, y+12
+
+    # repo path
+    d.text((px, py), "legendarymsr", font=fn["gh_sm"], fill=rgb(GH_LNK))
+    ow = tw(d, "legendarymsr", fn["gh_sm"])
+    d.text((px+ow, py), " / ", font=fn["gh_sm"], fill=rgb(GH_FG2))
+    d.text((px+ow+14, py), "legenddots", font=fn["gh_lg"], fill=rgb(GH_FG))
+    py += 22
+
+    # badges
+    for badge, bc in [("⭐ 0", YELLOW), ("MIT", GREEN), ("Tokyo Night", ACCENT)]:
+        bw = tw(d, badge, fn["gh_sm"]) + 14
+        d.rounded_rectangle([px, py, px+bw, py+16], radius=3,
+                             fill=rgb(GH_BG3), outline=rgb(GH_BDR), width=1)
+        d.text((px+7, py+2), badge, font=fn["gh_sm"], fill=rgb(bc))
+        px += bw + 6
+    px = x+14
+    py += 22
+
+    # tabs
+    for i, tab in enumerate(["< > Code", "Issues", "Pull requests", "Actions", "Settings"]):
+        tw_ = tw(d, tab, fn["gh_sm"])
+        if i == 0:
+            d.text((px, py), tab, font=fn["gh_sm"], fill=rgb(GH_FG))
+            d.line([px, py+14, px+tw_, py+14], fill=rgb(ORANGE), width=2)
+        else:
+            d.text((px, py), tab, font=fn["gh_sm"], fill=rgb(GH_FG2))
+        px += tw_ + 18
+    py += 20
+    px = x+14
+
+    d.line([x, py, x+w, py], fill=rgb(GH_BDR))
+    py += 8
+
+    # branch bar
+    d.rounded_rectangle([px, py, x+w-14, py+22], radius=4,
+                         fill=rgb(GH_BG2), outline=rgb(GH_BDR), width=1)
+    d.text((px+8, py+4), "⎇  master", font=fn["gh_sm"], fill=rgb(GH_FG2))
+    msg = "legendarymsr: Redesign mockups with realistic WM layouts"
+    d.text((px+90, py+4), msg, font=fn["gh_sm"], fill=rgb(GH_FG))
+    d.text((x+w-68, py+4), "just now", font=fn["gh_sm"], fill=rgb(GH_FG2))
+    py += 30
+
+    # file list
+    ROW_H = 20
+    for name, desc, age in FILES:
+        if py + ROW_H > y + h - 4:
+            break
+        d.line([x, py-1, x+w, py-1], fill=rgb(GH_BDR))
+        icon = "📁" if name.endswith("/") else "📄"
+        d.text((px, py+1), icon, font=fn["gh_sm"], fill=rgb(GH_FG2))
+        d.text((px+18, py+1), name, font=fn["gh_sm"], fill=rgb(GH_LNK))
+        d.text((px+200, py+1), desc, font=fn["gh_sm"], fill=rgb(GH_FG2))
+        aw = tw(d, age, fn["gh_sm"])
+        d.text((x+w-aw-14, py+1), age, font=fn["gh_sm"], fill=rgb(GH_FG2))
+        py += ROW_H
+
+    # README preview below file list
+    if py + 30 < y + h:
+        d.line([x, py, x+w, py], fill=rgb(GH_BDR))
+        py += 8
+        readme = [
+            (ACCENT, "# legenddots"),
+            (FG2,    "Personal dotfiles for NixOS, Guix, and Arch Linux."),
+            (FG2,    "Theme: Tokyo Night throughout."),
+        ]
+        for rc, rl in readme:
+            if py + 14 > y + h:
+                break
+            d.text((px, py), rl, font=fn["gh_sm"], fill=rgb(rc))
+            py += 14
+
+# ══════════════════════════════════════════════════════════════════════════
+# Font registry
+# ══════════════════════════════════════════════════════════════════════════
+def make_fonts():
+    return {
+        "bar":    fnt(SANS,   11),
+        "bar_b":  fnt(SANS_B, 11),
+        "pl":     fnt(SANS_B, 18),   # powerline separators
+        "title":  fnt(SANS,   10),
+        "tiny":   fnt(SANS,   9),
+        "sm":     fnt(SANS,   10),
+        "md":     fnt(SANS,   13),
+        "lg":     fnt(SANS_B, 14),
+        "url":    fnt(SANS,   10),
+        "mono_b": fnt(MONO,   12),
+        "mono_r": fnt(MONO_R, 12),
+        "gh_sm":  fnt(SANS,   11),
+        "gh_md":  fnt(SANS,   12),
+        "gh_lg":  fnt(SANS_B, 14),
+    }
+
+# ══════════════════════════════════════════════════════════════════════════
+# Per-WM image generators
+# ══════════════════════════════════════════════════════════════════════════
+
+GAP   = 8
+TW    = 490  # terminal window width
+
+def gen_hyprland(outpath, os_name, accent, pkgs, browser_fn):
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
-    fn  = fonts()
+    fn  = make_fonts()
 
-    bar_h = 28
-    draw_waybar(d, fn, 0, bar_h, 1, wm_color,
-                right=f"  CPU 6%  RAM 3.4G  12:34  2026-05-05 ")
-
-    # desktop wallpaper strip below bar
-    draw_wallpaper(d, 0, bar_h, W, H-bar_h)
+    bar_h = waybar(d, fn, accent=accent)
+    wallpaper(img, 0, bar_h, W, H-bar_h)
 
     # terminal window
-    tx = GAP
-    ty = bar_h + GAP
-    tw = TERM_W
-    th = H - bar_h - GAP*2
-    cx, cy, cw, ch = draw_window(d, fn, tx, ty, tw, th,
-                                 "alacritty  —  zsh", wm_color, rounded=True)
-    d.rectangle([cx, cy, cx+cw-1, cy+ch-1], fill=rgb(BG))
-    draw_fastfetch(d, fn, cx+4, cy+4, cw-8, ch-8, os_name, "Hyprland", pkgs)
+    tx, ty = GAP, bar_h+GAP
+    tw_, th = TW, H-bar_h-GAP*2
+    cx, cy, cw, ch = hyprland_window(d, fn, tx, ty, tw_, th,
+                                      "alacritty  —  zsh", accent)
+    draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "Hyprland", pkgs)
 
     # browser window
-    bx = GAP*2 + TERM_W
-    by = bar_h + GAP
-    bw = W - bx - GAP
-    bh = H - bar_h - GAP*2
-    draw_window(d, fn, bx, by, bw, bh, "Brave", wm_color, rounded=True, titled=False)
-    pcx, pcy, pcw, pch = browser_fn(d, fn, bx+1, by+1, bw-2, bh-2)
-    draw_github_page(d, fn, pcx, pcy, pcw, pch)
+    bx = GAP*2+TW
+    bw = W-bx-GAP
+    hyprland_window(d, fn, bx, ty, bw, th, "Brave", accent, )
+    pcx, pcy, pcw, pch = browser_fn(d, fn, bx+2, ty+2, bw-4, th-4)
+    draw_github(d, fn, pcx, pcy, pcw, pch)
 
-    img.save(path)
-    print(f"  {path}")
+    img.save(outpath)
+    print(f"  {outpath}")
 
 
-def gen_i3(path, os_name, wm_color, pkgs):
+def gen_i3(outpath, os_name, accent, pkgs):
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
-    fn  = fonts()
+    fn  = make_fonts()
 
-    bar_h = 24
-    draw_polybar(d, fn, 0, bar_h, 1, wm_color)
+    # polybar
+    bar_h = polybar(d, fn, accent=accent)
+    wallpaper(img, 0, bar_h, W, H-bar_h)
 
-    # i3 windows — no rounded corners, visible border, gaps
-    tx = GAP
-    ty = bar_h + GAP
-    tw = TERM_W
-    th = H - bar_h - GAP*2
-    # border
-    d.rectangle([tx-2, ty-2, tx+tw+1, ty+th+1], fill=rgb(wm_color))
-    d.rectangle([tx, ty, tx+tw-1, ty+th-1], fill=rgb(BG))
-    draw_fastfetch(d, fn, tx+6, ty+6, tw-12, th-12, os_name, "i3", pkgs)
+    SMALL_GAP = 4
+    tx, ty = SMALL_GAP, bar_h+SMALL_GAP
+    tw_, th = TW+GAP, H-bar_h-SMALL_GAP*2
 
-    bx = GAP*2 + TERM_W
-    by = bar_h + GAP
-    bw = W - bx - GAP
-    bh = H - bar_h - GAP*2
-    d.rectangle([bx-2, by-2, bx+bw+1, by+bh+1], fill=rgb(wm_color))
-    d.rectangle([bx, by, bx+bw-1, by+bh-1], fill=rgb(BG))
-    pcx, pcy, pcw, pch = draw_brave(d, fn, bx, by, bw, bh)
-    draw_github_page(d, fn, pcx, pcy, pcw, pch)
+    # terminal window — sharp
+    cx, cy, cw, ch = i3_window(d, fn, tx, ty, tw_, th,
+                                "alacritty  —  zsh", accent, active=True)
+    draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "i3", pkgs)
 
-    img.save(path)
-    print(f"  {path}")
+    # browser window — sharp
+    bx = SMALL_GAP*2+TW+GAP
+    bw = W-bx-SMALL_GAP
+    bh = th
+    cx2, cy2, cw2, ch2 = i3_window(d, fn, bx, ty, bw, bh,
+                                    "Brave  —  github.com", accent, active=False)
+    pcx, pcy, pcw, pch = draw_brave(d, fn, cx2, cy2, cw2, ch2)
+    draw_github(d, fn, pcx, pcy, pcw, pch)
+
+    img.save(outpath)
+    print(f"  {outpath}")
 
 
-def gen_niri(path, os_name, wm_color, pkgs):
+def gen_niri(outpath, os_name, accent, pkgs):
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
-    fn  = fonts()
+    fn  = make_fonts()
 
-    bar_h = 28
-    draw_waybar(d, fn, 0, bar_h, 1, wm_color,
-                right="  CPU 4%  RAM 2.9G  12:34  2026-05-05 ")
-    draw_wallpaper(d, 0, bar_h, W, H-bar_h)
+    bar_h = waybar(d, fn, accent=accent,
+                   right_txt="  Niri   CPU 4%   RAM 2.9G   12:34 ")
+    wallpaper(img, 0, bar_h, W, H-bar_h)
 
-    # Niri: columns with gaps, rounded
-    tx = GAP
-    ty = bar_h + GAP
-    tw = TERM_W
-    th = H - bar_h - GAP*2
-    cx, cy, cw, ch = draw_window(d, fn, tx, ty, tw, th,
-                                 "alacritty  —  zsh", wm_color, rounded=True)
-    d.rectangle([cx, cy, cx+cw-1, cy+ch-1], fill=rgb(BG))
-    draw_fastfetch(d, fn, cx+4, cy+4, cw-8, ch-8, os_name, "Niri", pkgs)
+    # Niri: column layout hint — show arrow on right edge
+    tx, ty = GAP, bar_h+GAP
+    tw_, th = TW, H-bar_h-GAP*2
+    cx, cy, cw, ch = hyprland_window(d, fn, tx, ty, tw_, th,
+                                      "alacritty  —  zsh", accent)
+    draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "Niri", pkgs)
 
-    bx = GAP*2 + TERM_W
-    by = bar_h + GAP
-    bw = W - bx - GAP
-    bh = H - bar_h - GAP*2
-    draw_window(d, fn, bx, by, bw, bh, "Brave", wm_color, rounded=True, titled=False)
-    pcx, pcy, pcw, pch = draw_brave(d, fn, bx+1, by+1, bw-2, bh-2)
-    draw_github_page(d, fn, pcx, pcy, pcw, pch)
+    bx = GAP*2+TW
+    bw = W-bx-GAP
+    # scroll indicator — subtle arrow hinting at more columns →
+    d.text((W-20, H//2-10), "›", font=fnt(SANS_B, 28), fill=rgb(DIM))
+    hyprland_window(d, fn, bx, ty, bw-24, th, "Brave", accent)
+    pcx, pcy, pcw, pch = draw_brave(d, fn, bx+2, ty+2, bw-28, th-4)
+    draw_github(d, fn, pcx, pcy, pcw, pch)
 
-    img.save(path)
-    print(f"  {path}")
+    img.save(outpath)
+    print(f"  {outpath}")
 
 
-def gen_ratpoison(path, os_name, wm_color, pkgs):
-    """Ratpoison: no gaps, no decorations, just a split + thin status bar."""
+def gen_ratpoison(outpath, os_name, pkgs):
+    """Ratpoison: no WM chrome whatsoever. Windows are raw rectangles."""
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
-    fn  = fonts()
+    fn  = make_fonts()
 
-    # ratpoison status bar at the top (very minimal)
-    bar_h = 18
-    d.rectangle([0, 0, W-1, bar_h-1], fill=rgb(BG3))
-    d.text((6, 3), "ratpoison 1.4.9", font=fn["sm"], fill=rgb(DIM))
-    d.text((W-80, 3), "12:34", font=fn["sm"], fill=rgb(FG2))
+    bar_h = ratpoison_bar(d, fn)
 
-    # two windows split exactly 50/50, no gaps, no borders
+    # two windows split 50/50, no gaps, no borders
     split = W // 2
-    # left = terminal
-    d.rectangle([0, bar_h, split-1, H-1], fill=rgb(BG))
-    draw_fastfetch(d, fn, 8, bar_h+8, split-16, H-bar_h-16, os_name, "Ratpoison", pkgs)
+    # left — terminal
+    lx, ly, lw, lh = ratpoison_window(d, 0, bar_h, split, H-bar_h)
+    draw_terminal(d, fn, lx, ly, lw, lh, os_name, "Ratpoison", pkgs)
 
-    # thin divider
-    d.line([split, bar_h, split, H-1], fill=rgb(BORDER))
+    # 1px divider
+    d.line([split, bar_h, split, H], fill=rgb(BORDER))
 
-    # right = icecat browser
-    pcx, pcy, pcw, pch = draw_icecat(d, fn, split+1, bar_h, split-2, H-bar_h)
-    draw_github_page(d, fn, pcx, pcy, pcw, pch)
+    # right — icecat (no window frame, just browser chrome directly)
+    rx, ry, rw, rh = ratpoison_window(d, split+1, bar_h, W-split-1, H-bar_h)
+    pcx, pcy, pcw, pch = draw_icecat(d, fn, rx, ry, rw, rh)
+    draw_github(d, fn, pcx, pcy, pcw, pch)
 
-    img.save(path)
-    print(f"  {path}")
+    img.save(outpath)
+    print(f"  {outpath}")
 
 
-# ── Render all ─────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
 out = os.path.dirname(os.path.abspath(__file__))
 
 print("Generating...")
-gen_hyprland(os.path.join(out, "nixos-hyprland.png"),
-             "NixOS", ACCENT, "1842 (nix)", draw_brave)
-
-gen_ratpoison(os.path.join(out, "guix-ratpoison.png"),
-              "GNU Guix", GREEN, "312 (guix)")
-
-gen_niri(os.path.join(out, "arch-niri.png"),
-         "Arch Linux", PURPLE, "1203 (pacman)")
-
-gen_i3(os.path.join(out, "arch-i3.png"),
-       "Arch Linux", YELLOW, "1187 (pacman)")
-
-gen_hyprland(os.path.join(out, "arch-hyprland.png"),
-             "Arch Linux", RED, "1241 (pacman)", draw_brave)
-
+gen_hyprland(f"{out}/nixos-hyprland.png",  "NixOS",      ACCENT, "1842 (nix)",    draw_brave)
+gen_ratpoison(f"{out}/guix-ratpoison.png", "GNU Guix",             "312 (guix)")
+gen_niri(f"{out}/arch-niri.png",           "Arch Linux", PURPLE, "1203 (pacman)")
+gen_i3(f"{out}/arch-i3.png",              "Arch Linux", YELLOW, "1187 (pacman)")
+gen_hyprland(f"{out}/arch-hyprland.png",  "Arch Linux", RED,    "1241 (pacman)", draw_brave)
 print("done.")
