@@ -124,17 +124,27 @@ Install scripts symlink configs and back up any existing ones.
 
 ## Keybinds
 
-Arch rices (niri, i3, hyprland) use `Mod` (Super). Guix/ratpoison uses `C-t` as the prefix key instead.
+Arch rices (niri, i3, hyprland) use `Mod` (Super) for keybinds.
 
-| Key | Guix `C-t` equivalent | Action |
-|-----|-----------------------|--------|
-| `Mod+Return` | `C-t c` | Terminal |
-| `Mod+d` | `C-t d` | Launcher |
-| `Mod+b` | `C-t b` | Browser |
-| `Mod+q` | `C-t q` | Close window |
-| `Mod+hjkl` | `C-t n/p` | Focus |
-| `Mod+Shift+hjkl` | — | Move window |
-| `Mod+1-9` | — | Workspaces |
-| `Mod+Escape` | — | Lock screen |
-| `Mod+Shift+e` | `C-t Q` | Exit |
-| `Print` | `C-t Print` | Screenshot |
+Guix/ratpoison works differently — every bind goes through a **prefix key** (`C-t`, i.e. Ctrl+t), then a second key. There is no held modifier. Think of it like Tmux.
+
+| Action | Arch (`Mod+`) | Guix (`C-t` then) |
+|--------|--------------|-------------------|
+| Terminal | `Return` | `c` |
+| Launcher | `d` | `d` |
+| Browser | `b` | `b` |
+| Close window | `q` | `q` |
+| Focus left/right/up/down | `h/l/k/j` | `h/l/k/j` |
+| Move window | `Shift+hjkl` | `H/L/K/J` (uppercase) |
+| Switch workspace | `1-9` | `1-9` |
+| Move window to workspace | `Shift+1-9` | `!/@ /#/$/%/^/&/*/(`  (Shift+1-9) |
+| Lock screen | `Escape` | `Escape` |
+| Exit | `Shift+e` | `Q` |
+| Screenshot | `Print` | `Print` |
+
+### Ratpoison notes
+
+- **Workspaces are called groups** in ratpoison. `C-t 1` switches to group 1. Groups must exist before you can switch — ratpoison creates them on first use.
+- **Moving windows between groups**: `C-t !` moves the current window to group 1, `C-t @` to group 2, and so on (Shift+number).
+- **Lock screen** uses `slock` — a minimal suckless screen locker. Screen goes black, type password to unlock, no UI.
+- **Focus** is directional (`hjkl`) when windows are split, or use `C-t n`/`C-t p` to cycle through all windows.

@@ -37,6 +37,7 @@
 
           ;; browser
           "icecat"
+          "slock"
 
           ;; emacs
           "emacs"
@@ -148,17 +149,53 @@ bind d exec dmenu_run -fn 'monospace-11' -nb '#1a1b26' -nf '#c0caf5' -sb '#7aa2f
 bind e exec emacs
 bind b exec icecat
 
-# window management
+# focus
+bind h focusleft
+bind l focusright
+bind k focusup
+bind j focusdown
 bind n focusnext
 bind p focusprev
 bind Tab focusnext
+
+# move window
+bind H exchangeleft
+bind L exchangeright
+bind K exchangeup
+bind J exchangedown
+
+# workspaces (groups)
+bind 1 gselect 1
+bind 2 gselect 2
+bind 3 gselect 3
+bind 4 gselect 4
+bind 5 gselect 5
+bind 6 gselect 6
+bind 7 gselect 7
+bind 8 gselect 8
+bind 9 gselect 9
+
+# move window to group
+bind ! gmove 1
+bind @ gmove 2
+bind # gmove 3
+bind $ gmove 4
+bind % gmove 5
+bind ^ gmove 6
+bind & gmove 7
+bind * gmove 8
+bind ( gmove 9
+
+# lock screen
+bind Escape exec slock
+
+# splits
 bind s hsplit
 bind S vsplit
 bind r remove
 bind R ratrestart
 bind Q quit
 bind q delete
-bind k delete
 bind K kill
 
 # resize
