@@ -245,6 +245,74 @@ LS_OUTPUT = [
 ]
 COLOR_BLOCKS = [RED, GREEN, YELLOW, ACCENT, PURPLE, CYAN, FG2, DIM]
 
+NIX_CODE = [
+    ("{",                                                         FG),
+    ('  description = "legenddots — NixOS flake";',              GREEN),
+    ("",                                                          FG),
+    ("  inputs = {",                                              FG),
+    ("    nixpkgs.url =",                                         CYAN),
+    ('      "github:nixos/nixpkgs/nixos-unstable";',             GREEN),
+    ("    home-manager = {",                                      FG),
+    ('      url = "github:nix-community/home-manager";',         GREEN),
+    ('      inputs.nixpkgs.follows = "nixpkgs";',                GREEN),
+    ("    };",                                                    FG),
+    ('    nixvim.url = "github:nix-community/nixvim";',          GREEN),
+    ("  };",                                                      FG),
+    ("",                                                          FG),
+    ("  outputs = { self, nixpkgs, home-manager, nixvim, ... }:", FG),
+    ("  let",                                                     PURPLE),
+    ('    system = "x86_64-linux";',                             GREEN),
+    ("  in {",                                                    PURPLE),
+    ("    nixosConfigurations.legend-box =",                      CYAN),
+    ("      nixpkgs.lib.nixosSystem {",                           FG),
+    ("        inherit system;",                                   CYAN),
+    ("        modules = [",                                       FG),
+    ("          ./system.nix",                                    GREEN),
+    ("          home-manager.nixosModules.home-manager",          GREEN),
+    ("          nixvim.nixosModules.nixvim",                      GREEN),
+    ("        ];",                                                FG),
+    ("      };",                                                  FG),
+    ("  };",                                                      FG),
+    ("}",                                                         FG),
+]
+
+def draw_nvim_pane(d, fn, x, y, w, h, filename="flake.nix", code=None, accent=ACCENT):
+    """Neovim mockup with line numbers, syntax-coloured code, lualine statusbar."""
+    if code is None:
+        code = NIX_CODE
+    LUALINE_H = 18
+    LN_W = 34     # line-number column width
+
+    # background
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+
+    # lualine at bottom
+    sl_y = y + h - LUALINE_H
+    d.rectangle([x, sl_y, x+w, y+h], fill=rgb(BG3))
+    # mode pill
+    mode_txt = "  NORMAL  "
+    mw = tw(d, mode_txt, fn["bar_b"])
+    d.rectangle([x, sl_y, x+mw, y+h], fill=rgb(accent))
+    d.text((x, sl_y+3), mode_txt, font=fn["bar_b"], fill=rgb(BG))
+    # filename
+    d.text((x+mw+8, sl_y+3), filename, font=fn["bar"], fill=rgb(FG2))
+    # right: position
+    pos = "  1:1   80% "
+    pw = tw(d, pos, fn["bar"])
+    d.rectangle([x+w-pw, sl_y, x+w, y+h], fill=rgb(accent))
+    d.text((x+w-pw, sl_y+3), pos, font=fn["bar_b"], fill=rgb(BG))
+
+    # code lines
+    lh = 13
+    cy2 = y + 4
+    for i, (line, col) in enumerate(code):
+        if cy2 + lh > sl_y - 2:
+            break
+        ln = str(i + 1).rjust(3)
+        d.text((x+4, cy2), ln, font=fn["mono_r"], fill=rgb(DIM))
+        d.text((x+LN_W, cy2), line, font=fn["mono_r"], fill=rgb(col))
+        cy2 += lh
+
 def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
     art_map   = {"NixOS": (NIXOS_ART, ACCENT),
                  "GNU Guix": (GUIX_ART, GREEN),
@@ -259,7 +327,7 @@ def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
         d.text((x, y), line, font=fn["mono_b"], fill=rgb(col))
         y += lh
 
-    # info block starts at logo top
+    # info block (starts at same y as logo)
     ix = cx + 125
     iy = cy
     def iline(key, val, kc=CYAN, vc=FG):
@@ -285,50 +353,63 @@ def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
         d.rounded_rectangle([bx, iy, bx+11, iy+9], radius=2, fill=rgb(bc))
     iy += 18
 
-    # shell prompt
+    # cursor is at max(logo_end, info_end)
+    iy = max(y, iy)
+
+    # shell prompt + ls
     prompt = "user@legend"
     path   = " ~/legenddots"
     git    = " git:(master)"
     cur    = " ❯ "
-    px = cx
-    d.text((px, iy), prompt, font=fn["mono_b"], fill=rgb(GREEN)); px += tw(d,prompt,fn["mono_b"])
-    d.text((px, iy), path,   font=fn["mono_b"], fill=rgb(CYAN));  px += tw(d,path,  fn["mono_b"])
-    d.text((px, iy), git,    font=fn["mono_b"], fill=rgb(PURPLE));px += tw(d,git,   fn["mono_b"])
-    d.text((px, iy), cur,    font=fn["mono_b"], fill=rgb(FG2));   px += tw(d,cur,   fn["mono_b"])
-    d.text((px, iy), "ls",   font=fn["mono_r"], fill=rgb(FG))
-    iy += lh + 3
 
-    # ls output in 2 columns
-    col_w = (cw - cx - 4) // 2
-    lx1 = cx
-    lx2 = cx + col_w
-    for i, (name, fc) in enumerate(LS_OUTPUT):
-        if iy > cy + ch - lh:
-            break
-        lx = lx1 if i % 2 == 0 else lx2
-        if i % 2 == 1:
-            d.text((lx, iy - lh), name, font=fn["mono_r"], fill=rgb(fc))
-        else:
-            d.text((lx, iy), name, font=fn["mono_r"], fill=rgb(fc))
-            if i % 2 == 0 and i + 1 >= len(LS_OUTPUT):
-                iy += lh
-        if i % 2 == 1:
-            pass
-        else:
-            iy += lh
-
-    iy += 4
-    # second prompt (blinking cursor)
-    if iy < cy + ch - lh:
+    def draw_prompt(cmd=""):
+        nonlocal iy
         px = cx
         d.text((px, iy), prompt, font=fn["mono_b"], fill=rgb(GREEN)); px += tw(d,prompt,fn["mono_b"])
         d.text((px, iy), path,   font=fn["mono_b"], fill=rgb(CYAN));  px += tw(d,path,  fn["mono_b"])
         d.text((px, iy), git,    font=fn["mono_b"], fill=rgb(PURPLE));px += tw(d,git,   fn["mono_b"])
-        d.text((px, iy), cur,    font=fn["mono_b"], fill=rgb(FG2))
+        d.text((px, iy), cur,    font=fn["mono_b"], fill=rgb(FG2));   px += tw(d,cur,   fn["mono_b"])
+        if cmd:
+            d.text((px, iy), cmd, font=fn["mono_r"], fill=rgb(FG))
         iy += lh
-        # blinking block cursor
-        d.rectangle([px + tw(d,cur,fn["mono_b"]), iy-lh+2,
-                     px + tw(d,cur,fn["mono_b"])+8, iy-2], fill=rgb(FG))
+        return px + tw(d, cur, fn["mono_b"])
+
+    draw_prompt("ls")
+    iy += 3
+
+    # ls in 2 columns
+    half = len(LS_OUTPUT) // 2 + len(LS_OUTPUT) % 2
+    col_w = cw // 2
+    for i in range(half):
+        if iy > cy + ch - lh * 8:
+            break
+        name_l, fc_l = LS_OUTPUT[i]
+        d.text((cx,        iy), name_l, font=fn["mono_r"], fill=rgb(fc_l))
+        if i + half < len(LS_OUTPUT):
+            name_r, fc_r = LS_OUTPUT[i + half]
+            d.text((cx+col_w, iy), name_r, font=fn["mono_r"], fill=rgb(fc_r))
+        iy += lh
+
+    iy += 3
+    cursor_x = draw_prompt()  # empty prompt with cursor
+    d.rectangle([cursor_x, iy-lh+2, cursor_x+8, iy-2], fill=rgb(FG))
+    iy += 4
+
+    # ── tmux split line + neovim pane ─────────────────────────────────────
+    remaining = (cy + ch) - iy
+    if remaining > 60:
+        TMUX_H = 16
+        # tmux status bar
+        d.rectangle([cx, iy, cx+cw, iy+TMUX_H], fill=rgb(BG3))
+        d.rectangle([cx, iy, cx+60, iy+TMUX_H], fill=rgb(GREEN))
+        d.text((cx+4, iy+2), "1:zsh", font=fn["tiny"], fill=rgb(BG))
+        d.rectangle([cx+62, iy, cx+120, iy+TMUX_H], fill=rgb(BG4))
+        d.text((cx+66, iy+2), "2:nvim", font=fn["tiny"], fill=rgb(FG2))
+        d.text((cx+cw-80, iy+2), "legend-box  12:34", font=fn["tiny"], fill=rgb(DIM))
+        iy += TMUX_H
+
+        # neovim fills the rest
+        draw_nvim_pane(d, fn, cx, iy, cw, cy+ch-iy, filename="flake.nix")
 
 # ══════════════════════════════════════════════════════════════════════════
 # Brave browser (Chromium-style)
@@ -530,17 +611,45 @@ def draw_github(d, fn, x, y, w, h):
     # README preview below file list
     if py + 30 < y + h:
         d.line([x, py, x+w, py], fill=rgb(GH_BDR))
-        py += 8
+        py += 10
         readme = [
-            (ACCENT, "# legenddots"),
-            (FG2,    "Personal dotfiles for NixOS, Guix, and Arch Linux."),
-            (FG2,    "Theme: Tokyo Night throughout."),
+            (ACCENT,  "# legenddots"),
+            (GH_FG2,  ""),
+            (GH_FG,   "Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: Tokyo Night throughout."),
+            (GH_FG2,  ""),
+            (YELLOW,  "## Screenshots"),
+            (GH_FG2,  ""),
+            (GREEN,   "## NixOS"),
+            (GH_FG,   "Fully declarative desktop — packages, services, users, Neovim config all in Nix."),
+            (GH_FG,   "Nothing installed imperatively. WM: Hyprland. Editor: NixVim. Shell: Zsh + starship."),
+            (GH_FG2,  ""),
+            (GREEN,   "## Guix"),
+            (GH_FG,   "Libre software only. GNU Guix enforces no proprietary blobs by policy."),
+            (GH_FG,   "WM: Ratpoison (prefix-key, tmux-like). Editor: Emacs. Browser: IceCat."),
+            (GH_FG,   "Hardened kernel, AppArmor, nftables, fail2ban, noexec mounts."),
+            (GH_FG2,  ""),
+            (GREEN,   "## Arch Rice"),
+            (GH_FG,   "Three self-contained rices — Niri (scrollable Wayland), i3 (X11), Hyprland (Wayland)."),
+            (GH_FG,   "Each has an install.sh that symlinks configs and backs up existing ones."),
+            (GH_FG2,  ""),
+            (YELLOW,  "## Keybinds"),
+            (GH_FG2,  "Arch rices use Mod (Super). Ratpoison uses a prefix key C-t like Tmux."),
+            (GH_FG2,  ""),
+            (GH_FG2,  "| Action          | Arch (Mod+)   | Guix (C-t then) |"),
+            (GH_BDR,  "|-----------------|---------------|-----------------|"),
+            (GH_FG2,  "| Terminal        | Return        | c               |"),
+            (GH_FG2,  "| Launcher        | d             | d               |"),
+            (GH_FG2,  "| Browser         | b             | b               |"),
+            (GH_FG2,  "| Close window    | Shift+q       | q               |"),
+            (GH_FG2,  "| Exit            | q             | Q               |"),
+            (GH_FG2,  "| Focus           | h/j/k/l       | h/j/k/l         |"),
+            (GH_FG2,  "| Workspace       | 1-9           | 1-9             |"),
         ]
         for rc, rl in readme:
-            if py + 14 > y + h:
+            if py + 13 > y + h:
                 break
             d.text((px, py), rl, font=fn["gh_sm"], fill=rgb(rc))
-            py += 14
+            py += 13
 
 # ══════════════════════════════════════════════════════════════════════════
 # Font registry
