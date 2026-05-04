@@ -4,6 +4,25 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 
 ---
 
+## Screenshots
+
+### NixOS — Hyprland
+![NixOS Hyprland](screenshots/nixos-hyprland.png)
+
+### Guix — Ratpoison
+![Guix Ratpoison](screenshots/guix-ratpoison.png)
+
+### Arch — Niri
+![Arch Niri](screenshots/arch-niri.png)
+
+### Arch — i3
+![Arch i3](screenshots/arch-i3.png)
+
+### Arch — Hyprland
+![Arch Hyprland](screenshots/arch-hyprland.png)
+
+---
+
 ## Browsers
 
 | Config | Browser |
