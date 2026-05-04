@@ -69,7 +69,7 @@ binds {
     Mod+Shift+q { close-window; }
     Mod+Shift+e { quit; }
     Mod+Shift+p { power-off-monitors; }
-    Mod+l { spawn "swaylock" "-c" "1a1b26"; }
+    Mod+Escape { spawn "swaylock" "-c" "1a1b26"; }
 
     Mod+Left  { focus-column-left; }
     Mod+Right { focus-column-right; }
