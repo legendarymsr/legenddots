@@ -889,31 +889,80 @@ def gen_hyprland(outpath, os_name, accent, pkgs, browser_fn):
     print(f"  {outpath}")
 
 
+GIT_LOG = [
+    ("0f33cb5", "Guix: proper EWW (plain text buffer, no chrome)"),
+    ("7bb4669", "Fill empty space: nvim pane + full README"),
+    ("2cc5275", "Mockups: visually distinct per WM"),
+    ("8591126", "Redesign mockups with realistic WM layouts"),
+    ("36a030e", "Add Tokyo Night mockup screenshots"),
+    ("ece5905", "Add screenshots section to README"),
+    ("569a8da", "Expand README with full rice explanations"),
+    ("064e725", "Fix ratpoison config, remove non-libre pkgs"),
+    ("2383261", "Harden Guix: noexec, SSH crypto, fail2ban"),
+    ("1fe5ba1", "Note brave is stable on NixOS"),
+    ("e81f009", "Mod+q exit, Mod+Shift+q close, Tab cycle"),
+]
+
+def draw_gitlog(d, fn, x, y, w, h):
+    """Simple git log --oneline output filling a terminal pane."""
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+    px, py = x+6, y+6
+    lh = 14
+
+    d.text((px, py), "user@legend ~/legenddots git:(master) ❯ git log --oneline",
+           font=fn["mono_r"], fill=rgb(FG2))
+    py += lh + 2
+
+    for sha, msg in GIT_LOG:
+        if py + lh > y + h - 4:
+            break
+        d.text((px,      py), sha, font=fn["mono_b"], fill=rgb(YELLOW))
+        d.text((px + 58, py), msg, font=fn["mono_r"], fill=rgb(FG))
+        py += lh
+
+    py += 4
+    if py + lh <= y + h:
+        d.text((px, py), "user@legend ~/legenddots git:(master) ❯ ",
+               font=fn["mono_r"], fill=rgb(FG2))
+        cursor_x = px + tw(d, "user@legend ~/legenddots git:(master) ❯ ", fn["mono_r"])
+        d.rectangle([cursor_x, py+2, cursor_x+8, py+lh-2], fill=rgb(FG))
+
+
 def gen_i3(outpath, os_name, accent, pkgs):
+    """i3: polybar + LEFT SIDE SPLIT (terminal top / git log bottom) + browser right."""
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
     fn  = make_fonts()
 
-    # polybar
     bar_h = polybar(d, fn, accent=accent)
     wallpaper(img, 0, bar_h, W, H-bar_h)
 
-    SMALL_GAP = 4
-    tx, ty = SMALL_GAP, bar_h+SMALL_GAP
-    tw_, th = TW+GAP, H-bar_h-SMALL_GAP*2
+    SG = 4   # i3-gaps small gap
+    LEFT_W = 470
+    RIGHT_X = SG*2 + LEFT_W
+    RIGHT_W = W - RIGHT_X - SG
+    FULL_H  = H - bar_h - SG*2
 
-    # terminal window — sharp
-    cx, cy, cw, ch = i3_window(d, fn, tx, ty, tw_, th,
+    # Left side: two stacked windows (i3 horizontal split)
+    TOP_H = int(FULL_H * 0.55)
+    BOT_H = FULL_H - TOP_H - SG
+
+    # Top-left: terminal with fastfetch
+    cx, cy, cw, ch = i3_window(d, fn, SG, bar_h+SG, LEFT_W, TOP_H,
                                 "alacritty  —  zsh", accent, active=True)
     draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "i3", pkgs)
 
-    # browser window — sharp
-    bx = SMALL_GAP*2+TW+GAP
-    bw = W-bx-SMALL_GAP
-    bh = th
-    cx2, cy2, cw2, ch2 = i3_window(d, fn, bx, ty, bw, bh,
-                                    "Brave  —  github.com", accent, active=False)
-    pcx, pcy, pcw, pch = draw_brave(d, fn, cx2, cy2, cw2, ch2)
+    # Bottom-left: git log
+    bly = bar_h + SG + TOP_H + SG
+    cx2, cy2, cw2, ch2 = i3_window(d, fn, SG, bly, LEFT_W, BOT_H,
+                                    "alacritty  —  git log", accent, active=False)
+    draw_gitlog(d, fn, cx2, cy2+2, cw2, ch2-2)
+
+    # Right: browser (full height)
+    cx3, cy3, cw3, ch3 = i3_window(d, fn, RIGHT_X, bar_h+SG, RIGHT_W, FULL_H,
+                                    "Brave  —  github.com/legendarymsr/legenddots",
+                                    accent, active=False)
+    pcx, pcy, pcw, pch = draw_brave(d, fn, cx3, cy3, cw3, ch3)
     draw_github(d, fn, pcx, pcy, pcw, pch)
 
     img.save(outpath)
@@ -921,6 +970,7 @@ def gen_i3(outpath, os_name, accent, pkgs):
 
 
 def gen_niri(outpath, os_name, accent, pkgs):
+    """Niri: THREE scrollable columns — terminal | browser | partial nvim clipped at edge."""
     img = Image.new("RGB", (W, H), rgb(BG))
     d   = ImageDraw.Draw(img)
     fn  = make_fonts()
@@ -929,20 +979,49 @@ def gen_niri(outpath, os_name, accent, pkgs):
                    right_txt="  Niri   CPU 4%   RAM 2.9G   12:34 ")
     wallpaper(img, 0, bar_h, W, H-bar_h)
 
-    # Niri: column layout hint — show arrow on right edge
-    tx, ty = GAP, bar_h+GAP
-    tw_, th = TW, H-bar_h-GAP*2
-    cx, cy, cw, ch = hyprland_window(d, fn, tx, ty, tw_, th,
+    ty = bar_h + GAP
+    th = H - bar_h - GAP*2
+
+    COL1 = 310   # terminal
+    COL2 = 530   # browser
+    # COL3 starts at GAP+COL1+GAP+COL2+GAP = 8+310+8+530+8 = 864
+    # visible width = W-8-864 = 408 of a 420-wide window (clipped naturally)
+    COL3_START = GAP + COL1 + GAP + COL2 + GAP
+    COL3_FULL  = 420
+    COL3_VIS   = W - COL3_START   # no right gap — clips at screen edge
+
+    # column 1 — terminal
+    cx, cy, cw, ch = hyprland_window(d, fn, GAP, ty, COL1, th,
                                       "alacritty  —  zsh", accent)
     draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "Niri", pkgs)
 
-    bx = GAP*2+TW
-    bw = W-bx-GAP
-    # scroll indicator — subtle arrow hinting at more columns →
-    d.text((W-20, H//2-10), "›", font=fnt(SANS_B, 28), fill=rgb(DIM))
-    hyprland_window(d, fn, bx, ty, bw-24, th, "Brave", accent)
-    pcx, pcy, pcw, pch = draw_brave(d, fn, bx+2, ty+2, bw-28, th-4)
+    # column 2 — browser
+    bx = GAP + COL1 + GAP
+    hyprland_window(d, fn, bx, ty, COL2, th, "Brave", accent)
+    pcx, pcy, pcw, pch = draw_brave(d, fn, bx+2, ty+2, COL2-4, th-4)
     draw_github(d, fn, pcx, pcy, pcw, pch)
+
+    # column 3 — neovim, partially clipped (shows scroll nature)
+    # draw a full window but clip it at the right edge by only drawing within [COL3_START, W]
+    nx3 = COL3_START
+    # window border + bg
+    d.rounded_rectangle([nx3, ty, nx3+COL3_FULL, ty+th],
+                         radius=10, outline=rgb(DIM), width=2, fill=rgb(BG2))
+    # title bar
+    d.rounded_rectangle([nx3+2, ty+2, nx3+COL3_FULL-2, ty+26],
+                         radius=9, fill=rgb(BG3))
+    d.rectangle([nx3+2, ty+15, nx3+COL3_FULL-2, ty+26], fill=rgb(BG3))
+    d.text((nx3+10, ty+7), "nvim  —  flake.nix", font=fn["title"], fill=rgb(DIM))
+    # content area
+    d.rectangle([nx3+2, ty+27, nx3+COL3_FULL-2, ty+th-2], fill=rgb(BG))
+    draw_nvim_pane(d, fn, nx3+4, ty+28, COL3_FULL-8, th-32,
+                   filename="flake.nix", accent=DIM)
+
+    # "more to the right" scroll shadow at right edge
+    for i in range(20):
+        alpha = int(200 * i / 20)
+        shade = tuple(max(0, c - alpha//6) for c in rgb(BG))
+        d.line([W-20+i, bar_h, W-20+i, H], fill=shade)
 
     img.save(outpath)
     print(f"  {outpath}")
