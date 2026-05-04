@@ -10,7 +10,6 @@
   (timezone "Europe/Berlin")
   (locale "en_US.utf8")
 
-  ;; Kernel hardening
   (kernel-arguments
    '("quiet"
      "loglevel=3"
@@ -37,6 +36,22 @@
            (device (uuid "YOUR-EFI-UUID" 'fat))
            (mount-point "/boot/efi")
            (type "vfat"))
+          (file-system
+           (device (file-system-label "home"))
+           (mount-point "/home")
+           (type "ext4")
+           (options "noatime,noexec,nosuid"))
+          (file-system
+           (device (file-system-label "data"))
+           (mount-point "/data")
+           (type "ext4")
+           (options "noatime,nodiratime,noexec"))
+          (file-system
+           (device "none")
+           (mount-point "/tmp")
+           (type "tmpfs")
+           (check? #f)
+           (options "mode=1777,noexec,nosuid,nodev,size=2G"))
           %base-file-systems))
 
   (swap-devices
@@ -56,7 +71,6 @@
 
   (packages
    (cons* (specification->package "nss-certs")
-          ;; ratpoison stack
           (specification->package "ratpoison")
           (specification->package "alacritty")
           (specification->package "dmenu")
@@ -79,7 +93,10 @@ MaxAuthTries 3
 LoginGraceTime 20
 ClientAliveInterval 300
 ClientAliveCountMax 2
-AllowUsers legend")))
+AllowUsers legend
+KexAlgorithms curve25519-sha256
+Ciphers chacha20-poly1305@openssh.com
+MACs hmac-sha2-512-etm@openssh.com")))
 
      (service nftables-service-type
               (nftables-configuration
@@ -98,6 +115,7 @@ table inet filter {
   chain output  { type filter hook output priority 0; policy accept; }
 }"))))
 
+     (service fail2ban-service-type)
      (service apparmor-service-type)
      (service libvirt-service-type))
 
@@ -105,4 +123,5 @@ table inet filter {
       (guix-service-type config =>
         (guix-configuration
          (inherit config)
-         (substitute-urls '("https://ci.guix.gnu.org"))))))))
+         (substitute-urls '("https://ci.guix.gnu.org"
+                            "https://bordeaux.guix.gnu.org"))))))))
