@@ -122,17 +122,19 @@ Install scripts symlink configs and back up any existing ones.
 
 ---
 
-## Keybinds (all WMs)
+## Keybinds
 
-| Key | Action |
-|-----|--------|
-| `Mod+Return` | Terminal |
-| `Mod+d` | Launcher |
-| `Mod+b` | Browser |
-| `Mod+hjkl` | Focus |
-| `Mod+q` | Close window |
-| `Mod+Shift+hjkl` | Move |
-| `Mod+1-9` | Workspaces |
-| `Mod+Escape` | Lock screen |
-| `Mod+Shift+e` | Exit |
-| `Print` | Screenshot |
+Arch rices (niri, i3, hyprland) use `Mod` (Super). Guix/ratpoison uses `C-t` as the prefix key instead.
+
+| Key | Guix `C-t` equivalent | Action |
+|-----|-----------------------|--------|
+| `Mod+Return` | `C-t c` | Terminal |
+| `Mod+d` | `C-t d` | Launcher |
+| `Mod+b` | `C-t b` | Browser |
+| `Mod+q` | `C-t q` | Close window |
+| `Mod+hjkl` | `C-t n/p` | Focus |
+| `Mod+Shift+hjkl` | — | Move window |
+| `Mod+1-9` | — | Workspaces |
+| `Mod+Escape` | — | Lock screen |
+| `Mod+Shift+e` | `C-t Q` | Exit |
+| `Print` | `C-t Print` | Screenshot |
