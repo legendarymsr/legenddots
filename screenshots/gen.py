@@ -76,69 +76,109 @@ def wallpaper(img, x, y, w, h):
 # WM bars
 # ══════════════════════════════════════════════════════════════════════════
 
-def waybar(d, fn, active=1, accent=ACCENT, right_txt="  CPU 6%   RAM 3.4G   12:34 "):
-    """Hyprland / Niri waybar — rounded workspace pills."""
-    BAR_H = 30
+def waybar_niri(d, fn, active=1, accent=PURPLE,
+                right_txt="  Niri   CPU 4%   RAM 2.9G   12:34 "):
+    """Niri waybar — flush with screen edges, workspace pills."""
+    BAR_H = 28
     d.rectangle([0, 0, W, BAR_H], fill=rgb(BG2))
-    # workspace pills
-    x = 10
+    d.line([0, BAR_H-1, W, BAR_H-1], fill=rgb(BORDER))
+    x = 8
     for i in range(1, 6):
         s = str(i)
         active_ws = (i == active)
-        pill_w = 26
-        fill = accent if active_ws else BG4
-        d.rounded_rectangle([x, 5, x+pill_w, BAR_H-5], radius=5, fill=rgb(fill))
-        label_col = BG if active_ws else DIM
-        lw = tw(d, s, fn["bar"])
-        d.text((x + (pill_w-lw)//2, 8), s, font=fn["bar"], fill=rgb(label_col))
-        x += pill_w + 4
-    # center: active window title
+        pill_w = 24
+        fill = accent if active_ws else BG3
+        d.rounded_rectangle([x, 4, x+pill_w, BAR_H-4], radius=4, fill=rgb(fill))
+        lw_ = tw(d, s, fn["bar"])
+        d.text((x+(pill_w-lw_)//2, 7), s, font=fn["bar"],
+               fill=rgb(BG if active_ws else DIM))
+        x += pill_w + 3
+    # Niri-specific: column position indicator
+    col_ind = "col 2/4"
+    d.text((x+10, 7), col_ind, font=fn["bar"], fill=rgb(DIM))
+    # center title
     title = "alacritty  —  zsh"
-    lw = tw(d, title, fn["bar"])
-    d.text(((W-lw)//2, 8), title, font=fn["bar"], fill=rgb(FG2))
-    # right modules
-    rw = tw(d, right_txt, fn["bar"])
-    d.text((W-rw-6, 8), right_txt, font=fn["bar"], fill=rgb(FG2))
+    lw_ = tw(d, title, fn["bar"])
+    d.text(((W-lw_)//2, 7), title, font=fn["bar"], fill=rgb(FG2))
+    # right
+    rw_ = tw(d, right_txt, fn["bar"])
+    d.text((W-rw_-4, 7), right_txt, font=fn["bar"], fill=rgb(FG2))
     return BAR_H
 
-def polybar(d, fn, active=1, accent=YELLOW):
-    """i3 polybar — powerline colour segments."""
-    BAR_H = 24
-    d.rectangle([0, 0, W, BAR_H], fill=rgb(BG))
-    # workspaces: solid coloured blocks
-    x = 0
+def waybar_floating(d, fn, img, active=1, accent=ACCENT,
+                    right_txt="  CPU 6%   RAM 3.4G   12:34 "):
+    """Hyprland floating waybar — pill inset from screen edges, wallpaper visible above/beside."""
+    M   = 8   # margin from screen edge
+    BAR_H = 30
+    # the bar is a rounded pill floating over wallpaper
+    d.rounded_rectangle([M, M, W-M, M+BAR_H], radius=14,
+                         fill=rgb(BG2), outline=rgb(BORDER), width=1)
+    # workspace pills
+    x = M + 10
     for i in range(1, 6):
-        s = f"  {i}  "
-        lw = tw(d, s, fn["bar_b"])
+        s = str(i)
         active_ws = (i == active)
-        fill = accent if active_ws else BG3
-        d.rectangle([x, 0, x+lw, BAR_H], fill=rgb(fill))
-        d.text((x, 5), s, font=fn["bar_b"],
+        pill_w = 24
+        fill = accent if active_ws else BG4
+        d.rounded_rectangle([x, M+5, x+pill_w, M+BAR_H-5], radius=5, fill=rgb(fill))
+        lw_ = tw(d, s, fn["bar"])
+        d.text((x+(pill_w-lw_)//2, M+8), s, font=fn["bar"],
                fill=rgb(BG if active_ws else DIM))
-        x += lw
-    # powerline arrow
-    sep = "▌"
-    sep_w = tw(d, sep, fn["pl"])
-    d.text((x, 0), sep, font=fn["pl"], fill=rgb(BG3))
-    x += sep_w
-    # window title
-    d.text((x+6, 5), "alacritty  —  zsh", font=fn["bar"], fill=rgb(FG2))
-    # right modules
-    mods = [
-        ("  VOL 65%", DIM),
-        ("  CPU 8% ", DIM),
-        ("  MEM 4G ", DIM),
+        x += pill_w + 3
+    # center
+    title = "nvim  —  flake.nix"
+    lw_ = tw(d, title, fn["bar"])
+    d.text(((W-lw_)//2, M+8), title, font=fn["bar"], fill=rgb(FG2))
+    # right modules with colored pills
+    modules = [
+        ("  CPU 6%  ", BG4),
+        ("  RAM 3.4G  ", BG4),
+        ("  12:34  ", accent),
+    ]
+    rx = W - M - 6
+    for txt, bg in reversed(modules):
+        mw = tw(d, txt, fn["bar"]) + 6
+        rx -= mw + 2
+        d.rounded_rectangle([rx, M+5, rx+mw, M+BAR_H-5], radius=4, fill=rgb(bg))
+        d.text((rx+3, M+8), txt, font=fn["bar"],
+               fill=rgb(BG if bg == accent else FG2))
+    return M + BAR_H + M   # total space consumed from top
+
+def polybar_bottom(d, fn, active=1, accent=YELLOW):
+    """i3 polybar at the bottom — wide powerline blocks, date on right."""
+    BAR_H = 26
+    by = H - BAR_H
+    d.rectangle([0, by, W, H], fill=rgb(BG))
+    # workspaces
+    x = 0
+    for i in range(1, 10):
+        s = f" {i} "
+        lw_ = tw(d, s, fn["bar_b"])
+        active_ws = (i == active)
+        fill = accent if active_ws else (BG3 if i <= 5 else BG)
+        d.rectangle([x, by, x+lw_, H], fill=rgb(fill))
+        d.text((x, by+5), s, font=fn["bar_b"],
+               fill=rgb(BG if active_ws else (FG2 if i <= 5 else DIM)))
+        x += lw_
+    # powerline sep
+    d.text((x, by+2), "▌", font=fnt(SANS_B, 20), fill=rgb(BG3))
+    x += 14
+    d.text((x+4, by+5), "alacritty  —  git log", font=fn["bar"], fill=rgb(FG2))
+    # right: date time in colored blocks
+    right_mods = [
+        ("  2026-05-05 ", BG3),
         (f"  12:34 ", accent),
+        ("  VOL 65% ", BG3),
+        ("  CPU 8%  RAM 4G ", BG4),
     ]
     rx = W
-    for txt, col in reversed(mods):
-        rw = tw(d, txt, fn["bar"])
-        rx -= rw
-        seg_col = accent if col == accent else BG3
-        d.rectangle([rx, 0, rx+rw, BAR_H], fill=rgb(seg_col))
-        d.text((rx, 5), txt, font=fn["bar"],
-               fill=rgb(BG if col == accent else FG2))
-    return BAR_H
+    for txt, bg in reversed(right_mods):
+        mw = tw(d, txt, fn["bar"])
+        rx -= mw
+        d.rectangle([rx, by, rx+mw, H], fill=rgb(bg))
+        d.text((rx, by+5), txt, font=fn["bar"],
+               fill=rgb(BG if bg == accent else FG2))
+    return by   # windows fill y=0 to y=by
 
 def ratpoison_bar(d, fn):
     """Ratpoison status bar — 14px plain text, completely minimal."""
@@ -245,41 +285,57 @@ LS_OUTPUT = [
 ]
 COLOR_BLOCKS = [RED, GREEN, YELLOW, ACCENT, PURPLE, CYAN, FG2, DIM]
 
-NIX_CODE = [
-    ("{",                                                         FG),
-    ('  description = "legenddots — NixOS flake";',              GREEN),
-    ("",                                                          FG),
-    ("  inputs = {",                                              FG),
-    ("    nixpkgs.url =",                                         CYAN),
-    ('      "github:nixos/nixpkgs/nixos-unstable";',             GREEN),
-    ("    home-manager = {",                                      FG),
-    ('      url = "github:nix-community/home-manager";',         GREEN),
-    ('      inputs.nixpkgs.follows = "nixpkgs";',                GREEN),
-    ("    };",                                                    FG),
-    ('    nixvim.url = "github:nix-community/nixvim";',          GREEN),
-    ("  };",                                                      FG),
-    ("",                                                          FG),
-    ("  outputs = { self, nixpkgs, home-manager, nixvim, ... }:", FG),
-    ("  let",                                                     PURPLE),
-    ('    system = "x86_64-linux";',                             GREEN),
-    ("  in {",                                                    PURPLE),
-    ("    nixosConfigurations.legend-box =",                      CYAN),
-    ("      nixpkgs.lib.nixosSystem {",                           FG),
-    ("        inherit system;",                                   CYAN),
-    ("        modules = [",                                       FG),
-    ("          ./system.nix",                                    GREEN),
-    ("          home-manager.nixosModules.home-manager",          GREEN),
-    ("          nixvim.nixosModules.nixvim",                      GREEN),
-    ("        ];",                                                FG),
-    ("      };",                                                  FG),
-    ("  };",                                                      FG),
-    ("}",                                                         FG),
+# ── Actual init.lua (Neovim config) ───────────────────────────────────────
+LUA_CODE = [
+    ("-- Legend@Yuki // RED TEAM COMMAND & CONTROL v25.0 [STABILIZED]", DIM),
+    ("",                                                                  FG),
+    ("-- 1. BOOTSTRAP LAZY.NVIM",                                        DIM),
+    ('local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"',    CYAN),
+    ("vim.opt.rtp:prepend(lazypath)",                                    CYAN),
+    ("",                                                                  FG),
+    ("-- 2. SYSTEM HARDENING (The Fundamentals)",                        DIM),
+    ('vim.g.mapleader        = " "',                                     CYAN),
+    ("vim.opt.number         = true",                                    CYAN),
+    ("vim.opt.relativenumber = true",                                    CYAN),
+    ("vim.opt.termguicolors  = true",                                    CYAN),
+    ("vim.opt.shiftwidth     = 2",                                       CYAN),
+    ("vim.opt.tabstop        = 2",                                       CYAN),
+    ('vim.opt.clipboard      = "unnamedplus"',                           CYAN),
+    ("vim.opt.undofile       = true",                                    CYAN),
+    ("vim.opt.cursorline     = true",                                    CYAN),
+    ("",                                                                  FG),
+    ("-- 3. THE PLUGINS",                                               DIM),
+    ('require("lazy").setup({',                                          PURPLE),
+    ("  -- THEME: TokyoNight",                                          DIM),
+    ("  {",                                                              FG),
+    ('    "folke/tokyonight.nvim",',                                     GREEN),
+    ("    lazy = false, priority = 1000,",                               FG),
+    ("    config = function()",                                          PURPLE),
+    ('      require("tokyonight").setup({',                              PURPLE),
+    ('        style = "night", transparent = false,',                    GREEN),
+    ("      })",                                                         FG),
+    ("      vim.cmd[[colorscheme tokyonight-night]]",                    CYAN),
+    ("    end,",                                                         FG),
+    ("  },",                                                             FG),
+    ('  { "folke/which-key.nvim",        event = "VeryLazy" },',        GREEN),
+    ('  { "kdheepak/lazygit.nvim",       cmd   = { "LazyGit" } },',     GREEN),
+    ('  { "nvim-telescope/telescope.nvim", tag = "0.1.8" },',           GREEN),
+    ('  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },',   GREEN),
+    ('  { "nvim-tree/nvim-tree.lua" },',                                 GREEN),
+    ('  { "nvim-lualine/lualine.nvim" },',                              GREEN),
+    ("})",                                                               FG),
+    ("",                                                                  FG),
+    ("-- 6. KEYMAPS (Pure Efficiency)",                                 DIM),
+    ('vim.keymap.set("n","<leader>ff","<cmd>Telescope find_files<cr>")', CYAN),
+    ('vim.keymap.set("n","<leader>gg","<cmd>LazyGit<CR>")',             CYAN),
+    ('vim.keymap.set("n","<leader>e", "<cmd>NvimTreeToggle<CR>")',      CYAN),
+    ('vim.keymap.set("t","<Esc>",    [[<C-\\><C-n>]])',                 CYAN),
 ]
 
-def draw_nvim_pane(d, fn, x, y, w, h, filename="flake.nix", code=None, accent=ACCENT):
+def draw_nvim_pane(d, fn, x, y, w, h, filename="init.lua", code=None, accent=ACCENT):
     """Neovim mockup with line numbers, syntax-coloured code, lualine statusbar."""
     if code is None:
-        code = NIX_CODE
+        code = LUA_CODE
     LUALINE_H = 18
     LN_W = 34     # line-number column width
 
@@ -411,7 +467,7 @@ def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
         if editor_label == "emacs":
             draw_emacs_editor(d, fn, cx, iy, cw, cy+ch-iy, filename="init.el")
         else:
-            draw_nvim_pane(d, fn, cx, iy, cw, cy+ch-iy, filename="flake.nix")
+            draw_nvim_pane(d, fn, cx, iy, cw, cy+ch-iy, filename="init.lua")
 
 # ══════════════════════════════════════════════════════════════════════════
 # Brave browser (Chromium-style)
@@ -662,39 +718,62 @@ def draw_emacs_eww(d, fn, x, y, w, h):
 # Emacs editor buffer — shows init.el with elisp syntax colouring
 # ══════════════════════════════════════════════════════════════════════════
 ELISP_CODE = [
-    (";; init.el — Tokyo Night · Evil · LSP",               DIM),
-    ("",                                                     FG),
-    ("(setq inhibit-startup-message t)",                     FG),
-    ("(menu-bar-mode -1)",                                   FG),
-    ("(tool-bar-mode -1)",                                   FG),
-    ("(scroll-bar-mode -1)",                                 FG),
-    ("(global-display-line-numbers-mode 1)",                 FG),
-    ("",                                                     FG),
-    ("(require 'package)",                                   PURPLE),
-    ("(setq package-archives",                               PURPLE),
-    (' \'(("gnu"    . "https://elpa.gnu.org/packages/")',    GREEN),
-    ('   ("nongnu" . "https://elpa.nongnu.org/packages/")))', GREEN),
-    ("(package-initialize)",                                 PURPLE),
-    ("",                                                     FG),
-    ("(use-package doom-themes",                             PURPLE),
-    ("  :config",                                            CYAN),
-    ("  (load-theme 'doom-tokyo-night t))",                  GREEN),
-    ("",                                                     FG),
-    ("(use-package evil",                                    PURPLE),
-    ("  :init",                                              CYAN),
-    ("  (setq evil-want-integration t",                      FG),
-    ("        evil-want-keybinding nil)",                    FG),
-    ("  :config",                                            CYAN),
-    ("  (evil-mode 1))",                                     FG),
-    ("",                                                     FG),
-    ("(use-package lsp-mode",                                PURPLE),
-    ("  :commands (lsp lsp-deferred)",                       FG),
-    ("  :hook",                                              CYAN),
-    ("  (scheme-mode . lsp-deferred)",                       FG),
-    ("  (nix-mode    . lsp-deferred))",                      FG),
-    ("",                                                     FG),
-    ("(use-package magit  :bind (\"C-c g\" . magit-status))", PURPLE),
-    ("(use-package which-key :config (which-key-mode 1))",   PURPLE),
+    (";; LegendOS Bunker: Red Team Edition v5.0 — GPL-3.0",  DIM),
+    (";; Freedom is not granted — it is taken and defended.", DIM),
+    ("",                                                      FG),
+    (";; --- 0. PRELIMINARIES ---",                           DIM),
+    ("(setq inhibit-startup-message t)",                      FG),
+    ("(if (display-graphic-p)",                               PURPLE),
+    ("    (progn",                                            PURPLE),
+    ("      (menu-bar-mode -1)",                              FG),
+    ("      (tool-bar-mode -1)",                              FG),
+    ("      (scroll-bar-mode -1)))",                          FG),
+    ("(setq display-line-numbers-type 'relative)",            FG),
+    ("(add-hook 'prog-mode-hook #'display-line-numbers-mode)", CYAN),
+    ("",                                                      FG),
+    (";; --- 1. PACKAGE MANAGEMENT ---",                      DIM),
+    ("(require 'package)",                                    PURPLE),
+    ("(setq package-archives",                                PURPLE),
+    (' \'(("melpa"  . "https://melpa.org/packages/")',         GREEN),
+    ('   ("gnu"    . "https://elpa.gnu.org/packages/")))',    GREEN),
+    ("(package-initialize)",                                   PURPLE),
+    ("(setq use-package-always-ensure t)",                    FG),
+    ("",                                                      FG),
+    (";; --- 2. EVIL MODE ---",                               DIM),
+    ("(use-package evil",                                     PURPLE),
+    ("  :init",                                               CYAN),
+    ("  (setq evil-want-integration t)",                      FG),
+    ("  (setq evil-want-keybinding nil)",                     FG),
+    ("  :config (evil-mode 1))",                              FG),
+    ("(use-package evil-collection",                          PURPLE),
+    ("  :after evil",                                         CYAN),
+    ("  :config (evil-collection-init))",                     FG),
+    ("",                                                      FG),
+    (";; --- 3. SPC LEADER KEY ---",                          DIM),
+    ("(use-package general",                                  PURPLE),
+    ("  :config",                                             CYAN),
+    ("  (general-evil-setup t)",                              FG),
+    ("  (general-create-definer leader",                      FG),
+    ('    :states \'(normal visual insert emacs)',             GREEN),
+    ('    :prefix "SPC")',                                    GREEN),
+    ("  (leader",                                             FG),
+    ('    "ff" \'(find-file :which-key "Find file")',         YELLOW),
+    ('    "bb" \'(consult-buffer :which-key "Buffers")',      YELLOW),
+    ('    "gg" \'(magit-status :which-key "Magit")',          YELLOW),
+    ('    "tt" \'(eshell :which-key "Open terminal")))',       YELLOW),
+    ("",                                                      FG),
+    (";; --- 6. THEME + MODELINE ---",                        DIM),
+    ("(use-package doom-themes",                              PURPLE),
+    ("  :config (load-theme 'doom-one t))",                   GREEN),
+    ("(use-package doom-modeline",                            PURPLE),
+    ("  :init (doom-modeline-mode 1))",                       FG),
+    ("(use-package which-key",                                PURPLE),
+    ("  :init (which-key-mode)",                              FG),
+    ("  :config (setq which-key-idle-delay 0.3))",            FG),
+    ("",                                                      FG),
+    (";; --- 5. MAGIT ---",                                   DIM),
+    ("(use-package magit",                                    PURPLE),
+    ("  :bind (\"C-x g\" . magit-status))",                   GREEN),
 ]
 
 def draw_emacs_editor(d, fn, x, y, w, h, filename="init.el"):
@@ -868,7 +947,7 @@ def gen_hyprland(outpath, os_name, accent, pkgs, browser_fn):
     d   = ImageDraw.Draw(img)
     fn  = make_fonts()
 
-    bar_h = waybar(d, fn, accent=accent)
+    bar_h = waybar_floating(d, fn, img, accent=accent)
     wallpaper(img, 0, bar_h, W, H-bar_h)
 
     # terminal window
@@ -934,32 +1013,33 @@ def gen_i3(outpath, os_name, accent, pkgs):
     d   = ImageDraw.Draw(img)
     fn  = make_fonts()
 
-    bar_h = polybar(d, fn, accent=accent)
-    wallpaper(img, 0, bar_h, W, H-bar_h)
+    bar_h = H   # polybar_bottom returns the y where windows end (bar is at bottom)
+    bot_y = polybar_bottom(d, fn, accent=accent)
+    wallpaper(img, 0, 0, W, bot_y)
 
     SG = 4   # i3-gaps small gap
     LEFT_W = 470
     RIGHT_X = SG*2 + LEFT_W
     RIGHT_W = W - RIGHT_X - SG
-    FULL_H  = H - bar_h - SG*2
+    FULL_H  = bot_y - SG*2
 
     # Left side: two stacked windows (i3 horizontal split)
     TOP_H = int(FULL_H * 0.55)
     BOT_H = FULL_H - TOP_H - SG
 
     # Top-left: terminal with fastfetch
-    cx, cy, cw, ch = i3_window(d, fn, SG, bar_h+SG, LEFT_W, TOP_H,
+    cx, cy, cw, ch = i3_window(d, fn, SG, SG, LEFT_W, TOP_H,
                                 "alacritty  —  zsh", accent, active=True)
     draw_terminal(d, fn, cx+2, cy+2, cw-4, ch-4, os_name, "i3", pkgs)
 
     # Bottom-left: git log
-    bly = bar_h + SG + TOP_H + SG
+    bly = SG + TOP_H + SG
     cx2, cy2, cw2, ch2 = i3_window(d, fn, SG, bly, LEFT_W, BOT_H,
                                     "alacritty  —  git log", accent, active=False)
     draw_gitlog(d, fn, cx2, cy2+2, cw2, ch2-2)
 
     # Right: browser (full height)
-    cx3, cy3, cw3, ch3 = i3_window(d, fn, RIGHT_X, bar_h+SG, RIGHT_W, FULL_H,
+    cx3, cy3, cw3, ch3 = i3_window(d, fn, RIGHT_X, SG, RIGHT_W, FULL_H,
                                     "Brave  —  github.com/legendarymsr/legenddots",
                                     accent, active=False)
     pcx, pcy, pcw, pch = draw_brave(d, fn, cx3, cy3, cw3, ch3)
@@ -975,8 +1055,8 @@ def gen_niri(outpath, os_name, accent, pkgs):
     d   = ImageDraw.Draw(img)
     fn  = make_fonts()
 
-    bar_h = waybar(d, fn, accent=accent,
-                   right_txt="  Niri   CPU 4%   RAM 2.9G   12:34 ")
+    bar_h = waybar_niri(d, fn, accent=accent,
+                       right_txt="  Niri   CPU 4%   RAM 2.9G   12:34 ")
     wallpaper(img, 0, bar_h, W, H-bar_h)
 
     ty = bar_h + GAP
