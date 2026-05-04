@@ -66,8 +66,8 @@ window-rule {
 binds {
     Mod+Return { spawn "alacritty"; }
     Mod+d { spawn "fuzzel"; }
-    Mod+w { spawn "brave"; }
-    Mod+Shift+q { close-window; }
+    Mod+b { spawn "brave"; }
+    Mod+q { close-window; }
     Mod+Shift+e { quit; }
     Mod+Shift+p { power-off-monitors; }
     Mod+Escape { spawn "swaylock" "-c" "1a1b26"; }

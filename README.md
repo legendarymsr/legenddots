@@ -128,8 +128,9 @@ Install scripts symlink configs and back up any existing ones.
 |-----|--------|
 | `Mod+Return` | Terminal |
 | `Mod+d` | Launcher |
-| `Mod+w` | Browser |
+| `Mod+b` | Browser |
 | `Mod+hjkl` | Focus |
+| `Mod+q` | Close window |
 | `Mod+Shift+hjkl` | Move |
 | `Mod+1-9` | Workspaces |
 | `Mod+Escape` | Lock screen |
