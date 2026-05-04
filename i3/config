@@ -37,6 +37,7 @@ exec --no-startup-id dunst
 # ── Keybinds ──────────────────────────────────────────────────────────────────
 bindsym $mod+Return exec alacritty
 bindsym $mod+d exec rofi -show drun
+bindsym $mod+w exec brave
 bindsym $mod+Shift+q kill
 bindsym $mod+Shift+e exec i3-msg exit
 bindsym $mod+Escape exec i3lock -c 1a1b26

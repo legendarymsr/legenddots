@@ -41,6 +41,7 @@ PACMAN_PKGS=(
 
 AUR_PKGS=(
     waybar-git
+    brave-origin-nightly-bin
 )
 
 info "Installing pacman packages..."
