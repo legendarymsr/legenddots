@@ -59,7 +59,7 @@
                ("XDG_CACHE_HOME"  . "$HOME/.cache")
                ("XDG_CONFIG_HOME" . "$HOME/.config")
                ("XDG_DATA_HOME"   . "$HOME/.local/share")
-               ("PATH"            . "$HOME/.local/bin:$PATH")))
+               ("PATH"            . "$HOME/.local/bin:$HOME/bin:$HOME/.guix-profile/bin:$PATH")))
 
     ;; ── Zsh ────────────────────────────────────────────────────────────────
     (service home-zsh-service-type
