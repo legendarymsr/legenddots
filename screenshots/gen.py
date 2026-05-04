@@ -395,21 +395,23 @@ def draw_terminal(d, fn, cx, cy, cw, ch, os_name, wm, pkgs):
     d.rectangle([cursor_x, iy-lh+2, cursor_x+8, iy-2], fill=rgb(FG))
     iy += 4
 
-    # ── tmux split line + neovim pane ─────────────────────────────────────
+    # ── tmux/ratpoison split + editor pane ────────────────────────────────
     remaining = (cy + ch) - iy
     if remaining > 60:
         TMUX_H = 16
-        # tmux status bar
+        editor_label = getattr(draw_terminal, "_editor", "nvim")
         d.rectangle([cx, iy, cx+cw, iy+TMUX_H], fill=rgb(BG3))
         d.rectangle([cx, iy, cx+60, iy+TMUX_H], fill=rgb(GREEN))
         d.text((cx+4, iy+2), "1:zsh", font=fn["tiny"], fill=rgb(BG))
         d.rectangle([cx+62, iy, cx+120, iy+TMUX_H], fill=rgb(BG4))
-        d.text((cx+66, iy+2), "2:nvim", font=fn["tiny"], fill=rgb(FG2))
+        d.text((cx+66, iy+2), f"2:{editor_label}", font=fn["tiny"], fill=rgb(FG2))
         d.text((cx+cw-80, iy+2), "legend-box  12:34", font=fn["tiny"], fill=rgb(DIM))
         iy += TMUX_H
 
-        # neovim fills the rest
-        draw_nvim_pane(d, fn, cx, iy, cw, cy+ch-iy, filename="flake.nix")
+        if editor_label == "emacs":
+            draw_emacs_editor(d, fn, cx, iy, cw, cy+ch-iy, filename="init.el")
+        else:
+            draw_nvim_pane(d, fn, cx, iy, cw, cy+ch-iy, filename="flake.nix")
 
 # ══════════════════════════════════════════════════════════════════════════
 # Brave browser (Chromium-style)
@@ -532,127 +534,186 @@ def draw_icecat(d, fn, x, y, w, h):
     return x, y, w, h - TB_H - TOOL_H
 
 # ══════════════════════════════════════════════════════════════════════════
-# Emacs EWW (text-mode web browser inside Emacs)
+# Emacs frame helper — shared chrome (menu bar, modeline, minibuffer)
 # ══════════════════════════════════════════════════════════════════════════
-def draw_emacs_eww(d, fn, x, y, w, h):
-    """Emacs frame: menu bar → EWW buffer → modeline → minibuffer."""
-    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+MENU_H     = 20
+MODELINE_H = 18
+MINIBUF_H  = 16
 
-    # ── menu bar (20px) ───────────────────────────────────────────────────
-    MENU_H = 20
+def _emacs_chrome(d, fn, x, y, w, h, modeline_txt):
+    """Draw Emacs menu bar + modeline + minibuffer. Returns content rect."""
+    # menu bar
     d.rectangle([x, y, x+w, y+MENU_H], fill=rgb(BG3))
     d.line([x, y+MENU_H-1, x+w, y+MENU_H-1], fill=rgb(BORDER))
-    menu_items = ["File", "Edit", "Options", "Buffers", "Tools", "Help"]
     mx = x + 6
-    for item in menu_items:
+    for item in ["File", "Edit", "Options", "Buffers", "Tools", "Help"]:
         d.text((mx, y+4), item, font=fn["bar"], fill=rgb(FG2))
         mx += tw(d, item, fn["bar"]) + 14
 
-    y += MENU_H
+    content_y = y + MENU_H
+    content_h = h - MENU_H - MODELINE_H - MINIBUF_H
 
-    # ── EWW buffer content ────────────────────────────────────────────────
-    MODELINE_H = 18
-    MINIBUF_H  = 16
-    content_h  = h - MENU_H - MODELINE_H - MINIBUF_H
-    py = y + 8
-    px = x + 10
-    lh = 14
+    # modeline — dark bar, full width
+    ml_y = content_y + content_h
+    d.rectangle([x, ml_y, x+w, ml_y+MODELINE_H], fill=rgb(BG4))
+    d.rectangle([x, ml_y, x+w, ml_y+1], fill=rgb(DIM))
+    d.text((x+4, ml_y+3), modeline_txt, font=fn["mono_r"], fill=rgb(FG2))
 
-    def eline(text, col=FG2, bold=False, indent=0):
-        nonlocal py
-        if py + lh > y + content_h:
-            return
-        f = fn["mono_b"] if bold else fn["mono_r"]
-        d.text((px + indent, py), text, font=f, fill=rgb(col))
-        py += lh
-
-    def egap():
-        nonlocal py
-        py += lh // 2
-
-    # EWW top: URL bar as a header line
-    d.rectangle([x, y, x+w, y+lh+6], fill=rgb(BG2))
-    d.text((px, y+3), "github.com/legendarymsr/legenddots",
-           font=fn["mono_r"], fill=rgb(CYAN))
-    py = y + lh + 10
-
-    # page title
-    eline("legendarymsr / legenddots", FG, bold=True)
-    egap()
-
-    # nav links (EWW renders links underlined, shown in accent colour)
-    nav_items = ["[Code]", "[Issues]", "[Pull requests]", "[Actions]", "[Settings]"]
-    nav_x = px
-    for item in nav_items:
-        if nav_x + tw(d, item, fn["mono_r"]) > x+w-10:
-            break
-        d.text((nav_x, py), item, font=fn["mono_r"], fill=rgb(ACCENT))
-        iw = tw(d, item, fn["mono_r"])
-        d.line([nav_x, py+lh-1, nav_x+iw, py+lh-1], fill=rgb(ACCENT))
-        nav_x += iw + 8
-    py += lh
-    egap()
-
-    # file list (EWW plain-text table)
-    eline("── Files ─────────────────────────────────────────────", BORDER)
-    for name, desc, age in [
-        ("flake.nix",              "NixOS flake",             "3 days ago"),
-        ("configuration.nix",      "NixOS stub",              "3 days ago"),
-        ("home.nix",               "Home-manager entry",      "3 days ago"),
-        ("home/",                  "packages, nixvim",        "3 days ago"),
-        ("config.scm",             "Guix system config",      "1 day ago"),
-        ("home-configuration.scm", "Guix home (ratpoison)",   "1 day ago"),
-        ("alacritty.toml",         "Tokyo Night, 95% opacity","5 days ago"),
-        ("hyprland/",              "Hyprland rice",           "2 days ago"),
-        ("i3/",                    "i3 rice",                 "2 days ago"),
-        ("niri/",                  "Niri rice",               "2 days ago"),
-        ("screenshots/",           "Mockup screenshots",      "just now"),
-        ("README.md",              "Expand explanations",     "just now"),
-    ]:
-        if py + lh > y + content_h - lh*6:
-            break
-        col = CYAN if name.endswith("/") else ACCENT
-        d.text((px,        py), name, font=fn["mono_r"], fill=rgb(col))
-        d.text((px+180,    py), desc, font=fn["mono_r"], fill=rgb(FG2))
-        aw = tw(d, age, fn["mono_r"])
-        d.text((x+w-aw-10, py), age,  font=fn["mono_r"], fill=rgb(DIM))
-        py += lh
-    egap()
-
-    eline("── README.md ─────────────────────────────────────────", BORDER)
-    eline("# legenddots", ACCENT, bold=True)
-    eline("Personal dotfiles for NixOS, Guix, and Arch Linux.")
-    eline("Theme: Tokyo Night throughout.")
-    egap()
-    eline("## NixOS", GREEN, bold=True)
-    eline("Fully declarative. Hyprland, NixVim, home-manager.")
-    egap()
-    eline("## Guix", GREEN, bold=True)
-    eline("Libre-only. Ratpoison, Emacs, Icecat, slock,")
-    eline("AppArmor, nftables, fail2ban, hardened kernel.")
-    egap()
-    eline("## Arch Rice", GREEN, bold=True)
-    eline("Niri · i3 · Hyprland. install.sh per rice.")
-
-    # ── modeline ──────────────────────────────────────────────────────────
-    ml_y = y + content_h
-    d.rectangle([x, ml_y, x+w, ml_y+MODELINE_H], fill=rgb(BG3))
-    d.rectangle([x, ml_y, x+w, ml_y+1], fill=rgb(BORDER))
-    # left: mode indicators
-    ml_left = " --:--  *eww*   All L1     (EWW)---"
-    d.text((x+4, ml_y+3), ml_left, font=fn["mono_r"], fill=rgb(GREEN))
-    # right: url
-    ml_right = "github.com/legendarymsr/legenddots "
-    rw = tw(d, ml_right, fn["mono_r"])
-    d.text((x+w-rw, ml_y+3), ml_right, font=fn["mono_r"], fill=rgb(DIM))
-
-    # ── minibuffer ────────────────────────────────────────────────────────
+    # minibuffer
     mb_y = ml_y + MODELINE_H
     d.rectangle([x, mb_y, x+w, mb_y+MINIBUF_H], fill=rgb(BG))
-    # blinking cursor in minibuffer
-    d.rectangle([x+4, mb_y+3, x+10, mb_y+MINIBUF_H-3], fill=rgb(FG))
+    d.rectangle([x+4, mb_y+3, x+12, mb_y+MINIBUF_H-3], fill=rgb(FG))
 
-    return x, y, w, content_h
+    return x, content_y, w, content_h
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Emacs EWW — plain text buffer, no browser chrome
+# EWW renders pages as flowing monospace text. No tabs, no address bar.
+# The URL is the first line of the buffer itself.
+# ══════════════════════════════════════════════════════════════════════════
+def draw_emacs_eww(d, fn, x, y, w, h):
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+
+    modeline = ("-U:---  *eww*   All L1     (EWW)"
+                + "-" * 40)
+    bx, by, bw, bh = _emacs_chrome(d, fn, x, y, w, h, modeline)
+
+    lh = 13
+    px = bx + 8
+    py = by + 4
+
+    def line(text, col=FG2, ul=False):
+        nonlocal py
+        if py + lh > by + bh - 2:
+            return
+        d.text((px, py), text, font=fn["mono_r"], fill=rgb(col))
+        if ul:
+            lw = tw(d, text, fn["mono_r"])
+            d.line([px, py+lh-2, px+lw, py+lh-2], fill=rgb(col))
+        py += lh
+
+    def gap(n=1):
+        nonlocal py
+        py += lh * n // 2
+
+    # ── EWW buffer contents ───────────────────────────────────────────────
+    # First line of buffer = the URL (no separate address bar in real EWW)
+    line("github.com/legendarymsr/legenddots", CYAN, ul=True)
+    gap()
+
+    # EWW navigation buttons rendered as inline text in the buffer
+    nav = "[back]  [forward]  [reload]  [history]"
+    d.text((px, py), nav, font=fn["mono_r"], fill=rgb(DIM))
+    py += lh
+    gap()
+
+    # Page content — EWW renders GitHub as plain text
+    line("legendarymsr / legenddots", FG, ul=False)
+    line("=" * 34, BORDER)
+    gap()
+
+    line("Personal dotfiles for NixOS, Guix, and Arch Linux.")
+    line("Theme: Tokyo Night throughout.")
+    gap()
+
+    # GitHub tabs rendered as plain links
+    for tab in ["[< > Code]", "[Issues]", "[Pull requests]", "[Actions]"]:
+        d.text((px, py), tab + "  ", font=fn["mono_r"], fill=rgb(ACCENT))
+        tw_ = tw(d, tab + "  ", fn["mono_r"])
+        d.line([px, py+lh-2, px+tw_-4, py+lh-2], fill=rgb(ACCENT))
+        px += tw_
+    py += lh
+    px = bx + 8
+    gap()
+
+    # File listing — EWW renders tables as plain text rows
+    line("flake.nix              NixOS flake               3 days ago", FG2)
+    line("configuration.nix      NixOS stub                3 days ago", FG2)
+    line("home.nix               Home-manager entry        3 days ago", FG2)
+    line("home/                  packages, nixvim          3 days ago", FG2)
+    line("config.scm             Guix system config        1 day ago",  FG2)
+    line("home-configuration.scm Guix home (ratpoison)     1 day ago",  FG2)
+    line("alacritty.toml         Tokyo Night, 95% opacity  5 days ago", FG2)
+    line("hyprland/              Hyprland rice             2 days ago", FG2)
+    line("i3/                    i3 rice                   2 days ago", FG2)
+    line("niri/                  Niri rice                 2 days ago", FG2)
+    line("screenshots/           Mockup screenshots        just now",   FG2)
+    line("README.md              Expand explanations       just now",   FG2)
+    gap()
+
+    line("legenddots", ACCENT)
+    line("──────────", BORDER)
+    line("Personal dotfiles for NixOS, Guix, and Arch Linux.")
+    line("Theme: Tokyo Night throughout.")
+    gap()
+    line("NixOS", GREEN)
+    line("  Fully declarative desktop. Hyprland, NixVim, home-manager.")
+    gap()
+    line("Guix", GREEN)
+    line("  Libre-only. Ratpoison, Emacs, slock. Hardened kernel,")
+    line("  AppArmor, nftables, fail2ban.")
+    gap()
+    line("Arch Rice", GREEN)
+    line("  Niri · i3 · Hyprland. install.sh per rice.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Emacs editor buffer — shows init.el with elisp syntax colouring
+# ══════════════════════════════════════════════════════════════════════════
+ELISP_CODE = [
+    (";; init.el — Tokyo Night · Evil · LSP",               DIM),
+    ("",                                                     FG),
+    ("(setq inhibit-startup-message t)",                     FG),
+    ("(menu-bar-mode -1)",                                   FG),
+    ("(tool-bar-mode -1)",                                   FG),
+    ("(scroll-bar-mode -1)",                                 FG),
+    ("(global-display-line-numbers-mode 1)",                 FG),
+    ("",                                                     FG),
+    ("(require 'package)",                                   PURPLE),
+    ("(setq package-archives",                               PURPLE),
+    (' \'(("gnu"    . "https://elpa.gnu.org/packages/")',    GREEN),
+    ('   ("nongnu" . "https://elpa.nongnu.org/packages/")))', GREEN),
+    ("(package-initialize)",                                 PURPLE),
+    ("",                                                     FG),
+    ("(use-package doom-themes",                             PURPLE),
+    ("  :config",                                            CYAN),
+    ("  (load-theme 'doom-tokyo-night t))",                  GREEN),
+    ("",                                                     FG),
+    ("(use-package evil",                                    PURPLE),
+    ("  :init",                                              CYAN),
+    ("  (setq evil-want-integration t",                      FG),
+    ("        evil-want-keybinding nil)",                    FG),
+    ("  :config",                                            CYAN),
+    ("  (evil-mode 1))",                                     FG),
+    ("",                                                     FG),
+    ("(use-package lsp-mode",                                PURPLE),
+    ("  :commands (lsp lsp-deferred)",                       FG),
+    ("  :hook",                                              CYAN),
+    ("  (scheme-mode . lsp-deferred)",                       FG),
+    ("  (nix-mode    . lsp-deferred))",                      FG),
+    ("",                                                     FG),
+    ("(use-package magit  :bind (\"C-c g\" . magit-status))", PURPLE),
+    ("(use-package which-key :config (which-key-mode 1))",   PURPLE),
+]
+
+def draw_emacs_editor(d, fn, x, y, w, h, filename="init.el"):
+    d.rectangle([x, y, x+w, y+h], fill=rgb(BG))
+    modeline = (f"-U:---  {filename}   All L1     (Emacs-Lisp)"
+                + "-" * 30)
+    bx, by, bw, bh = _emacs_chrome(d, fn, x, y, w, h, modeline)
+
+    LN_W = 30
+    lh   = 13
+    cy2  = by + 4
+
+    for i, (code_line, col) in enumerate(ELISP_CODE):
+        if cy2 + lh > by + bh - 2:
+            break
+        ln = str(i + 1).rjust(3)
+        d.text((bx+2,    cy2), ln,        font=fn["mono_r"], fill=rgb(DIM))
+        d.text((bx+LN_W, cy2), code_line, font=fn["mono_r"], fill=rgb(col))
+        cy2 += lh
 
 # ══════════════════════════════════════════════════════════════════════════
 # GitHub dark page
@@ -899,7 +960,9 @@ def gen_ratpoison(outpath, os_name, pkgs):
     split = W // 2
     # left — terminal
     lx, ly, lw, lh = ratpoison_window(d, 0, bar_h, split, H-bar_h)
+    draw_terminal._editor = "emacs"
     draw_terminal(d, fn, lx, ly, lw, lh, os_name, "Ratpoison", pkgs)
+    draw_terminal._editor = "nvim"
 
     # 1px divider
     d.line([split, bar_h, split, H], fill=rgb(BORDER))
