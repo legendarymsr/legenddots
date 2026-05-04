@@ -34,6 +34,8 @@
           "xterm"
           "xdotool"
           "scrot"
+          "xsetroot"
+          "font-jetbrains-mono"
 
           ;; browser
           "icecat"
@@ -125,7 +127,6 @@ escape C-t
 
 # appearance (Tokyo Night)
 set border 2
-set barborder 2
 set barinpadding 4
 set bargravity NE
 set fgcolor #c0caf5
@@ -135,7 +136,6 @@ set font -misc-fixed-medium-r-normal--14-130-75-75-c-70-iso10646-1
 
 # padding
 set padding 0 0 0 0
-set gap 8
 
 # terminal
 bind c exec alacritty
@@ -208,7 +208,6 @@ bind Down resize +h 50
 bind Print exec scrot '%Y-%m-%d-%H%M%S.png' -e 'mv $f ~/Pictures/'
 
 # startup
-exec xwallpaper --tile /dev/null
 exec xsetroot -solid '#1a1b26'
 exec emacs --daemon
 "))))
