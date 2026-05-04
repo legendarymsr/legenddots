@@ -133,11 +133,13 @@ Guix/ratpoison works differently — every bind goes through a **prefix key** (`
 | Terminal | `Return` | `c` |
 | Launcher | `d` | `d` |
 | Browser | `b` | `b` |
+| Emacs | — | `e` |
 | Close window | `q` | `q` |
-| Focus left/right/up/down | `h/l/k/j` | `h/l/k/j` |
-| Move window | `Shift+hjkl` | `H/L/K/J` (uppercase) |
+| Focus directional | `h/j/k/l` | `h/j/k/l` |
+| Cycle focus | — | `n` / `p` |
+| Move window | `Shift+h/j/k/l` | `H/J/K/L` |
 | Switch workspace | `1-9` | `1-9` |
-| Move window to workspace | `Shift+1-9` | `!/@ /#/$/%/^/&/*/(`  (Shift+1-9) |
+| Move window to workspace | `Shift+1-9` | `!/@/#/$/%/^/&/*/( ` |
 | Lock screen | `Escape` | `Escape` |
 | Exit | `Shift+e` | `Q` |
 | Screenshot | `Print` | `Print` |
