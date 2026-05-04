@@ -35,6 +35,9 @@
           "xdotool"
           "scrot"
 
+          ;; browser
+          "icecat"
+
           ;; emacs
           "emacs"
           "emacs-magit"

@@ -35,8 +35,13 @@ PACMAN_PKGS=(
     ttf-jetbrains-mono-nerd
 )
 
+AUR_PKGS=(
+    brave-origin-nightly-bin
+)
+
 info "Installing packages..."
 sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}"
+$AUR "${AUR_PKGS[@]}"
 success "Packages installed."
 
 link() {
