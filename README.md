@@ -4,6 +4,16 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 
 ---
 
+## Browsers
+
+| Config | Browser |
+|--------|---------|
+| NixOS | `brave` (nixpkgs) |
+| Guix | `icecat` (GNU, fully libre) |
+| Arch rices | `brave-origin-nightly-bin` (AUR), installed by each `install.sh` |
+
+---
+
 ## Structure
 
 ```
@@ -118,6 +128,7 @@ Install scripts symlink configs and back up any existing ones.
 |-----|--------|
 | `Mod+Return` | Terminal |
 | `Mod+d` | Launcher |
+| `Mod+w` | Browser |
 | `Mod+hjkl` | Focus |
 | `Mod+Shift+hjkl` | Move |
 | `Mod+1-9` | Workspaces |
