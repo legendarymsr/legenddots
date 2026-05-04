@@ -38,8 +38,9 @@ exec --no-startup-id dunst
 bindsym $mod+Return exec alacritty
 bindsym $mod+d exec rofi -show drun
 bindsym $mod+b exec brave
-bindsym $mod+q kill
-bindsym $mod+Shift+e exec i3-msg exit
+bindsym $mod+Shift+q kill
+bindsym $mod+q exec i3-msg exit
+bindsym $mod+Tab focus next
 bindsym $mod+Escape exec i3lock -c 1a1b26
 
 bindsym $mod+h focus left
