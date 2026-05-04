@@ -147,7 +147,6 @@ bind d exec dmenu_run -fn 'monospace-11' -nb '#1a1b26' -nf '#c0caf5' -sb '#7aa2f
 # apps
 bind e exec emacs
 bind b exec icecat
-bind f exec firefox
 
 # window management
 bind n focusnext
@@ -158,6 +157,7 @@ bind S vsplit
 bind r remove
 bind R ratrestart
 bind Q quit
+bind q delete
 bind k delete
 bind K kill
 
