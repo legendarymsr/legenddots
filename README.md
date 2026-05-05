@@ -4,30 +4,6 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 
 ---
 
-## Screenshots
-
-### NixOS — Hyprland
-![NixOS Hyprland](screenshots/nixos-hyprland.png)
-*Waybar · rounded windows · 8px gaps · Alacritty + Neovim (tmux split) · Brave*
-
-### Guix — Ratpoison
-![Guix Ratpoison](screenshots/guix-ratpoison.png)
-*No WM chrome · bare 14px status bar · Alacritty + Emacs (tmux split) · Emacs EWW*
-
-### Arch — Niri
-![Arch Niri](screenshots/arch-niri.png)
-*Waybar · three scrollable columns · third window clipped at screen edge · Brave*
-
-### Arch — i3
-![Arch i3](screenshots/arch-i3.png)
-*Polybar · split left pane (fastfetch top / git log bottom) · sharp title bars · Brave*
-
-### Arch — Hyprland
-![Arch Hyprland](screenshots/arch-hyprland.png)
-*Waybar · rounded windows · 8px gaps · Alacritty + Neovim (tmux split) · Brave*
-
----
-
 ## Browsers
 
 | Config | Browser |
