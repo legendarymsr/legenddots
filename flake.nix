@@ -25,35 +25,29 @@
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
-          ./configuration.nix
-          ./system.nix
-
+          ./hosts/legend-box
           home-manager.nixosModules.home-manager
           {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
+            home-manager.useGlobalPkgs    = true;
+            home-manager.useUserPackages  = true;
             home-manager.extraSpecialArgs = { inherit inputs; };
-            home-manager.users.legend = {
-              imports = [
-                nixvim.homeManagerModules.nixvim
-                ./home.nix
-              ];
-            };
+            home-manager.users.legend.imports = [
+              nixvim.homeManagerModules.nixvim
+              ./hosts/legend-box/home.nix
+            ];
           }
         ];
       };
 
-      devShells.${system}.pentest = pkgs.mkShell {
-        name = "pentest";
-        packages = with pkgs; [
-          metasploit  # exploitation framework
-          burpsuite   # web proxy / scanner
-          ghidra      # reverse engineering
-          hashcat     # GPU password cracking
+      homeConfigurations."legend@legend-box" = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        extraSpecialArgs = { inherit inputs; };
+        modules = [
+          nixvim.homeManagerModules.nixvim
+          ./hosts/legend-box/home.nix
         ];
-        shellHook = ''
-          echo "pentest shell — metasploit  burpsuite  ghidra  hashcat"
-        '';
       };
+
+      devShells.${system}.pentest = import ./shells/pentest.nix { inherit pkgs; };
     };
 }
