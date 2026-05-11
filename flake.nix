@@ -18,7 +18,8 @@
   outputs = { self, nixpkgs, home-manager, nixvim, ... }@inputs:
     let
       system = "x86_64-linux";
-      lib = nixpkgs.lib;
+      pkgs   = nixpkgs.legacyPackages.${system};
+      lib    = nixpkgs.lib;
     in {
       nixosConfigurations.legend-box = lib.nixosSystem {
         inherit system;
@@ -40,6 +41,19 @@
             };
           }
         ];
+      };
+
+      devShells.${system}.pentest = pkgs.mkShell {
+        name = "pentest";
+        packages = with pkgs; [
+          metasploit  # exploitation framework
+          burpsuite   # web proxy / scanner
+          ghidra      # reverse engineering
+          hashcat     # GPU password cracking
+        ];
+        shellHook = ''
+          echo "pentest shell — metasploit  burpsuite  ghidra  hashcat"
+        '';
       };
     };
 }
