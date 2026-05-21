@@ -1,0 +1,12 @@
+arch-install-scripts
+base
+dosfstools
+e2fsprogs
+efibootmgr
+gptfdisk
+grub
+linux
+linux-firmware
+networkmanager
+parted
+syslinux
