@@ -29,8 +29,12 @@ PACMAN_PKGS=(
     xclip
     xorg-xsetroot
     brightnessctl
+    pipewire
+    pipewire-alsa
+    pipewire-pulse
     wireplumber
     pavucontrol
+    xss-lock
     papirus-icon-theme
     ttf-jetbrains-mono-nerd
 )
@@ -63,8 +67,10 @@ link "$REPO_DIR/rofi/config.rasi" "$HOME/.config/rofi/config.rasi"
 
 chmod +x "$HOME/.config/polybar/launch.sh"
 
-info "Enabling wireplumber..."
-systemctl --user enable --now wireplumber.service 2>/dev/null && success "wireplumber enabled" || warn "wireplumber not found, skipping"
+info "Enabling pipewire..."
+systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
+systemctl --user enable --now pipewire-pulse.socket 2>/dev/null && success "pipewire-pulse enabled" || warn "pipewire-pulse not found, skipping"
+systemctl --user enable --now wireplumber.service   2>/dev/null && success "wireplumber enabled"    || warn "wireplumber not found, skipping"
 
 echo ""
 echo -e "${GREEN}i3 rice installed.${NC}"
