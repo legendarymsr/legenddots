@@ -80,12 +80,12 @@ window#waybar {
   padding: 0 8px;
 }
 
-#pulseaudio {
+#wireplumber {
   color: #bb9af7;
   padding: 0 8px;
 }
 
-#pulseaudio.muted {
+#wireplumber.muted {
   color: #414868;
 }
 
