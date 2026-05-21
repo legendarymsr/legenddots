@@ -29,6 +29,9 @@ PACMAN_PKGS=(
     slurp
     wl-clipboard
     brightnessctl
+    pipewire
+    pipewire-alsa
+    pipewire-pulse
     wireplumber
     pavucontrol
     polkit-gnome
@@ -63,10 +66,12 @@ link "$REPO_DIR/hyprpaper.conf" "$HOME/.config/hypr/hyprpaper.conf"
 link "$REPO_DIR/hyprlock.conf"  "$HOME/.config/hypr/hyprlock.conf"
 link "$REPO_DIR/waybar"         "$HOME/.config/waybar"
 
-warn "No wallpaper set — add one at ~/.config/hyprland/wallpaper.jpg or edit hyprpaper.conf"
+warn "No wallpaper set — add one at ~/.config/hypr/wallpaper.jpg or edit hyprpaper.conf"
 
-info "Enabling wireplumber..."
-systemctl --user enable --now wireplumber.service 2>/dev/null && success "wireplumber enabled" || warn "wireplumber not found, skipping"
+info "Enabling pipewire..."
+systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
+systemctl --user enable --now pipewire-pulse.socket 2>/dev/null && success "pipewire-pulse enabled" || warn "pipewire-pulse not found, skipping"
+systemctl --user enable --now wireplumber.service   2>/dev/null && success "wireplumber enabled"    || warn "wireplumber not found, skipping"
 
 echo ""
 echo -e "${GREEN}Hyprland rice installed.${NC}"

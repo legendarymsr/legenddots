@@ -68,7 +68,7 @@ binds {
     Mod+d { spawn "fuzzel"; }
     Mod+b { spawn "brave"; }
     Mod+Shift+q { close-window; }
-    Mod+q { quit; }
+    Mod+Shift+e { quit; }
     Mod+Tab { focus-column-right; }
     Mod+Shift+p { power-off-monitors; }
     Mod+Escape { spawn "swaylock" "-c" "1a1b26"; }
