@@ -7,7 +7,7 @@
 
 (operating-system
   (host-name "legend-box")
-  (timezone "Europe/Berlin")
+  (timezone "Europe/Brussels")
   (locale "en_US.utf8")
 
   (kernel-arguments

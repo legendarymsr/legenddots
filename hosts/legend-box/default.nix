@@ -42,5 +42,7 @@
   # ── Fonts ───────────────────────────────────────────────────────────────────────────
   fonts.packages = with pkgs; [ nerd-fonts.jetbrains-mono ];
 
+  time.timeZone = "Europe/Brussels";
+
   system.stateVersion = "25.11";
 }
