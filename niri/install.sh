@@ -33,6 +33,9 @@ PACMAN_PKGS=(
     dunst
     alacritty
     brightnessctl
+    pipewire
+    pipewire-alsa
+    pipewire-pulse
     wireplumber
     pavucontrol
     ttf-jetbrains-mono-nerd
@@ -74,7 +77,9 @@ link "$REPO_DIR/swaylock"           "$HOME/.config/swaylock"
 
 # ── systemd user services ─────────────────────────────────────────────────────
 info "Enabling systemd user services..."
-systemctl --user enable --now wireplumber.service 2>/dev/null && success "wireplumber enabled" || warn "wireplumber service not found, skipping"
+systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
+systemctl --user enable --now pipewire-pulse.socket 2>/dev/null && success "pipewire-pulse enabled" || warn "pipewire-pulse not found, skipping"
+systemctl --user enable --now wireplumber.service   2>/dev/null && success "wireplumber enabled"    || warn "wireplumber not found, skipping"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""

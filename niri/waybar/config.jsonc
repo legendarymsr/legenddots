@@ -9,7 +9,7 @@
 
   "modules-left": ["niri/workspaces", "niri/window"],
   "modules-center": ["clock"],
-  "modules-right": ["pulseaudio", "network", "cpu", "memory", "battery", "tray"],
+  "modules-right": ["wireplumber", "network", "cpu", "memory", "battery", "tray"],
 
   "niri/workspaces": {
     "format": "{index}"
@@ -53,12 +53,10 @@
     "tooltip-format": "{ipaddr} via {gwaddr}"
   },
 
-  "pulseaudio": {
+  "wireplumber": {
     "format": "{icon} {volume}%",
-    "format-muted": "󰝟 ",
-    "format-icons": {
-      "default": ["", "", ""]
-    },
+    "format-muted": "󰝟",
+    "format-icons": ["", "", ""],
     "on-click": "pavucontrol"
   },
 
