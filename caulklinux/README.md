@@ -3,39 +3,259 @@
 Minimal Arch-based ISO. Single-file TUI installer written in C — static binary,
 raw `termios`, zero ncurses. GPL-2.0.
 
-```
-┌─────────────────────────────────────────────────┐
-│              CaulkLinux Installer               │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Modes:  i3 (X11)  Hyprland (Wayland)  Niri    │
-│                                                 │
-│  Dotfiles are copied from /dots on the ISO.     │
-│                                                 │
-│  All data on the selected disk will be erased.  │
-└─────────────────────────────────────────────────┘
-```
+---
 
 ## Install Modes
 
-| Mode     | Display | WM       | Bar     | Launcher | Lock      |
-|----------|---------|----------|---------|----------|-----------|
-| i3       | X11     | i3-wm    | polybar | rofi     | i3lock    |
-| Hyprland | Wayland | hyprland | waybar  | fuzzel   | hyprlock  |
-| Niri     | Wayland | niri     | waybar  | fuzzel   | swaylock  |
+### i3 — X11 tiling
 
-Each mode installs only its own stack — nothing extra.
+The classic X11 stack. Fast, keyboard-driven, works on any hardware including
+machines without Wayland support.
 
-## Installer Steps
+| Component    | Package             |
+|--------------|---------------------|
+| WM           | i3-wm               |
+| Bar          | polybar             |
+| Launcher     | rofi                |
+| Locker       | i3lock              |
+| Compositor   | picom               |
+| Notifications| dunst               |
+| Login        | lightdm             |
 
-1. Disk selection
-2. Username + password + hostname
-3. Timezone + keymap
-4. Window manager
-5. Confirm → install
+---
 
-UEFI: GPT with 512 MB EFI partition + ext4 root.  
-BIOS: MBR with single ext4 root.
+### Hyprland — Wayland compositor
+
+Eye candy and animations with full Wayland. Requires a GPU with good Mesa/DRM
+support (most modern AMD/Intel; Nvidia works with proprietary drivers).
+
+| Component    | Package                         |
+|--------------|---------------------------------|
+| Compositor   | hyprland                        |
+| Bar          | waybar                          |
+| Launcher     | fuzzel                          |
+| Locker       | hyprlock                        |
+| Notifications| dunst                           |
+| Portals      | xdg-desktop-portal-hyprland     |
+
+---
+
+### Niri — Wayland scrolling WM
+
+Infinite scrolling canvas of windows. Wayland-native, wlroots-based. Suits
+ultrawide or multi-monitor setups.
+
+| Component    | Package                      |
+|--------------|------------------------------|
+| WM           | niri                         |
+| Bar          | waybar                       |
+| Launcher     | fuzzel                       |
+| Locker       | swaylock                     |
+| Notifications| dunst                        |
+| Portals      | xdg-desktop-portal-gnome     |
+
+---
+
+### Custom — Nerd mode
+
+Skip the presets. A scrollable checkbox list lets you hand-pick every package
+before install. ~45 options across WMs, bars, launchers, terminals, editors,
+browsers, media tools, audio, and fonts. Dotfiles are copied for any WM you
+selected.
+
+---
+
+## Installer Walkthrough
+
+### 1 — Welcome
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                  CaulkLinux Installer                    ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  Minimal Arch-based Linux
+
+  Modes:  i3   Hyprland   Niri   Custom
+
+  Dotfiles are copied from /dots on the ISO.
+
+  All data on the selected disk will be erased.
+
+  ╚══════════════════════════════════════════════════════════╝
+  Press Enter to begin...
+```
+
+---
+
+### 2 — Disk selection
+
+All block devices are discovered from `/sys/block`. Loop, RAM, and optical
+drives are filtered out automatically.
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                Select Installation Disk                  ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  ▌ /dev/nvme0n1                                            ▐
+    /dev/sda
+    /dev/sdb
+
+  [j/↓] down  [k/↑] up  [Enter] select
+
+  ╚══════════════════════════════════════════════════════════╝
+  Selected: /dev/nvme0n1  (UEFI)
+```
+
+UEFI is detected from `/sys/firmware/efi`. The partition layout is chosen
+automatically:
+
+- **UEFI** → GPT, 512 MB FAT32 EFI partition + ext4 root
+- **BIOS** → MBR, single ext4 root with boot flag
+
+---
+
+### 3 — User setup
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                       User Setup                         ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  Username: legend
+  Password: ········
+  Confirm : ········
+  Hostname: arch-box
+
+  ╚══════════════════════════════════════════════════════════╝
+```
+
+Password is typed hidden. A mismatch loops back to retry.
+
+---
+
+### 4 — Locale
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                         Locale                           ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  Timezone (e.g. Europe/Brussels): Europe/Brussels
+  Keymap   (e.g. se, us, de):      se
+
+  ╚══════════════════════════════════════════════════════════╝
+```
+
+Defaults to `Europe/Brussels` / `se` if left empty.
+
+---
+
+### 5 — Window manager
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                     Window Manager                       ║
+  ╠══════════════════════════════════════════════════════════╣
+
+    i3        — X11 · i3-wm · polybar · rofi · i3lock
+  ▌ Hyprland  — Wayland · hyprland · waybar · fuzzel · hyprlock ▐
+    Niri      — Wayland · niri · waybar · fuzzel · swaylock
+    Custom    — pick your own packages (nerd mode)
+
+  [j/↓] down  [k/↑] up  [Enter] select
+
+  ╚══════════════════════════════════════════════════════════╝
+```
+
+Choosing **Custom** opens the package picker on the next screen.
+
+---
+
+### 6 — Custom package picker *(nerd mode only)*
+
+Space toggles a package. Enter confirms and proceeds to the confirm screen.
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                    Custom Packages                       ║
+  ╠══════════════════════════════════════════════════════════╣
+  [j/k] move   [Space] toggle   [Enter] confirm
+
+    [x] alacritty             Alacritty (GPU terminal)
+  ▌ [x] hyprland              Hyprland compositor (Wayland)  ▐
+    [ ] hyprlock               Hyprlock (Hyprland locker)
+    [ ] i3-wm                  i3 tiling WM (X11)
+    [ ] kitty                  Kitty (GPU terminal)
+    [x] neovim                 Neovim
+    [x] pipewire               PipeWire audio server
+    [x] pipewire-alsa          PipeWire ALSA compat
+    [x] pipewire-pulse         PipeWire PulseAudio compat
+    [ ] rofi                   Rofi launcher (X11/Wayland)
+
+  ╚══════════════════════════════════════════════════════════╝
+  6 selected   1/46 shown
+```
+
+Categories available: window managers, bars, launchers, terminals, lockers,
+notifications, compositors, browsers, editors, file managers, media, screenshot
+tools, clipboard, audio, portals, polkit, fonts.
+
+---
+
+### 7 — Confirm
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                  Confirm Installation                    ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  Disk     : /dev/nvme0n1
+  Firmware : UEFI
+  User     : legend
+  Hostname : arch-box
+  Timezone : Europe/Brussels
+  Keymap   : se
+  WM       : Hyprland
+
+  ALL DATA ON /dev/nvme0n1 WILL BE ERASED.
+
+  ▌ Install now                                             ▐
+    Abort
+
+  ╚══════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 8 — Installation
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║                  Installing CaulkLinux                   ║
+  ╠══════════════════════════════════════════════════════════╣
+
+  → Partitioning /dev/nvme0n1 ...
+  → Mounting ...
+  → Installing packages ...
+  → Configuring system ...
+  → Copying dotfiles ...
+  → Unmounting ...
+
+  Installation complete!
+  Log: /tmp/caulk-install.log
+
+  Remove the USB and reboot.
+
+  Press Enter to reboot...
+
+  ╚══════════════════════════════════════════════════════════╝
+```
+
+Full log is written to `/tmp/caulk-install.log` on the live system.
+
+---
 
 ## Build
 
@@ -48,16 +268,18 @@ sudo pacman -S archiso dosfstools squashfs-tools gcc
 **Build ISO:**
 
 ```sh
-git clone https://github.com/legendarymsr/caulklinux
-cd caulklinux
-
-# Add your dotfiles
-cp -r /path/to/your/dots/* dots/
-
-# Compile installer + build ISO
+cd legenddots/caulklinux
 make iso
 # → caulklinux-YYYY.MM-x86_64.iso
 ```
+
+Remove old builds before rebuilding:
+
+```sh
+make clean
+```
+
+---
 
 ## Flash & Boot
 
@@ -66,6 +288,8 @@ dd if=caulklinux-*.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
 Boot from USB. The installer launches automatically on root login.
+
+---
 
 ## Dotfiles Layout
 
@@ -84,6 +308,10 @@ dots/
 └── .zshrc          → ~/
 ```
 
+Custom mode copies dotfiles for every WM you selected.
+
+---
+
 ## Source
 
 ```
@@ -98,6 +326,8 @@ caulklinux/
 └── Makefile
 ```
 
+---
+
 ## Principles
 
 - No proprietary software
@@ -105,6 +335,8 @@ caulklinux/
 - No AI tools
 - Minimal — only what's needed per WM
 - One C file, zero library dependencies beyond libc
+
+---
 
 ## License
 
