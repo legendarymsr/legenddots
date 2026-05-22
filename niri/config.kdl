@@ -68,19 +68,19 @@ binds {
     Mod+d { spawn "fuzzel"; }
     Mod+b { spawn "brave-origin-nightly"; }
     Mod+Shift+q { close-window; }
-    Mod+Shift+e { quit; }
+    Mod+Shift+e { quit skip-confirmation=true; }
     Mod+Tab { focus-column-right; }
     Mod+Shift+p { power-off-monitors; }
     Mod+Escape { spawn "swaylock" "-c" "1a1b26"; }
 
     Mod+Left  { focus-column-left; }
     Mod+Right { focus-column-right; }
-    Mod+Up    { focus-window-up; }
-    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-or-workspace-up; }
+    Mod+Down  { focus-window-or-workspace-down; }
     Mod+h { focus-column-left; }
     Mod+l { focus-column-right; }
-    Mod+j { focus-window-down; }
-    Mod+k { focus-window-up; }
+    Mod+j { focus-window-or-workspace-down; }
+    Mod+k { focus-window-or-workspace-up; }
 
     Mod+Shift+h { move-column-left; }
     Mod+Shift+l { move-column-right; }
