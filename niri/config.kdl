@@ -59,7 +59,7 @@ window-rule {
 }
 
 window-rule {
-    match app-id="alacritty"
+    match app-id="Alacritty"
     opacity 0.95
 }
 
