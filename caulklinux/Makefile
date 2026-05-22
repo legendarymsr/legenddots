@@ -19,6 +19,7 @@ $(BIN): installer/install.c
 iso: installer
 	cp $(BIN) $(PROFILE)/airootfs/usr/bin/caulk-install
 	chmod +x $(PROFILE)/airootfs/usr/bin/caulk-install
+	sudo rm -rf $(WORK)
 	sudo mkarchiso -v -w $(WORK) -o $(OUT) $(PROFILE)
 
 clean:
