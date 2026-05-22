@@ -273,7 +273,7 @@ static int find_disks(char disks[][64], int max) {
     return n;
 }
 
-/* partition suffix: nvme0n1 → nvme0n1p1, sda → sda1 */
+/* partition suffix: nvme0n1/mmcblk → p1, sda/vda/hda → 1 */
 static void pname(const char *disk, int num, char *out, int sz) {
     if (strstr(disk, "nvme") || strstr(disk, "mmcblk"))
         snprintf(out, sz, "%sp%d", disk, num);
@@ -320,12 +320,18 @@ static void do_partition(const char *disk, int uefi, char *p1, char *p2, int sz)
         sh("parted -s %s mkpart ESP fat32 1MiB 513MiB", disk);
         sh("parted -s %s set 1 esp on", disk);
         sh("parted -s %s mkpart primary ext4 513MiB 100%%", disk);
-        sh("mkfs.fat -F32 %s", p1);
-        sh("mkfs.ext4 -F %s", p2);
     } else {
         sh("parted -s %s mklabel msdos", disk);
         sh("parted -s %s mkpart primary ext4 1MiB 100%%", disk);
         sh("parted -s %s set 1 boot on", disk);
+    }
+    /* let the kernel register the new partition table before formatting */
+    sh("partprobe %s", disk);
+    sh("udevadm settle");
+    if (uefi) {
+        sh("mkfs.fat -F32 %s", p1);
+        sh("mkfs.ext4 -F %s", p2);
+    } else {
         sh("mkfs.ext4 -F %s", p1);
         snprintf(p2, sz, "none");
     }
@@ -387,6 +393,10 @@ static void do_configure(const char *root, const Cfg *c, const char *p1, const c
             break;
     }
 
+    /* mount EFI before genfstab so it gets an entry in fstab */
+    if (c->uefi)
+        sh("mount --mkdir %s %s/boot/efi", p1, root);
+
     sh("genfstab -U %s >> %s/etc/fstab", root, root);
     chr(root, "ln -sf /usr/share/zoneinfo/%s /etc/localtime && hwclock --systohc", c->tz);
     chr(root, "sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen");
@@ -396,6 +406,8 @@ static void do_configure(const char *root, const Cfg *c, const char *p1, const c
     chr(root, "printf '127.0.0.1 localhost\\n::1 localhost\\n127.0.1.1 %s\\n' >> /etc/hosts", c->host);
     chr(root, "useradd -m -G wheel,audio,video,network -s /bin/zsh %s", c->user);
     chr(root, "echo '%s:%s' | chpasswd", c->user, c->pass);
+    /* set root password = user password so emergency shell is always accessible */
+    chr(root, "echo 'root:%s' | chpasswd", c->pass);
     chr(root, "sed -i 's/^# %%wheel ALL=(ALL:ALL) ALL/%%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers");
     chr(root, "systemctl enable NetworkManager");
 
@@ -414,12 +426,10 @@ static void do_configure(const char *root, const Cfg *c, const char *p1, const c
         }
     }
 
-    if (c->uefi) {
-        sh("mount --mkdir %s /mnt/boot/efi", p1);
+    if (c->uefi)
         chr(root, "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=CaulkLinux");
-    } else {
+    else
         chr(root, "grub-install --target=i386-pc %s", c->disk);
-    }
     chr(root, "grub-mkconfig -o /boot/grub/grub.cfg");
     (void)p2;
 }
