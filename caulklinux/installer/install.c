@@ -266,6 +266,7 @@ static int find_disks(char disks[][64], int max) {
         if (strncmp(nm, "ram",  3) == 0) continue;
         if (strncmp(nm, "zram", 4) == 0) continue;
         if (strncmp(nm, "sr",   2) == 0) continue;
+        if (strlen(nm) > 58) continue;
         snprintf(disks[n], 64, "/dev/%s", nm);
         n++;
     }
@@ -427,7 +428,8 @@ static void do_configure(const char *root, const Cfg *c, const char *p1, const c
     }
 
     if (c->uefi)
-        chr(root, "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=CaulkLinux");
+        /* --removable writes fallback EFI path so the system boots even without NVRAM entries */
+        chr(root, "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=CaulkLinux --removable");
     else
         chr(root, "grub-install --target=i386-pc %s", c->disk);
     chr(root, "grub-mkconfig -o /boot/grub/grub.cfg");
@@ -548,6 +550,15 @@ static void scr_user(Cfg *c) {
         sleep(2);
         scr_user(c);
         return;
+    }
+    /* single quotes would break the chpasswd shell invocation */
+    for (const char *p = c->pass; *p; p++) {
+        if (*p == '\'' || *p == '\\') {
+            printf(RR "  Password may not contain ' or \\\n" R0);
+            sleep(2);
+            scr_user(c);
+            return;
+        }
     }
 
     printf("  " RBL "Hostname: " R0); fflush(stdout);
@@ -687,14 +698,13 @@ static void scr_install(const Cfg *c) {
     fflush(stdout);
 
 #define STEP(label, ...) \
-    do { printf("  " RBL "→ " R0 label "\n"); fflush(stdout); __VA_ARGS__; } while(0)
+    do { printf("  " RBL "→ " R0 "%s\n", (label)); fflush(stdout); __VA_ARGS__; } while(0)
 
-    STEP("Partitioning %s ...", c->disk,
+    STEP("Partitioning disk ...",
          do_partition(c->disk, c->uefi, p1, p2, sizeof p1));
 
     STEP("Mounting ...",
-         sh("mount %s %s", c->uefi ? p2 : p1, root);
-         if (c->uefi) sh("mkdir -p %s/boot/efi", root));
+         sh("mount %s %s", c->uefi ? p2 : p1, root));
 
     STEP("Installing packages ...",
          do_pacstrap(root, c));
