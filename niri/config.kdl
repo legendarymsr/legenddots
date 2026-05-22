@@ -66,7 +66,7 @@ window-rule {
 binds {
     Mod+Return { spawn "alacritty"; }
     Mod+d { spawn "fuzzel"; }
-    Mod+b { spawn "brave"; }
+    Mod+b { spawn "brave-origin-nightly"; }
     Mod+Shift+q { close-window; }
     Mod+Shift+e { quit; }
     Mod+Tab { focus-column-right; }
