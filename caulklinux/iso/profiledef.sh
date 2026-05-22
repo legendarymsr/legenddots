@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034
 
 iso_name="caulklinux"
-iso_label="CAULK_$(date +%Y%m)"
+iso_label="CAULKLINUX"
 iso_publisher="CaulkLinux <https://github.com/legendarymsr/caulklinux>"
 iso_application="CaulkLinux"
 iso_version="$(date +%Y.%m)"
