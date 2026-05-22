@@ -3,3 +3,8 @@ undo/
 backups/
 swp/
 lazy-lock.json
+caulklinux/iso/airootfs/usr/bin/caulk-install
+caulklinux/installer/install
+caulklinux/*.iso
+caulklinux/OVMF_VARS.fd
+caulklinux/test.qcow2
