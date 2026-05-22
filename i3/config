@@ -39,7 +39,7 @@ exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -c 1a1b26 --nofork
 # ── Keybinds ──────────────────────────────────────────────────────────────────
 bindsym $mod+Return exec alacritty
 bindsym $mod+d exec rofi -show drun
-bindsym $mod+b exec brave
+bindsym $mod+b exec brave-origin-nightly
 bindsym $mod+Shift+q kill
 bindsym $mod+Shift+e exec i3-msg exit
 bindsym $mod+Tab focus right
