@@ -28,6 +28,7 @@ PACMAN_PKGS=(
     maim
     xclip
     xorg-xsetroot
+    xorg-setxkbmap
     brightnessctl
     pipewire
     pipewire-alsa
@@ -60,10 +61,12 @@ link() {
 }
 
 info "Linking configs..."
-link "$REPO_DIR/config"           "$HOME/.config/i3/config"
-link "$REPO_DIR/picom.conf"       "$HOME/.config/picom/picom.conf"
-link "$REPO_DIR/polybar"          "$HOME/.config/polybar"
-link "$REPO_DIR/rofi/config.rasi" "$HOME/.config/rofi/config.rasi"
+link "$REPO_DIR/config"             "$HOME/.config/i3/config"
+link "$REPO_DIR/picom.conf"         "$HOME/.config/picom/picom.conf"
+link "$REPO_DIR/polybar"            "$HOME/.config/polybar"
+link "$REPO_DIR/rofi/config.rasi"   "$HOME/.config/rofi/config.rasi"
+link "$REPO_DIR/dunst/dunstrc"      "$HOME/.config/dunst/dunstrc"
+link "$REPO_DIR/../alacritty.toml"  "$HOME/.config/alacritty/alacritty.toml"
 
 chmod +x "$HOME/.config/polybar/launch.sh"
 

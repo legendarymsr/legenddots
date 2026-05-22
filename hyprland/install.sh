@@ -38,6 +38,7 @@ PACMAN_PKGS=(
     qt6ct
     ttf-jetbrains-mono-nerd
     xdg-desktop-portal-hyprland
+    xdg-desktop-portal-gtk
 )
 
 AUR_PKGS=(
@@ -61,10 +62,11 @@ link() {
 }
 
 info "Linking configs..."
-link "$REPO_DIR/hyprland.conf"  "$HOME/.config/hypr/hyprland.conf"
-link "$REPO_DIR/hyprpaper.conf" "$HOME/.config/hypr/hyprpaper.conf"
-link "$REPO_DIR/hyprlock.conf"  "$HOME/.config/hypr/hyprlock.conf"
-link "$REPO_DIR/waybar"         "$HOME/.config/waybar"
+link "$REPO_DIR/hyprland.conf"       "$HOME/.config/hypr/hyprland.conf"
+link "$REPO_DIR/hyprpaper.conf"      "$HOME/.config/hypr/hyprpaper.conf"
+link "$REPO_DIR/hyprlock.conf"       "$HOME/.config/hypr/hyprlock.conf"
+link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
+link "$REPO_DIR/../alacritty.toml"   "$HOME/.config/alacritty/alacritty.toml"
 
 warn "No wallpaper set — add one at ~/.config/hypr/wallpaper.jpg or edit hyprpaper.conf"
 

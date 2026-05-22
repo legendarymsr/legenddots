@@ -39,7 +39,7 @@ PACMAN_PKGS=(
     wireplumber
     pavucontrol
     ttf-jetbrains-mono-nerd
-    xdg-desktop-portal-gnome
+    xdg-desktop-portal-gtk
 )
 
 AUR_PKGS=(
@@ -69,11 +69,12 @@ link() {
 
 info "Linking configs..."
 
-link "$REPO_DIR/config.kdl"         "$HOME/.config/niri/config.kdl"
-link "$REPO_DIR/waybar"             "$HOME/.config/waybar"
-link "$REPO_DIR/fuzzel"             "$HOME/.config/fuzzel"
-link "$REPO_DIR/dunst"              "$HOME/.config/dunst"
-link "$REPO_DIR/swaylock"           "$HOME/.config/swaylock"
+link "$REPO_DIR/config.kdl"          "$HOME/.config/niri/config.kdl"
+link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
+link "$REPO_DIR/fuzzel"              "$HOME/.config/fuzzel"
+link "$REPO_DIR/dunst"               "$HOME/.config/dunst"
+link "$REPO_DIR/swaylock"            "$HOME/.config/swaylock"
+link "$REPO_DIR/../alacritty.toml"   "$HOME/.config/alacritty/alacritty.toml"
 
 # ── systemd user services ─────────────────────────────────────────────────────
 info "Enabling systemd user services..."
