@@ -14,7 +14,6 @@ input {
     }
 
     warp-mouse-to-focus
-    focus-follows-mouse
 }
 
 layout {
@@ -60,7 +59,7 @@ window-rule {
 }
 
 window-rule {
-    match app-id=r#"Alacritty"#
+    match app-id="alacritty"
     opacity 0.95
 }
 
@@ -69,7 +68,7 @@ binds {
     Mod+d { spawn "fuzzel"; }
     Mod+b { spawn "brave-origin-nightly"; }
     Mod+Shift+q { close-window; }
-    Mod+Shift+e { quit skip-confirmation=true; }
+    Mod+Shift+e { quit; }
     Mod+Tab { focus-column-right; }
     Mod+Shift+p { power-off-monitors; }
     Mod+Escape { spawn "swaylock" "-c" "1a1b26"; }
@@ -124,7 +123,7 @@ binds {
     XF86MonBrightnessUp   { spawn "brightnessctl" "set" "+10%"; }
     XF86MonBrightnessDown { spawn "brightnessctl" "set" "10%-"; }
 
-    Print      { screenshot; }
-    Ctrl+Print { screenshot-screen; }
-    Alt+Print  { screenshot-window; }
+    Print       { screenshot; }
+    Ctrl+Print  { screenshot-screen; }
+    Alt+Print   { screenshot-window; }
 }
