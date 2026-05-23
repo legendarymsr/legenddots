@@ -14,6 +14,7 @@ input {
     }
 
     warp-mouse-to-focus
+    focus-follows-mouse
 }
 
 layout {
@@ -59,7 +60,7 @@ window-rule {
 }
 
 window-rule {
-    match app-id="Alacritty"
+    match app-id=r#"Alacritty"#
     opacity 0.95
 }
 
@@ -123,7 +124,7 @@ binds {
     XF86MonBrightnessUp   { spawn "brightnessctl" "set" "+10%"; }
     XF86MonBrightnessDown { spawn "brightnessctl" "set" "10%-"; }
 
-    Print       { screenshot; }
-    Ctrl+Print  { screenshot-screen; }
-    Alt+Print   { screenshot-window; }
+    Print      { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print  { screenshot-window; }
 }
