@@ -75,12 +75,12 @@ binds {
 
     Mod+Left  { focus-column-left; }
     Mod+Right { focus-column-right; }
-    Mod+Up    { focus-window-or-workspace-up; }
-    Mod+Down  { focus-window-or-workspace-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Down  { focus-window-down; }
     Mod+h { focus-column-left; }
     Mod+l { focus-column-right; }
-    Mod+j { focus-window-or-workspace-down; }
-    Mod+k { focus-window-or-workspace-up; }
+    Mod+j { focus-window-down; }
+    Mod+k { focus-window-up; }
 
     Mod+Shift+h { move-column-left; }
     Mod+Shift+l { move-column-right; }
