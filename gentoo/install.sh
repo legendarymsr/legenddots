@@ -269,22 +269,22 @@ case "$DE_CHOICE" in
                 gui-apps/waybar gui-apps/fuzzel gui-apps/swaylock \
                 gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
                 x11-misc/dunst sys-power/brightnessctl media-sound/pavucontrol \
-                gnome-extra/polkit-gnome dev-qt/qt6ct \
+                gnome-extra/polkit-gnome gui-apps/qt6ct \
                 gui-libs/xdg-desktop-portal-hyprland \
                 sys-apps/xdg-desktop-portal-gtk \
-                media-fonts/nerd-fonts www-client/brave-bin" ;;
+                media-fonts/nerdfonts www-client/brave-bin" ;;
     3) DE_PKGS="gui-wm/niri gui-apps/swaybg gui-apps/swaylock \
                 gui-apps/waybar gui-apps/fuzzel \
                 x11-misc/dunst app-misc/brightnessctl media-sound/pavucontrol \
                 sys-apps/xdg-desktop-portal-gtk \
-                media-fonts/nerd-fonts www-client/brave-bin" ;;
+                media-fonts/nerdfonts www-client/brave-bin" ;;
     4) DE_PKGS="x11-wm/i3 x11-misc/polybar x11-misc/rofi x11-misc/picom \
                 x11-misc/dunst x11-misc/i3lock x11-misc/xss-lock \
                 x11-apps/xrandr x11-apps/xsetroot x11-apps/setxkbmap \
                 x11-base/xorg-server media-gfx/maim x11-misc/xclip \
                 sys-power/brightnessctl media-sound/pavucontrol \
                 x11-themes/papirus-icon-theme \
-                media-fonts/nerd-fonts www-client/brave-bin" ;;
+                media-fonts/nerdfonts www-client/brave-bin" ;;
     *) DE_PKGS="" ;;
 esac
 
@@ -334,13 +334,26 @@ else
 fi
 ok "Kernel built."
 
-# ── Guru overlay (needed for Hyprland / niri) ─────────────────────────────────
+# ── Overlays ──────────────────────────────────────────────────────────────────
 if [[ "${NEED_GURU}" -eq 1 ]]; then
-    info "Enabling guru overlay for DE packages..."
     emerge app-eselect/eselect-repository dev-vcs/git
+
+    # guru: nerdfonts, brightnessctl, hyprland, niri
     eselect repository enable guru
     emaint sync --repo guru
-    ok "Guru overlay ready."
+    ok "guru overlay ready."
+
+    # gentoo-zh: brave-bin
+    eselect repository add gentoo-zh git https://github.com/microcai/gentoo-zh.git
+    emaint sync --repo gentoo-zh
+    ok "gentoo-zh overlay ready."
+
+    # hyproverlay: xdg-desktop-portal-hyprland (Hyprland only)
+    if [[ "${DE_CHOICE}" == "2" ]]; then
+        eselect repository add hyproverlay git https://codeberg.org/hyproverlay/hyproverlay.git
+        emaint sync --repo hyproverlay
+        ok "hyproverlay ready."
+    fi
 fi
 
 # ── Base system packages ───────────────────────────────────────────────────────
@@ -370,7 +383,7 @@ ok "Base packages installed."
 if [[ -n "${DE_PKGS}" ]]; then
     # Install only JetBrains Mono from nerd-fonts — the full set is several GB
     mkdir -p /etc/portage/package.use
-    echo "media-fonts/nerd-fonts jetbrains-mono" > /etc/portage/package.use/nerd-fonts
+    echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
     emerge ${DE_PKGS}
     ok "Desktop environment installed."
 fi
