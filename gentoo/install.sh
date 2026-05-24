@@ -322,17 +322,138 @@ ok "Locale set."
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
 emerge sys-kernel/linux-firmware sys-firmware/intel-microcode
-emerge sys-kernel/gentoo-sources
+
+# hardened-sources may be testing-keyworded depending on the current release
+mkdir -p /etc/portage/package.accept_keywords
+echo "sys-kernel/hardened-sources ~amd64" \
+    > /etc/portage/package.accept_keywords/kernel
+
+emerge sys-kernel/hardened-sources
 eselect kernel set 1
 emerge sys-kernel/genkernel
 
-if [[ -f /tmp/kernel-mba.config ]]; then
-    cp /tmp/kernel-mba.config /usr/src/linux/.config
-    genkernel --kernel-config=/usr/src/linux/.config all
-else
-    genkernel --menuconfig=no all
-fi
-ok "Kernel built."
+cd /usr/src/linux
+make defconfig
+
+# ── Intel ME — disable kernel driver access ───────────────────────────────────
+# This removes the kernel's MEI interface; for full neutralisation combine
+# with me_cleaner on the firmware blob after install.
+scripts/config -d CONFIG_INTEL_MEI
+scripts/config -d CONFIG_INTEL_MEI_ME
+scripts/config -d CONFIG_INTEL_MEI_TXE
+scripts/config -d CONFIG_INTEL_MEI_HDCP
+scripts/config -d CONFIG_INTEL_MEI_PXP
+
+# ── CPU: Intel only (Haswell i5-4250U) ───────────────────────────────────────
+scripts/config -e CONFIG_CPU_SUP_INTEL
+scripts/config -d CONFIG_CPU_SUP_AMD
+scripts/config -d CONFIG_CPU_SUP_HYGON
+scripts/config -d CONFIG_CPU_SUP_CENTAUR
+scripts/config -d CONFIG_CPU_SUP_ZHAOXIN
+
+# ── Graphics: Intel HD 5000 (Haswell GT3) ────────────────────────────────────
+scripts/config -e CONFIG_DRM
+scripts/config -e CONFIG_DRM_I915
+scripts/config -d CONFIG_DRM_RADEON
+scripts/config -d CONFIG_DRM_AMDGPU
+scripts/config -d CONFIG_DRM_NOUVEAU
+scripts/config -e CONFIG_BACKLIGHT_CLASS_DEVICE
+
+# ── EFI (required for GRUB on MBA) ───────────────────────────────────────────
+scripts/config -e CONFIG_EFI
+scripts/config -e CONFIG_EFI_STUB
+scripts/config -e CONFIG_FB_EFI
+
+# ── Storage: Apple PCIe SSD (AHCI interface, shows up as /dev/sda) ───────────
+scripts/config -e CONFIG_ATA
+scripts/config -e CONFIG_SATA_AHCI
+scripts/config -e CONFIG_ATA_PIIX
+
+# ── Sound: Intel HDA + Cirrus Logic CS4208 (MBA 6,2 audio codec) ─────────────
+scripts/config -e CONFIG_SND
+scripts/config -e CONFIG_SND_PCI
+scripts/config -e CONFIG_SND_HDA_INTEL
+scripts/config -e CONFIG_SND_HDA_CODEC_HDMI
+scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS
+
+# ── Input: Apple keyboard + trackpad (USB HID, hid-apple driver) ─────────────
+scripts/config -e CONFIG_HID
+scripts/config -e CONFIG_HID_APPLE
+scripts/config -e CONFIG_USB_HID
+scripts/config -e CONFIG_INPUT_EVDEV
+scripts/config -e CONFIG_INPUT_MOUSE
+
+# ── Camera: Apple FaceTime HD (USB UVC) ──────────────────────────────────────
+scripts/config -e CONFIG_MEDIA_SUPPORT
+scripts/config -e CONFIG_MEDIA_USB_SUPPORT
+scripts/config -e CONFIG_USB_VIDEO_CLASS
+
+# ── USB: XHCI (USB 3.0) + EHCI (USB 2.0) ────────────────────────────────────
+scripts/config -e CONFIG_USB_SUPPORT
+scripts/config -e CONFIG_USB
+scripts/config -e CONFIG_USB_XHCI_HCD
+scripts/config -e CONFIG_USB_EHCI_HCD
+scripts/config -e CONFIG_USB_STORAGE
+
+# ── Thunderbolt (USB-C ethernet adapter) ─────────────────────────────────────
+scripts/config -e CONFIG_THUNDERBOLT
+
+# ── Bluetooth: Broadcom USB ───────────────────────────────────────────────────
+scripts/config -e CONFIG_BT
+scripts/config -e CONFIG_BT_HCIBTUSB
+
+# ── Power management ──────────────────────────────────────────────────────────
+scripts/config -e CONFIG_ACPI
+scripts/config -e CONFIG_ACPI_BATTERY
+scripts/config -e CONFIG_ACPI_AC
+scripts/config -e CONFIG_CPU_FREQ
+scripts/config -e CONFIG_CPU_FREQ_GOV_SCHEDUTIL
+scripts/config -e CONFIG_CPU_FREQ_GOV_ONDEMAND
+scripts/config -e CONFIG_X86_INTEL_PSTATE
+scripts/config -e CONFIG_INTEL_IDLE
+scripts/config -e CONFIG_THERMAL
+scripts/config -e CONFIG_X86_PKG_TEMP_THERMAL
+scripts/config -e CONFIG_INTEL_POWERCLAMP
+scripts/config -e CONFIG_PM_SLEEP
+scripts/config -e CONFIG_SUSPEND
+
+# ── Filesystems ───────────────────────────────────────────────────────────────
+scripts/config -e CONFIG_EXT4_FS
+scripts/config -e CONFIG_BTRFS_FS
+scripts/config -e CONFIG_VFAT_FS
+scripts/config -e CONFIG_TMPFS
+
+# ── Networking ────────────────────────────────────────────────────────────────
+scripts/config -e CONFIG_NET
+scripts/config -e CONFIG_INET
+scripts/config -e CONFIG_WIRELESS
+scripts/config -e CONFIG_CFG80211
+scripts/config -e CONFIG_MAC80211
+
+# ── Hardened security options ─────────────────────────────────────────────────
+# hardened-sources enables most of these; we verify the critical ones here.
+scripts/config -e CONFIG_RANDOMIZE_BASE          # KASLR
+scripts/config -e CONFIG_RANDOMIZE_MEMORY        # heap/stack ASLR
+scripts/config -e CONFIG_PAGE_TABLE_ISOLATION    # Meltdown (PTI)
+scripts/config -e CONFIG_RETPOLINE               # Spectre v2
+scripts/config -e CONFIG_STRICT_KERNEL_RWX       # no W+X kernel pages
+scripts/config -e CONFIG_STRICT_MODULE_RWX
+scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM
+scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY
+# Keep module signing enforcement OFF — broadcom-sta (wl) is unsigned
+scripts/config -d CONFIG_MODULE_SIG_FORCE
+
+# Resolve all dependency options automatically
+make olddefconfig
+
+# Build — 4 threads, load cap 3.5 to avoid OOM on 4/8 GB RAM
+make -j4 -l3.5
+make modules_install
+make install
+
+# Build initramfs (kernel is already compiled above)
+genkernel --no-clean --no-mrproper initramfs
+ok "Kernel built and installed."
 
 # ── Overlays ──────────────────────────────────────────────────────────────────
 if [[ "${NEED_GURU}" -eq 1 ]]; then
