@@ -87,8 +87,8 @@ bindsym XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-
 bindsym XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
 bindsym XF86MonBrightnessUp exec brightnessctl set +10%
 bindsym XF86MonBrightnessDown exec brightnessctl set 10%-
-bindsym Print       exec maim -s | xclip -selection clipboard -t image/png
-bindsym Shift+Print exec maim    | xclip -selection clipboard -t image/png
+bindsym Print       exec bash -c 'f="$HOME/Pictures/Screenshots/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"; maim -s "$f" && xclip -selection clipboard -t image/png < "$f"'
+bindsym Shift+Print exec bash -c 'f="$HOME/Pictures/Screenshots/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"; maim    "$f" && xclip -selection clipboard -t image/png < "$f"'
 
 mode "resize" {
     bindsym h resize shrink width 10 px or 10 ppt
