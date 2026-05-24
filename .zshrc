@@ -9,6 +9,8 @@ setopt AUTO_CD
 # Turn off "no match" errors
 setopt nonomatch
 
+fastfetch
+
 # -----------------------------------------------------------------------------
 # ZINIT PLUGIN MANAGER INSTALLATION
 # -----------------------------------------------------------------------------
