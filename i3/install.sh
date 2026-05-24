@@ -28,7 +28,6 @@ PACMAN_PKGS=(
     maim
     xclip
     xorg-xsetroot
-    feh
     xorg-setxkbmap
     brightnessctl
     pipewire
@@ -60,17 +59,6 @@ link() {
     ln -sfn "$src" "$dst"
     success "Linked $dst"
 }
-
-info "Downloading wallpaper..."
-mkdir -p "$HOME/Pictures"
-WALL_URL=$(curl -sf "https://wallhaven.cc/api/v1/w/zmqe1w" | grep -o '"path":"[^"]*"' | cut -d'"' -f4)
-if [[ -n "$WALL_URL" ]]; then
-    curl -L -o "$HOME/Pictures/wallpaper.jpg" "$WALL_URL" \
-        && success "Wallpaper downloaded." \
-        || warn "Wallpaper download failed — place an image at ~/Pictures/wallpaper.jpg manually."
-else
-    warn "Could not fetch wallpaper info — place an image at ~/Pictures/wallpaper.jpg manually."
-fi
 
 info "Linking configs..."
 link "$REPO_DIR/config"             "$HOME/.config/i3/config"

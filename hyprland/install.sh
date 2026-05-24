@@ -68,16 +68,7 @@ link "$REPO_DIR/hyprlock.conf"       "$HOME/.config/hypr/hyprlock.conf"
 link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
 link "$REPO_DIR/../alacritty.toml"   "$HOME/.config/alacritty/alacritty.toml"
 
-info "Downloading wallpaper..."
-mkdir -p "$HOME/Pictures"
-WALL_URL=$(curl -sf "https://wallhaven.cc/api/v1/w/zmqe1w" | grep -o '"path":"[^"]*"' | cut -d'"' -f4)
-if [[ -n "$WALL_URL" ]]; then
-    curl -L -o "$HOME/Pictures/wallpaper.jpg" "$WALL_URL" \
-        && success "Wallpaper downloaded." \
-        || warn "Wallpaper download failed — place an image at ~/Pictures/wallpaper.jpg manually."
-else
-    warn "Could not fetch wallpaper info — place an image at ~/Pictures/wallpaper.jpg manually."
-fi
+warn "No wallpaper set — add one at ~/.config/hypr/wallpaper.jpg or edit hyprpaper.conf"
 
 info "Enabling pipewire..."
 systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
