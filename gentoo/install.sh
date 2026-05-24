@@ -139,6 +139,7 @@ success "Formatted."
 
 # ── Mount ─────────────────────────────────────────────────────────────────────
 header "Mounting"
+mkdir -p /mnt/gentoo
 mount "$PART_ROOT" /mnt/gentoo
 
 if [[ "$FS_TYPE" == "btrfs" ]]; then
@@ -267,7 +268,7 @@ case "$DE_CHOICE" in
     2) DE_PKGS="gui-wm/hyprland gui-apps/hyprpaper gui-apps/hyprlock \
                 gui-apps/waybar gui-apps/fuzzel gui-apps/swaylock \
                 gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
-                x11-misc/dunst app-misc/brightnessctl media-sound/pavucontrol \
+                x11-misc/dunst sys-power/brightnessctl media-sound/pavucontrol \
                 gnome-extra/polkit-gnome dev-qt/qt6ct \
                 gui-libs/xdg-desktop-portal-hyprland \
                 sys-apps/xdg-desktop-portal-gtk \
@@ -281,7 +282,7 @@ case "$DE_CHOICE" in
                 x11-misc/dunst x11-misc/i3lock x11-misc/xss-lock \
                 x11-apps/xrandr x11-apps/xsetroot x11-apps/setxkbmap \
                 x11-base/xorg-server media-gfx/maim x11-misc/xclip \
-                app-misc/brightnessctl media-sound/pavucontrol \
+                sys-power/brightnessctl media-sound/pavucontrol \
                 x11-themes/papirus-icon-theme \
                 media-fonts/nerd-fonts www-client/brave-bin" ;;
     *) DE_PKGS="" ;;
@@ -367,6 +368,9 @@ ok "Base packages installed."
 
 # ── Desktop environment ────────────────────────────────────────────────────────
 if [[ -n "${DE_PKGS}" ]]; then
+    # Install only JetBrains Mono from nerd-fonts — the full set is several GB
+    mkdir -p /etc/portage/package.use
+    echo "media-fonts/nerd-fonts jetbrains-mono" > /etc/portage/package.use/nerd-fonts
     emerge ${DE_PKGS}
     ok "Desktop environment installed."
 fi
@@ -426,6 +430,7 @@ ok "Backlight udev rule written."
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 
 # ── User ──────────────────────────────────────────────────────────────────────
+groupadd -f plugdev
 useradd -m -G wheel,audio,video,usb,plugdev,bluetooth -s /bin/zsh "${USERNAME}"
 echo "Set password for ${USERNAME}:"
 passwd "${USERNAME}"
