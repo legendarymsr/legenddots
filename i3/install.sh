@@ -60,10 +60,6 @@ link() {
     success "Linked $dst"
 }
 
-info "Creating directories..."
-mkdir -p "$HOME/Pictures/Screenshots"
-success "Screenshots directory ready."
-
 info "Linking configs..."
 link "$REPO_DIR/config"             "$HOME/.config/i3/config"
 link "$REPO_DIR/picom.conf"         "$HOME/.config/picom/picom.conf"
