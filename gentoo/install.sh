@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Gentoo Install Script — MacBook Air 6,2 (THE FINAL FIX)
+# Gentoo Install Script — MacBook Air 6,2 (THE "NO-BLOAT" FINAL)
 # =============================================================================
 set -euo pipefail
 
@@ -30,6 +30,17 @@ DISK="/dev/${DISK_NAME}"
 ask "Username: "
 read -r USERNAME
 [[ -n "$USERNAME" ]] || die "Username cannot be empty."
+
+ask "Timezone (e.g. Europe/Stockholm) [Europe/Stockholm]: "
+read -r TIMEZONE; TIMEZONE="${TIMEZONE:-Europe/Stockholm}"
+
+echo -e "\n  Choose your path:"
+echo "  1) TTY Only (0.6GiB RAM lifestyle)"
+echo "  2) Hyprland (Wayland Bloat?)"
+echo "  3) Niri     (The Scrolling Ribbon)"
+echo "  4) i3       (The Honest Choice)"
+ask "Choice [1]: "
+read -r DE_CHOICE; DE_CHOICE="${DE_CHOICE:-1}"
 
 # ── Partition ─────────────────────────────────────────────────────────────────
 header "Partitioning $DISK"
@@ -80,9 +91,11 @@ source /etc/profile
 emerge-webrsync
 eselect profile set default/linux/amd64/23.0/hardened
 
-# Unmask Broadcom Driver (Fixes your Augh error)
+# Unmask Broadcom Driver & Desktop tools
 mkdir -p /etc/portage/package.accept_keywords
-echo "net-wireless/broadcom-sta ~amd64" >> /etc/portage/package.accept_keywords/broadcom
+echo "net-wireless/broadcom-sta ~amd64" >> /etc/portage/package.accept_keywords/legend
+echo "gui-wm/niri ~amd64" >> /etc/portage/package.accept_keywords/legend
+echo "gui-wm/hyprland ~amd64" >> /etc/portage/package.accept_keywords/legend
 
 # make.conf
 cat > /etc/portage/make.conf << 'EOF'
@@ -96,7 +109,14 @@ VIDEO_CARDS="intel iris"
 ACCEPT_LICENSE="*"
 EOF
 
-# Kernel Surgery
+# Locale
+echo "${TIMEZONE}" > /etc/timezone
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+locale-gen
+eselect locale set en_US.utf8
+env-update && source /etc/profile
+
+# ── KERNEL SURGERY ──
 emerge sys-kernel/hardened-sources sys-kernel/genkernel sys-kernel/linux-firmware
 eselect kernel set 1
 cd /usr/src/linux
@@ -109,7 +129,7 @@ make olddefconfig
 make -j4 && make modules_install && make install
 genkernel --no-clean --no-mrproper initramfs
 
-# Tools (Install ZSH first to avoid useradd error)
+# Essential Tools
 emerge app-shells/zsh
 emerge net-misc/networkmanager app-admin/sudo dev-vcs/git app-editors/neovim net-wireless/broadcom-sta sys-boot/grub
 
@@ -119,7 +139,7 @@ echo 'Defaults lecture="always"' > /etc/sudoers.d/legend
 echo 'Defaults lecture_msg="mommy is very proud of you~\ngood job, Legend~"' >> /etc/sudoers.d/legend
 echo '%wheel ALL=(ALL:ALL) ALL' >> /etc/sudoers.d/legend
 
-# User (chpasswd avoids the weak password interactive loop)
+# User setup (password is 'legendary')
 useradd -m -G wheel,audio,video,usb -s /bin/zsh "${USERNAME}"
 echo "${USERNAME}:legendary" | chpasswd
 echo "root:legendary" | chpasswd
@@ -128,12 +148,21 @@ echo "root:legendary" | chpasswd
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 grub-mkconfig -o /boot/grub/grub.cfg
 
+# Services
 rc-update add NetworkManager default
 rc-update add dbus default
 rc-update add elogind default
+
+# Optional Desktop logic (basic install)
+case "${DE_CHOICE}" in
+    2) emerge gui-wm/hyprland ;;
+    3) emerge gui-wm/niri ;;
+    4) emerge x11-wm/i3 ;;
+esac
+
 CHROOT_EOF
 
 chmod +x /mnt/gentoo/tmp/inside.sh
 chroot /mnt/gentoo /tmp/inside.sh
 
-success "Ascension complete. Reboot your MacBook now."
+success "Ascension complete. Reboot into the hardened kingdom."
