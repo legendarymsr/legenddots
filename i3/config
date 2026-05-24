@@ -30,7 +30,7 @@ title_align center
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 exec_always --no-startup-id $HOME/.config/polybar/launch.sh
-exec_always --no-startup-id xsetroot -solid "#1a1b26"
+exec_always --no-startup-id feh --bg-fill ~/Pictures/wallpaper.jpg
 exec_always --no-startup-id setxkbmap se
 exec --no-startup-id picom
 exec --no-startup-id dunst
