@@ -61,10 +61,6 @@ link() {
     success "Linked $dst"
 }
 
-info "Creating directories..."
-mkdir -p "$HOME/Pictures/Screenshots"
-success "Screenshots directory ready."
-
 info "Linking configs..."
 link "$REPO_DIR/hyprland.conf"       "$HOME/.config/hypr/hyprland.conf"
 link "$REPO_DIR/hyprpaper.conf"      "$HOME/.config/hypr/hyprpaper.conf"
