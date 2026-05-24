@@ -9,6 +9,8 @@ setopt AUTO_CD
 # Turn off "no match" errors
 setopt nonomatch
 
+fastfetch
+
 # -----------------------------------------------------------------------------
 # ZINIT PLUGIN MANAGER INSTALLATION
 # -----------------------------------------------------------------------------
@@ -245,4 +247,19 @@ else
     # STUFF ONLY FOR YOUR ARCH/GENTOO MACHINE
     alias ls='ls --color=auto --group-directories-first'
     alias nmap='sudo nmap'
+
+    # pacman → yay (yay accepts all pacman flags natively)
+    pacman() { yay "$@" }
+
+    # emerge-style → yay
+    emerge() {
+        case "$1" in
+            --sync)       yay -Sy ;;
+            -s|--search)  yay -Ss "${@:2}" ;;
+            -C|--unmerge) yay -Rns "${@:2}" ;;
+            --depclean)   yay -Rns $(yay -Qtdq) ;;
+            -uDN)         yay -Syu ;;
+            *)            yay -S "$@" ;;
+        esac
+    }
 fi
