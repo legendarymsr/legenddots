@@ -67,6 +67,10 @@ link() {
     success "Linked $dst"
 }
 
+info "Creating directories..."
+mkdir -p "$HOME/Pictures/Screenshots"
+success "Screenshots directory ready."
+
 info "Linking configs..."
 
 link "$REPO_DIR/config.kdl"          "$HOME/.config/niri/config.kdl"
