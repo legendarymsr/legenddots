@@ -3,3 +3,5 @@ undo/
 backups/
 swp/
 lazy-lock.json
+caulklinux/installer/install
+caulklinux/iso/airootfs/usr/bin/caulk-install
