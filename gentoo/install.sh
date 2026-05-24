@@ -264,20 +264,33 @@ header "Entering chroot"
 
 # Resolve desktop packages — expanded into the heredoc before chroot runs
 case "$DE_CHOICE" in
-    2) DE_PKGS="gui-wm/hyprland gui-apps/waybar gui-apps/fuzzel \
-                gui-apps/swaylock x11-misc/dunst app-misc/brightnessctl" ;;
-    3) DE_PKGS="gui-wm/niri gui-apps/waybar gui-apps/fuzzel \
-                x11-misc/dunst app-misc/brightnessctl" ;;
-    4) DE_PKGS="x11-wm/i3 x11-misc/i3status x11-apps/rofi \
-                x11-apps/xrandr x11-misc/dunst app-misc/brightnessctl \
-                x11-base/xorg-server" ;;
+    2) DE_PKGS="gui-wm/hyprland gui-apps/hyprpaper gui-apps/hyprlock \
+                gui-apps/waybar gui-apps/fuzzel gui-apps/swaylock \
+                gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
+                x11-misc/dunst app-misc/brightnessctl media-sound/pavucontrol \
+                gnome-extra/polkit-gnome dev-qt/qt6ct \
+                gui-libs/xdg-desktop-portal-hyprland \
+                sys-apps/xdg-desktop-portal-gtk \
+                media-fonts/nerd-fonts www-client/brave-bin" ;;
+    3) DE_PKGS="gui-wm/niri gui-apps/swaybg gui-apps/swaylock \
+                gui-apps/waybar gui-apps/fuzzel \
+                x11-misc/dunst app-misc/brightnessctl media-sound/pavucontrol \
+                sys-apps/xdg-desktop-portal-gtk \
+                media-fonts/nerd-fonts www-client/brave-bin" ;;
+    4) DE_PKGS="x11-wm/i3 x11-misc/polybar x11-misc/rofi x11-misc/picom \
+                x11-misc/dunst x11-misc/i3lock x11-misc/xss-lock \
+                x11-apps/xrandr x11-apps/xsetroot x11-apps/setxkbmap \
+                x11-base/xorg-server media-gfx/maim x11-misc/xclip \
+                app-misc/brightnessctl media-sound/pavucontrol \
+                x11-themes/papirus-icon-theme \
+                media-fonts/nerd-fonts www-client/brave-bin" ;;
     *) DE_PKGS="" ;;
 esac
 
-# Whether DE needs the guru overlay (Hyprland and niri are not in official tree)
+# All DE choices need guru (nerd-fonts + brave-bin live there; Hyprland/niri too)
 case "$DE_CHOICE" in
-    2|3) NEED_GURU=1 ;;
-    *)   NEED_GURU=0 ;;
+    2|3|4) NEED_GURU=1 ;;
+    *)     NEED_GURU=0 ;;
 esac
 
 chroot /mnt/gentoo /bin/bash -euo pipefail << CHROOT
@@ -423,15 +436,47 @@ ok "Users created."
 # ── Dotfiles ──────────────────────────────────────────────────────────────────
 if [[ "${WANT_DOTS}" =~ ^[Yy]\$ ]]; then
     su - "${USERNAME}" -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
+    su - "${USERNAME}" -c "mkdir -p ~/Pictures/Screenshots"
+
+    # Common to all DEs
+    su - "${USERNAME}" -c "
+        mkdir -p ~/.config/alacritty
+        ln -sfn ~/legenddots/alacritty.toml ~/.config/alacritty/alacritty.toml
+        ln -sfn ~/legenddots/.zshrc ~/.zshrc
+    "
+
     case "${DE_CHOICE}" in
-        2) su - "${USERNAME}" -c "bash ~/legenddots/hyprland/install.sh" ;;
-        3) su - "${USERNAME}" -c "bash ~/legenddots/niri/install.sh" ;;
-        4) su - "${USERNAME}" -c "
-               mkdir -p ~/.config/i3
-               ln -sfn ~/legenddots/i3/config ~/.config/i3/config
-           " ;;
+        2)
+            su - "${USERNAME}" -c "
+                mkdir -p ~/.config/hypr
+                ln -sfn ~/legenddots/hyprland/hyprland.conf  ~/.config/hypr/hyprland.conf
+                ln -sfn ~/legenddots/hyprland/hyprpaper.conf ~/.config/hypr/hyprpaper.conf
+                ln -sfn ~/legenddots/hyprland/hyprlock.conf  ~/.config/hypr/hyprlock.conf
+                ln -sfn ~/legenddots/hyprland/waybar         ~/.config/waybar
+            "
+            ;;
+        3)
+            su - "${USERNAME}" -c "
+                mkdir -p ~/.config/niri
+                ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
+                ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
+                ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
+                ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
+                ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
+            "
+            ;;
+        4)
+            su - "${USERNAME}" -c "
+                mkdir -p ~/.config/i3 ~/.config/picom ~/.config/rofi ~/.config/dunst
+                ln -sfn ~/legenddots/i3/config           ~/.config/i3/config
+                ln -sfn ~/legenddots/i3/picom.conf       ~/.config/picom/picom.conf
+                ln -sfn ~/legenddots/i3/polybar          ~/.config/polybar
+                ln -sfn ~/legenddots/i3/rofi/config.rasi ~/.config/rofi/config.rasi
+                ln -sfn ~/legenddots/i3/dunst/dunstrc    ~/.config/dunst/dunstrc
+                chmod +x ~/legenddots/i3/polybar/launch.sh
+            "
+            ;;
     esac
-    su - "${USERNAME}" -c "ln -sfn ~/legenddots/.zshrc ~/.zshrc"
     ok "Dotfiles linked."
 fi
 
