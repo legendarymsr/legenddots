@@ -103,12 +103,12 @@ sgdisk --zap-all "$DISK"
 sgdisk --new=1:0:+512M  --typecode=1:ef00 --change-name=1:"EFI"  "$DISK"
 if [[ "$SWAP_SIZE" -gt 0 ]]; then
     sgdisk --new=2:0:+"${SWAP_SIZE}G" --typecode=2:8200 --change-name=2:"swap" "$DISK"
-    sgdisk --new=3:0:0              --typecode=3:8304 --change-name=3:"root" "$DISK"
+    sgdisk --new=3:0:0                --typecode=3:8304 --change-name=3:"root" "$DISK"
     PART_EFI="${DISK}1"
     PART_SWAP="${DISK}2"
     PART_ROOT="${DISK}3"
 else
-    sgdisk --new=2:0:0              --typecode=2:8304 --change-name=2:"root" "$DISK"
+    sgdisk --new=2:0:0                --typecode=2:8304 --change-name=2:"root" "$DISK"
     PART_EFI="${DISK}1"
     PART_SWAP=""
     PART_ROOT="${DISK}2"
@@ -172,8 +172,8 @@ curl -# -O "$STAGE3_URL"
 curl -# -O "${STAGE3_URL}.asc"
 curl -# -O "${STAGE3_URL}.sha256"
 
-sha256sum -c "$(basename ${STAGE3_URL}).sha256" || die "Stage3 checksum failed."
-tar xpf "$(basename $STAGE3_URL)" --xattrs-include='*.*' --numeric-owner
+sha256sum -c "$(basename "${STAGE3_URL}").sha256" || die "Stage3 checksum failed."
+tar xpf "$(basename "$STAGE3_URL")" --xattrs-include='*.*' --numeric-owner
 success "Stage3 extracted."
 
 # ── make.conf ─────────────────────────────────────────────────────────────────
@@ -232,33 +232,62 @@ mkdir -p /mnt/gentoo/etc/portage/package.license
 echo "net-wireless/broadcom-sta Broadcom" \
     > /mnt/gentoo/etc/portage/package.license/broadcom-sta
 
+# ── fstab (generated here with blkid — genfstab is Arch-only) ────────────────
+header "Generating fstab"
+ROOT_UUID=$(blkid -s UUID -o value "$PART_ROOT")
+EFI_UUID=$(blkid -s UUID -o value "$PART_EFI")
+ROOT_OPTS="defaults,noatime"
+[[ "$FS_TYPE" == "btrfs" ]] && ROOT_OPTS="defaults,noatime,compress=zstd,subvol=@"
+{
+    echo "# <fs>                                  <mp>       <type>    <opts>               <d> <p>"
+    echo "UUID=${ROOT_UUID}  /          ${FS_TYPE}  ${ROOT_OPTS}  0 1"
+    echo "UUID=${EFI_UUID}   /boot/efi  vfat        defaults,noatime                        0 2"
+    if [[ -n "$PART_SWAP" ]]; then
+        SWAP_UUID=$(blkid -s UUID -o value "$PART_SWAP")
+        echo "UUID=${SWAP_UUID}  none       swap        sw                                      0 0"
+    fi
+} > /mnt/gentoo/etc/fstab
+success "fstab written."
+
 # ── Mount pseudo-filesystems ──────────────────────────────────────────────────
 header "Mounting pseudo-filesystems"
-mount --types proc  /proc   /mnt/gentoo/proc
-mount --rbind       /sys    /mnt/gentoo/sys
-mount --make-rslave         /mnt/gentoo/sys
-mount --rbind       /dev    /mnt/gentoo/dev
-mount --make-rslave         /mnt/gentoo/dev
-mount --bind        /run    /mnt/gentoo/run 2>/dev/null || true
+mount --types proc  /proc /mnt/gentoo/proc
+mount --rbind       /sys  /mnt/gentoo/sys
+mount --make-rslave       /mnt/gentoo/sys
+mount --rbind       /dev  /mnt/gentoo/dev
+mount --make-rslave       /mnt/gentoo/dev
+mount --bind        /run  /mnt/gentoo/run 2>/dev/null || true
 
 # ── Chroot stage ──────────────────────────────────────────────────────────────
 header "Entering chroot"
 
-# Determine desktop packages
+# Resolve desktop packages — expanded into the heredoc before chroot runs
 case "$DE_CHOICE" in
     2) DE_PKGS="gui-wm/hyprland gui-apps/waybar gui-apps/fuzzel \
                 gui-apps/swaylock x11-misc/dunst app-misc/brightnessctl" ;;
     3) DE_PKGS="gui-wm/niri gui-apps/waybar gui-apps/fuzzel \
                 x11-misc/dunst app-misc/brightnessctl" ;;
     4) DE_PKGS="x11-wm/i3 x11-misc/i3status x11-apps/rofi \
-                x11-apps/xrandr x11-misc/dunst x11-apps/brightnessctl \
+                x11-apps/xrandr x11-misc/dunst app-misc/brightnessctl \
                 x11-base/xorg-server" ;;
     *) DE_PKGS="" ;;
+esac
+
+# Whether DE needs the guru overlay (Hyprland and niri are not in official tree)
+case "$DE_CHOICE" in
+    2|3) NEED_GURU=1 ;;
+    *)   NEED_GURU=0 ;;
 esac
 
 chroot /mnt/gentoo /bin/bash -euo pipefail << CHROOT
 source /etc/profile
 export PS1="(chroot) \$PS1"
+
+# Redefine colours inside chroot (outer variables don't carry across)
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+BLUE='\033[0;34m'; NC='\033[0m'
+ok()   { echo -e "\${GREEN}ok\${NC}  \$*"; }
+info() { echo -e "\${BLUE}::\${NC} \$*"; }
 
 # ── Portage sync ──────────────────────────────────────────────────────────────
 emerge-webrsync
@@ -267,12 +296,14 @@ eselect profile set default/linux/amd64/23.0
 # ── Timezone ──────────────────────────────────────────────────────────────────
 echo "${TIMEZONE}" > /etc/timezone
 emerge --config sys-libs/timezone-data
+ok "Timezone set."
 
 # ── Locale ────────────────────────────────────────────────────────────────────
 echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
 eselect locale set en_US.utf8
 env-update && source /etc/profile
+ok "Locale set."
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
 emerge sys-kernel/linux-firmware sys-firmware/intel-microcode
@@ -280,15 +311,22 @@ emerge sys-kernel/gentoo-sources
 eselect kernel set 1
 emerge sys-kernel/genkernel
 
-# Generate .config from saved MBA config if present, else use defaults
 if [[ -f /tmp/kernel-mba.config ]]; then
     cp /tmp/kernel-mba.config /usr/src/linux/.config
     genkernel --kernel-config=/usr/src/linux/.config all
 else
     genkernel --menuconfig=no all
 fi
+ok "Kernel built."
 
-success_msg() { echo -e "${GREEN}ok${NC}  \$1"; }
+# ── Guru overlay (needed for Hyprland / niri) ─────────────────────────────────
+if [[ "${NEED_GURU}" -eq 1 ]]; then
+    info "Enabling guru overlay for DE packages..."
+    emerge app-eselect/eselect-repository dev-vcs/git
+    eselect repository enable guru
+    emerge --sync guru
+    ok "Guru overlay ready."
+fi
 
 # ── Base system packages ───────────────────────────────────────────────────────
 emerge \
@@ -308,21 +346,22 @@ emerge \
     app-shells/zsh \
     dev-vcs/git \
     app-editors/neovim \
-    media-sound/pipewire \
-    media-sound/wireplumber \
     media-video/pipewire \
+    media-video/wireplumber \
     app-terminal/alacritty
+ok "Base packages installed."
 
 # ── Desktop environment ────────────────────────────────────────────────────────
-[[ -n "${DE_PKGS}" ]] && emerge ${DE_PKGS}
+if [[ -n "${DE_PKGS}" ]]; then
+    emerge ${DE_PKGS}
+    ok "Desktop environment installed."
+fi
 
 # ── GRUB (EFI) ────────────────────────────────────────────────────────────────
 emerge sys-boot/grub
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo
 grub-mkconfig -o /boot/grub/grub.cfg
-
-# ── fstab ─────────────────────────────────────────────────────────────────────
-genfstab -U / >> /etc/fstab
+ok "GRUB installed."
 
 # ── Hostname ──────────────────────────────────────────────────────────────────
 echo "${HOSTNAME}" > /etc/hostname
@@ -331,27 +370,35 @@ cat > /etc/hosts << EOF
 ::1         localhost
 127.0.1.1   ${HOSTNAME}.localdomain ${HOSTNAME}
 EOF
+ok "Hostname set."
 
 # ── Services (OpenRC) ─────────────────────────────────────────────────────────
-rc-update add NetworkManager     default
-rc-update add bluetooth          default
-rc-update add tlp                default
-rc-update add laptop_mode        default
-rc-update add dbus               default
-rc-update add acpid              default
+rc-update add NetworkManager  default
+rc-update add bluetooth       default
+rc-update add tlp             default
+rc-update add laptop_mode     default
+rc-update add dbus            default
+rc-update add acpid           default
+ok "Services enabled."
 
 # ── Broadcom wl driver ────────────────────────────────────────────────────────
-# Block in-kernel brcmfmac so wl loads cleanly
-echo "blacklist brcmfmac"   >> /etc/modprobe.d/broadcom-sta.conf
-echo "blacklist brcmsmac"   >> /etc/modprobe.d/broadcom-sta.conf
-echo "blacklist b43"        >> /etc/modprobe.d/broadcom-sta.conf
-echo "blacklist b43legacy"  >> /etc/modprobe.d/broadcom-sta.conf
-echo "blacklist ssb"        >> /etc/modprobe.d/broadcom-sta.conf
-echo "blacklist bcma"       >> /etc/modprobe.d/broadcom-sta.conf
+# Blacklist competing in-kernel drivers
+cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcma
+EOF
+# Load wl at boot
+echo "wl" > /etc/modules-load.d/broadcom-sta.conf
 depmod -a
+ok "Broadcom wl driver configured."
 
 # ── Apple keyboard fn-mode ────────────────────────────────────────────────────
 echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
+ok "Apple fn-mode set."
 
 # ── Backlight ─────────────────────────────────────────────────────────────────
 mkdir -p /etc/udev/rules.d
@@ -359,6 +406,7 @@ cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
 EOF
+ok "Backlight udev rule written."
 
 # ── sudo ──────────────────────────────────────────────────────────────────────
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
@@ -369,26 +417,26 @@ echo "Set password for ${USERNAME}:"
 passwd "${USERNAME}"
 echo "Set root password:"
 passwd
+ok "Users created."
 
 # ── Dotfiles ──────────────────────────────────────────────────────────────────
-if [[ "${WANT_DOTS}" =~ ^[Yy]$ ]]; then
+if [[ "${WANT_DOTS}" =~ ^[Yy]\$ ]]; then
     su - "${USERNAME}" -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
     case "${DE_CHOICE}" in
         2) su - "${USERNAME}" -c "bash ~/legenddots/hyprland/install.sh" ;;
         3) su - "${USERNAME}" -c "bash ~/legenddots/niri/install.sh" ;;
-        4) # i3 install — just link the config
-           su - "${USERNAME}" -c "
+        4) su - "${USERNAME}" -c "
                mkdir -p ~/.config/i3
                ln -sfn ~/legenddots/i3/config ~/.config/i3/config
            " ;;
     esac
-    # Link zshrc
     su - "${USERNAME}" -c "ln -sfn ~/legenddots/.zshrc ~/.zshrc"
+    ok "Dotfiles linked."
 fi
 
 echo ""
-echo -e "${GREEN}Installation complete.${NC}"
-echo "Unmount and reboot:"
+echo -e "\${GREEN}Installation complete.\${NC}"
+echo "Exit the chroot, unmount, and reboot:"
 echo "  exit"
 echo "  umount -R /mnt/gentoo"
 echo "  reboot"
