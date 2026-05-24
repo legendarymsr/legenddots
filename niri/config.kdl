@@ -47,7 +47,7 @@ cursor {
 
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 
-spawn-at-startup "swaybg" "-c" "#1a1b26"
+spawn-at-startup "swaybg" "-m" "fill" "-i" "/home/$USER/Pictures/wallpaper.jpg"
 spawn-at-startup "waybar"
 spawn-at-startup "dunst"
 
