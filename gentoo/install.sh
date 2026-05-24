@@ -117,7 +117,7 @@ fi
 # Handle nvme naming (nvme0n1p1 vs sda1)
 if [[ "$DISK" == *nvme* ]]; then
     PART_EFI="${DISK}p1"
-    PART_SWAP="${DISK}p2"
+    [[ -n "$PART_SWAP" ]] && PART_SWAP="${DISK}p2"
     PART_ROOT="${DISK}p$([[ "$SWAP_SIZE" -gt 0 ]] && echo 3 || echo 2)"
 fi
 
@@ -140,10 +140,9 @@ success "Formatted."
 # ── Mount ─────────────────────────────────────────────────────────────────────
 header "Mounting"
 mount "$PART_ROOT" /mnt/gentoo
-mkdir -p /mnt/gentoo/boot/efi
-mount "$PART_EFI" /mnt/gentoo/boot/efi
 
 if [[ "$FS_TYPE" == "btrfs" ]]; then
+    # Create subvolumes before anything else is mounted under the root
     btrfs subvolume create /mnt/gentoo/@
     btrfs subvolume create /mnt/gentoo/@home
     btrfs subvolume create /mnt/gentoo/@snapshots
@@ -152,9 +151,11 @@ if [[ "$FS_TYPE" == "btrfs" ]]; then
     mkdir -p /mnt/gentoo/{home,.snapshots}
     mount -o defaults,compress=zstd,subvol=@home      "$PART_ROOT" /mnt/gentoo/home
     mount -o defaults,compress=zstd,subvol=@snapshots "$PART_ROOT" /mnt/gentoo/.snapshots
-    mkdir -p /mnt/gentoo/boot/efi
-    mount "$PART_EFI" /mnt/gentoo/boot/efi
 fi
+
+# Mount EFI after btrfs subvolume setup (avoids "device busy" on umount)
+mkdir -p /mnt/gentoo/boot/efi
+mount "$PART_EFI" /mnt/gentoo/boot/efi
 
 success "Mounted."
 
@@ -324,7 +325,7 @@ if [[ "${NEED_GURU}" -eq 1 ]]; then
     info "Enabling guru overlay for DE packages..."
     emerge app-eselect/eselect-repository dev-vcs/git
     eselect repository enable guru
-    emerge --sync guru
+    emaint sync --repo guru
     ok "Guru overlay ready."
 fi
 
@@ -348,7 +349,7 @@ emerge \
     app-editors/neovim \
     media-video/pipewire \
     media-video/wireplumber \
-    app-terminal/alacritty
+    x11-terms/alacritty
 ok "Base packages installed."
 
 # ── Desktop environment ────────────────────────────────────────────────────────
