@@ -122,6 +122,7 @@ if [[ "$DISK" == *nvme* ]]; then
 fi
 
 partprobe "$DISK"
+udevadm settle
 success "Partitioned."
 
 # ── Format ────────────────────────────────────────────────────────────────────
@@ -166,7 +167,7 @@ cd /mnt/gentoo
 
 MIRROR="https://mirror.init7.net/gentoo"
 STAGE3_PATH=$(curl -s "${MIRROR}/releases/amd64/autobuilds/latest-stage3-amd64-openrc.txt" \
-    | grep -v '^#' | awk '{print $1}' | head -1)
+    | grep -v '^#' | grep '\.tar\.xz' | awk '{print $1}' | head -1)
 STAGE3_URL="${MIRROR}/releases/amd64/autobuilds/${STAGE3_PATH}"
 
 info "Fetching: $STAGE3_URL"
@@ -189,20 +190,19 @@ FCFLAGS="${COMMON_FLAGS}"
 FFLAGS="${COMMON_FLAGS}"
 
 # ── CPU flags (Haswell) ───────────────────────────────────────────────────────
-CPU_FLAGS_X86="aes avx avx2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
+CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 
 # ── Parallelism (2 cores / 4 threads) ────────────────────────────────────────
 MAKEOPTS="-j4"
 EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=3.5 --with-bdeps=y --keep-going"
 
 # ── Portage ───────────────────────────────────────────────────────────────────
-PORTDIR="/var/db/repos/gentoo"
 DISTDIR="/var/cache/distfiles"
 PKGDIR="/var/cache/binpkgs"
 GENTOO_MIRRORS="https://mirror.init7.net/gentoo https://mirror.leaseweb.com/gentoo/"
 
 # ── USE flags ─────────────────────────────────────────────────────────────────
-USE="bluetooth pipewire pulseaudio alsa wifi udev policykit \
+USE="bluetooth pipewire -pulseaudio alsa wireless udev policykit \
      X wayland elogind dbus networkmanager \
      -systemd -gnome -kde -qt5 -cups -geolocation \
      jpeg png svg webp gif tiff \
@@ -210,7 +210,7 @@ USE="bluetooth pipewire pulseaudio alsa wifi udev policykit \
 
 # ── Input devices ─────────────────────────────────────────────────────────────
 INPUT_DEVICES="libinput"
-VIDEO_CARDS="intel i965"
+VIDEO_CARDS="intel iris"
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 ACCEPT_LICENSE="* -@EULA"
@@ -239,14 +239,22 @@ header "Generating fstab"
 ROOT_UUID=$(blkid -s UUID -o value "$PART_ROOT")
 EFI_UUID=$(blkid -s UUID -o value "$PART_EFI")
 ROOT_OPTS="defaults,noatime"
-[[ "$FS_TYPE" == "btrfs" ]] && ROOT_OPTS="defaults,noatime,compress=zstd,subvol=@"
+ROOT_PASS=1
+if [[ "$FS_TYPE" == "btrfs" ]]; then
+    ROOT_OPTS="defaults,noatime,compress=zstd,subvol=@"
+    ROOT_PASS=0
+fi
 {
-    echo "# <fs>                                  <mp>       <type>    <opts>               <d> <p>"
-    echo "UUID=${ROOT_UUID}  /          ${FS_TYPE}  ${ROOT_OPTS}  0 1"
-    echo "UUID=${EFI_UUID}   /boot/efi  vfat        defaults,noatime                        0 2"
+    echo "# <fs>                                  <mp>          <type>    <opts>                                       <d> <p>"
+    echo "UUID=${ROOT_UUID}  /             ${FS_TYPE}  ${ROOT_OPTS}  0 ${ROOT_PASS}"
+    if [[ "$FS_TYPE" == "btrfs" ]]; then
+        echo "UUID=${ROOT_UUID}  /home         btrfs     defaults,noatime,compress=zstd,subvol=@home       0 0"
+        echo "UUID=${ROOT_UUID}  /.snapshots   btrfs     defaults,noatime,compress=zstd,subvol=@snapshots  0 0"
+    fi
+    echo "UUID=${EFI_UUID}   /boot/efi     vfat      defaults,noatime                                     0 2"
     if [[ -n "$PART_SWAP" ]]; then
         SWAP_UUID=$(blkid -s UUID -o value "$PART_SWAP")
-        echo "UUID=${SWAP_UUID}  none       swap        sw                                      0 0"
+        echo "UUID=${SWAP_UUID}  none          swap      sw                                                   0 0"
     fi
 } > /mnt/gentoo/etc/fstab
 success "fstab written."
@@ -271,12 +279,12 @@ case "$DE_CHOICE" in
                 x11-misc/dunst sys-power/brightnessctl media-sound/pavucontrol \
                 gnome-extra/polkit-gnome gui-apps/qt6ct \
                 gui-libs/xdg-desktop-portal-hyprland \
-                sys-apps/xdg-desktop-portal-gtk \
+                x11-misc/xdg-desktop-portal-gtk \
                 media-fonts/nerdfonts www-client/brave-bin" ;;
     3) DE_PKGS="gui-wm/niri gui-apps/swaybg gui-apps/swaylock \
                 gui-apps/waybar gui-apps/fuzzel \
-                x11-misc/dunst app-misc/brightnessctl media-sound/pavucontrol \
-                sys-apps/xdg-desktop-portal-gtk \
+                x11-misc/dunst sys-power/brightnessctl media-sound/pavucontrol \
+                x11-misc/xdg-desktop-portal-gtk \
                 media-fonts/nerdfonts www-client/brave-bin" ;;
     4) DE_PKGS="x11-wm/i3 x11-misc/polybar x11-misc/rofi x11-misc/picom \
                 x11-misc/dunst x11-misc/i3lock x11-misc/xss-lock \
@@ -327,6 +335,11 @@ emerge sys-kernel/linux-firmware sys-firmware/intel-microcode
 mkdir -p /etc/portage/package.accept_keywords
 echo "sys-kernel/hardened-sources ~amd64" \
     > /etc/portage/package.accept_keywords/kernel
+
+# Accept testing-branch packages from all overlays used below
+echo "*/*::guru ~amd64"        >> /etc/portage/package.accept_keywords/overlays
+echo "*/*::hyproverlay ~amd64" >> /etc/portage/package.accept_keywords/overlays
+echo "*/*::gentoo-zh ~amd64"   >> /etc/portage/package.accept_keywords/overlays
 
 emerge sys-kernel/hardened-sources
 eselect kernel set 1
@@ -435,7 +448,8 @@ scripts/config -e CONFIG_MAC80211
 scripts/config -e CONFIG_RANDOMIZE_BASE          # KASLR
 scripts/config -e CONFIG_RANDOMIZE_MEMORY        # heap/stack ASLR
 scripts/config -e CONFIG_PAGE_TABLE_ISOLATION    # Meltdown (PTI)
-scripts/config -e CONFIG_RETPOLINE               # Spectre v2
+scripts/config -e CONFIG_RETPOLINE               # Spectre v2 (pre-6.9 name)
+scripts/config -e CONFIG_MITIGATION_RETPOLINE    # Spectre v2 (renamed in kernel ≥6.9)
 scripts/config -e CONFIG_STRICT_KERNEL_RWX       # no W+X kernel pages
 scripts/config -e CONFIG_STRICT_MODULE_RWX
 scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM
@@ -477,6 +491,10 @@ if [[ "${NEED_GURU}" -eq 1 ]]; then
     fi
 fi
 
+# pipewire needs sound-server USE to provide the PulseAudio replacement socket
+mkdir -p /etc/portage/package.use
+echo "media-video/pipewire sound-server" > /etc/portage/package.use/pipewire
+
 # ── Base system packages ───────────────────────────────────────────────────────
 emerge \
     sys-apps/pciutils \
@@ -488,7 +506,8 @@ emerge \
     sys-apps/dbus \
     sys-auth/polkit \
     sys-apps/acpi \
-    app-laptop/laptop-mode-tools \
+    sys-power/acpid \
+    net-wireless/bluez \
     sys-power/tlp \
     sys-apps/lm-sensors \
     app-misc/fastfetch \
@@ -528,7 +547,7 @@ ok "Hostname set."
 rc-update add NetworkManager  default
 rc-update add bluetooth       default
 rc-update add tlp             default
-rc-update add laptop_mode     default
+rc-update add elogind         default
 rc-update add dbus            default
 rc-update add acpid           default
 ok "Services enabled."
@@ -543,8 +562,8 @@ blacklist b43legacy
 blacklist ssb
 blacklist bcma
 EOF
-# Load wl at boot
-echo "wl" > /etc/modules-load.d/broadcom-sta.conf
+# Load wl at boot (OpenRC reads /etc/conf.d/modules, not systemd's modules-load.d)
+echo 'modules="wl"' >> /etc/conf.d/modules
 depmod -a
 ok "Broadcom wl driver configured."
 
@@ -613,6 +632,7 @@ if [[ "${WANT_DOTS}" =~ ^[Yy]\$ ]]; then
                 ln -sfn ~/legenddots/i3/rofi/config.rasi ~/.config/rofi/config.rasi
                 ln -sfn ~/legenddots/i3/dunst/dunstrc    ~/.config/dunst/dunstrc
                 chmod +x ~/legenddots/i3/polybar/launch.sh
+                echo 'exec i3' > ~/.xinitrc
             "
             ;;
     esac
