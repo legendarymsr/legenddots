@@ -100,7 +100,7 @@ echo "sys-auth/polkit elogind" > /etc/portage/package.use/polkit
 echo "net-misc/networkmanager tools" > /etc/portage/package.use/networkmanager
 
 # xdg-desktop-portal-gtk needs the gtk USE flag explicitly
-echo "x11-misc/xdg-desktop-portal-gtk gtk" > /etc/portage/package.use/portals
+echo "gui-libs/xdg-desktop-portal-gtk gtk" > /etc/portage/package.use/portals
 
 # elogind itself needs pam so login sessions are tracked properly
 echo "sys-auth/elogind pam" > /etc/portage/package.use/elogind
@@ -213,7 +213,7 @@ emerge \
   gui-apps/slurp \
   gui-apps/wl-clipboard \
   x11-misc/dunst \
-  x11-misc/xdg-desktop-portal-gtk \
+  gui-libs/xdg-desktop-portal-gtk \
   gnome-extra/polkit-gnome \
   sys-power/brightnessctl \
   media-sound/pavucontrol \
@@ -232,7 +232,7 @@ locale-gen
 eselect locale set sv_SE.utf8
 env-update && set +u && source /etc/profile && set -u
 
-useradd -m -G wheel,audio,video,usb,plugdev,bluetooth -s /bin/zsh legend || true
+useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend || true
 echo "legend:legendary" | chpasswd
 echo "root:legendary123" | chpasswd
 
@@ -295,7 +295,7 @@ EOF
 depmod -a
 
 # GRUB
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo --removable
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # Services
