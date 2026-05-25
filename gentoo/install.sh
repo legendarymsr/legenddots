@@ -166,7 +166,6 @@ emerge \
   app-admin/sudo \
   sys-apps/dbus \
   sys-auth/polkit \
-  sys-power/acpi \
   sys-power/acpid \
   sys-power/tlp \
   sys-apps/lm-sensors \
@@ -177,13 +176,9 @@ emerge \
   media-video/pipewire \
   media-video/wireplumber \
   x11-terms/alacritty \
-  sys-boot/grub \
-  media-sound/pavucontrol \
-  sys-power/brightnessctl \
-  app-misc/xdg-utils \
-  x11-misc/xdg-user-dirs
+  sys-boot/grub
 
-# 7. DESKTOP (niri + full Wayland stack)
+# 7. DESKTOP (niri + full Wayland stack — all guru/overlay packages together)
 header "Emerging desktop..."
 emerge \
   gui-wm/niri \
@@ -197,6 +192,10 @@ emerge \
   x11-misc/dunst \
   x11-misc/xdg-desktop-portal-gtk \
   gnome-extra/polkit-gnome \
+  sys-power/brightnessctl \
+  media-sound/pavucontrol \
+  app-misc/xdg-utils \
+  x11-misc/xdg-user-dirs \
   media-fonts/nerdfonts \
   www-client/brave-browser-nightly
 
