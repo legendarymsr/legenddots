@@ -79,15 +79,41 @@ MAKEOPTS="-j4"
 EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
-USE="hardened caps pic pie ssp wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
+USE="hardened wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64"
 EOF
 
 # package.use — set before any emerge so deps pick up the right flags
 mkdir -p /etc/portage/package.use
+
+# PipeWire must expose a sound-server so wireplumber can act as its session manager
 echo "media-video/pipewire sound-server" > /etc/portage/package.use/pipewire
+
+# wireplumber needs elogind for seat/session management (we have no systemd)
+echo "media-video/wireplumber elogind" > /etc/portage/package.use/wireplumber
+
+# polkit must use elogind for privilege checks on a running seat
+echo "sys-auth/polkit elogind" > /etc/portage/package.use/polkit
+
+# NetworkManager: enable nmtui/nmcli tools
+echo "net-misc/networkmanager tools" > /etc/portage/package.use/networkmanager
+
+# xdg-desktop-portal-gtk needs the gtk USE flag explicitly
+echo "x11-misc/xdg-desktop-portal-gtk gtk" > /etc/portage/package.use/portals
+
+# elogind itself needs pam so login sessions are tracked properly
+echo "sys-auth/elogind pam" > /etc/portage/package.use/elogind
+
+# Waybar needs tray support and gtk-layer-shell for Wayland
+echo "gui-apps/waybar tray" > /etc/portage/package.use/waybar
+
+# Only build JetBrains Mono; building all ~3.5GB of nerd fonts is impractical
 echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
+
+# alacritty: disable wayland feature flag — it uses winit which auto-detects at runtime
+# (forcing it at compile time can cause issues on the hardened profile)
+echo "x11-terms/alacritty -wayland" > /etc/portage/package.use/alacritty
 
 # 4. OVERLAYS
 header "Setting up overlays..."
@@ -159,6 +185,7 @@ groupadd -f bluetooth
 emerge \
   sys-apps/pciutils \
   sys-apps/usbutils \
+  sys-auth/elogind \
   net-misc/networkmanager \
   net-wireless/wpa_supplicant \
   net-wireless/broadcom-sta \
