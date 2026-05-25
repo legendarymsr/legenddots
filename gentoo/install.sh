@@ -79,7 +79,7 @@ MAKEOPTS="-j4"
 EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
-USE="hardened wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
+USE="wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64"
 EOF
@@ -110,10 +110,6 @@ echo "gui-apps/waybar tray" > /etc/portage/package.use/waybar
 
 # Only build JetBrains Mono; building all ~3.5GB of nerd fonts is impractical
 echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
-
-# alacritty: disable wayland feature flag — it uses winit which auto-detects at runtime
-# (forcing it at compile time can cause issues on the hardened profile)
-echo "x11-terms/alacritty -wayland" > /etc/portage/package.use/alacritty
 
 # 4. OVERLAYS
 header "Setting up overlays..."
