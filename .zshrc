@@ -244,19 +244,6 @@ if [[ -d /data/data/com.termux ]]; then
     # STUFF ONLY FOR YOUR PHONE
     alias ls='ls --color=auto -F'
 else
-    # STUFF ONLY FOR YOUR ARCH/GENTOO MACHINE
     alias ls='ls --color=auto --group-directories-first'
     alias nmap='sudo nmap'
-
-    # emerge-style → yay
-    emerge() {
-        case "$1" in
-            --sync)       yay -Sy ;;
-            -s|--search)  yay -Ss "${@:2}" ;;
-            -C|--unmerge) yay -Rns "${@:2}" ;;
-            --depclean)   yay -Rns $(yay -Qtdq) ;;
-            -uDN)         yay -Syu ;;
-            *)            yay -S "$@" ;;
-        esac
-    }
 fi
