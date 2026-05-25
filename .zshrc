@@ -248,9 +248,6 @@ else
     alias ls='ls --color=auto --group-directories-first'
     alias nmap='sudo nmap'
 
-    # pacman → yay (yay accepts all pacman flags natively)
-    pacman() { yay "$@" }
-
     # emerge-style → yay
     emerge() {
         case "$1" in
