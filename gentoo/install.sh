@@ -42,8 +42,11 @@ cp -L /etc/resolv.conf /mnt/gentoo/etc/
 # ── CHROOT LOGIC ──────────────────────────────────────────────────────────────
 cat << 'CHROOT_EOF' > /mnt/gentoo/tmp/inside.sh
 #!/bin/bash
+set -euo pipefail
 export DEBUGINFOD_URLS=""
 source /etc/profile
+export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
+header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 
 # 1. INITIALIZE PORTAGE & HARDENED PROFILE
 emerge-webrsync
@@ -75,14 +78,15 @@ EOF
 # 4. OVERLAYS (GURU, ANOTHER-BRAVE, HYPROVERLAY)
 emerge --oneshot app-eselect/eselect-repository dev-vcs/git
 eselect repository enable guru
-eselect repository add another-brave-overlay git https://github.com/falbrechtskirchinger/another-brave-overlay.git
-eselect repository add hyproverlay git https://codeberg.org/hyproverlay/hyproverlay.git
-emaint sync -repo guru
-emaint sync -repo another-brave-overlay
-emaint sync -repo hyproverlay
+eselect repository add another-brave-overlay git https://github.com/falbrechtskirchinger/another-brave-overlay.git || true
+eselect repository add hyproverlay git https://codeberg.org/hyproverlay/hyproverlay.git || true
+emaint sync --repo guru               || true  # warnings exit non-zero; ignore
+emaint sync --repo another-brave-overlay || true
+emaint sync --repo hyproverlay           || true
 
 # 5. KERNEL SURGERY (TOTAL HARDENING + ANTI-ME)
-emerge sys-kernel/hardened-sources sys-kernel/genkernel sys-kernel/linux-firmware
+emerge sys-kernel/hardened-sources sys-kernel/genkernel \
+       sys-kernel/linux-firmware sys-firmware/intel-microcode
 eselect kernel set 1
 cd /usr/src/linux
 make defconfig
@@ -119,6 +123,13 @@ genkernel --no-clean --no-mrproper initramfs
 
 # 6. BASE SYSTEM (LEGEND SPEC)
 header "Emerging Legend's Arsenal..."
+echo "mba" > /etc/hostname
+cat > /etc/hosts << 'EOF'
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   mba.localdomain mba
+EOF
+
 groupadd -f plugdev
 groupadd -f bluetooth
 
@@ -143,6 +154,8 @@ emerge --config sys-libs/timezone-data
 sed -i 's/keymap="us"/keymap="se"/' /etc/conf.d/keymaps
 echo "sv_SE.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
+eselect locale set sv_SE.utf8
+env-update && source /etc/profile
 
 useradd -m -G wheel,audio,video,usb,plugdev,bluetooth -s /bin/zsh legend || true
 echo "legend:legendary" | chpasswd
@@ -154,13 +167,42 @@ echo 'Defaults lecture_msg="mommy is very proud of you\ngood job, Legend~"' >> /
 chmod 0440 /etc/sudoers.d/legend
 
 # 9. FINALIZE
+
+# fstab — needed so /boot/efi remounts after reboot
+ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
+EFI_UUID=$(blkid  -s UUID -o value /dev/sda1)
+SWAP_UUID=$(blkid -s UUID -o value /dev/sda2)
+{
+    echo "UUID=${ROOT_UUID}  /          ext4  defaults,noatime  0 1"
+    echo "UUID=${EFI_UUID}   /boot/efi  vfat  defaults,noatime  0 2"
+    echo "UUID=${SWAP_UUID}  none       swap  sw                0 0"
+} > /etc/fstab
+
+# Broadcom wl — blacklist competing drivers, autoload wl at boot
+cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcma
+EOF
+echo 'modules="wl"' >> /etc/conf.d/modules
+
+# Apple keyboard fn-mode (fn keys act as F1-F12 by default)
+echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
+
+depmod -a
+
 grub-install --target=x86_64-efi --efi-directory=/boot/efi
 grub-mkconfig -o /boot/grub/grub.cfg
+
 rc-update add NetworkManager default
-rc-update add dbus default
-rc-update add elogind default
-rc-update add acpid default
-rc-update add tlp default
+rc-update add bluetooth       default
+rc-update add dbus            default
+rc-update add elogind         default
+rc-update add acpid           default
+rc-update add tlp             default
 CHROOT_EOF
 
 # ── Execution ─────────────────────────────────────────────────────────────────
