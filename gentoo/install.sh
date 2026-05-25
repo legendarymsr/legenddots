@@ -166,7 +166,7 @@ emerge \
   app-admin/sudo \
   sys-apps/dbus \
   sys-auth/polkit \
-  sys-apps/acpi \
+  sys-power/acpi \
   sys-power/acpid \
   sys-power/tlp \
   sys-apps/lm-sensors \
