@@ -44,7 +44,8 @@ cat << 'CHROOT_EOF' > /mnt/gentoo/tmp/inside.sh
 #!/bin/bash
 set -euo pipefail
 export DEBUGINFOD_URLS=""
-source /etc/profile
+export DEBUGINFOD_URLS_CERT_PATH=""
+set +u; source /etc/profile; set -u
 export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 
