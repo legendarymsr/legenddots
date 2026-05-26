@@ -115,6 +115,15 @@ echo "gui-apps/waybar tray" > /etc/portage/package.use/waybar
 # Only build JetBrains Mono; building all ~3.5GB of nerd fonts is impractical
 echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 
+# libglvnd has no X support; mesa requires it without X
+echo "media-libs/libglvnd -X" > /etc/portage/package.use/libglvnd
+
+# Desktop X11 libs needed by GTK/pango chain on Wayland
+echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
+echo "x11-libs/pango X" >> /etc/portage/package.use/xlibs
+echo "x11-libs/libxkbcommon X" >> /etc/portage/package.use/xlibs
+echo "dev-libs/libdbusmenu gtk3" >> /etc/portage/package.use/xlibs
+
 # 4. OVERLAYS
 header "Setting up overlays..."
 emerge --oneshot app-eselect/eselect-repository dev-vcs/git
