@@ -105,8 +105,6 @@ echo "sys-auth/polkit elogind" > /etc/portage/package.use/polkit
 # NetworkManager: enable nmtui/nmcli tools
 echo "net-misc/networkmanager tools" > /etc/portage/package.use/networkmanager
 
-# xdg-desktop-portal-gtk needs the gtk USE flag explicitly
-echo "gui-libs/xdg-desktop-portal-gtk gtk" > /etc/portage/package.use/portals
 
 # elogind itself needs pam so login sessions are tracked properly
 echo "sys-auth/elogind pam" > /etc/portage/package.use/elogind
@@ -225,7 +223,7 @@ emerge \
   gui-apps/slurp \
   gui-apps/wl-clipboard \
   x11-misc/dunst \
-  gui-libs/xdg-desktop-portal-gtk \
+  gui-libs/xdg-desktop-portal-wlr \
   gnome-extra/polkit-gnome \
   sys-power/brightnessctl \
   media-sound/pavucontrol \
