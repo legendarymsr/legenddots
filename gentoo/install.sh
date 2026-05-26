@@ -64,6 +64,8 @@ mkdir -p /etc/portage/package.accept_keywords
   echo "*/*::guru ~amd64"
   echo "*/*::hyproverlay ~amd64"
   echo "*/*::another-brave-overlay ~amd64"
+  # libglvnd-1.7.0 has no keyword at all (not even ~amd64); needs ** to accept
+  echo "media-libs/libglvnd **"
 } > /etc/portage/package.accept_keywords/legend
 
 # 3. MAKE.CONF
@@ -75,6 +77,7 @@ MAKEOPTS="-j4"
 EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
+ABI_X86="64"
 USE="wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
