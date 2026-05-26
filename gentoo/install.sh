@@ -262,8 +262,8 @@ eselect locale set sv_SE.utf8
 env-update && set +u && source /etc/profile && set -u
 
 useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend || true
-echo "legend:legendary" | chpasswd
-echo "root:legendary123" | chpasswd
+echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
+echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
 
 mkdir -p /etc/sudoers.d
 echo 'legend ALL=(ALL:ALL) ALL' > /etc/sudoers.d/legend
