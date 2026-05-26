@@ -117,10 +117,6 @@ echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 # libglvnd X flag is off by default; mesa requires libglvnd[X] for GLX/XWayland
 echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 
-# mesa LLVM_COMPAT=(18..22) auto-picks highest slot; spirv-llvm-translator
-# only has version 22 in the tree so LLVM 22 is required end-to-end.
-echo "media-libs/mesa llvm_slot_22" > /etc/portage/package.use/mesa-llvm
-echo "dev-util/mesa_clc llvm_slot_22" >> /etc/portage/package.use/mesa-llvm
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
@@ -221,7 +217,9 @@ emerge \
   app-editors/neovim \
   media-video/pipewire \
   media-video/wireplumber \
-  sys-boot/grub
+  sys-boot/grub \
+  llvm-core/llvm \
+  llvm-core/clang
 
 wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
     -O /usr/bin/synfetch && chmod +x /usr/bin/synfetch
