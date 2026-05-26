@@ -50,6 +50,11 @@ set +u; source /etc/profile; set -u
 export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 
+# Allow overcommit so portage fork() calls don't fail with ENOMEM
+# when the live-CD RAM is under pressure during heavy package builds
+echo 1 > /proc/sys/vm/overcommit_memory
+echo 262144 > /proc/sys/vm/max_map_count
+
 # 1. PORTAGE SYNC & HARDENED PROFILE
 header "Syncing portage tree..."
 emerge-webrsync
@@ -73,8 +78,8 @@ cat > /etc/portage/make.conf << 'EOF'
 COMMON_FLAGS="-march=haswell -O2 -pipe"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
-MAKEOPTS="-j4"
-EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5"
+MAKEOPTS="-j2"
+EMERGE_DEFAULT_OPTS="--jobs=1"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
