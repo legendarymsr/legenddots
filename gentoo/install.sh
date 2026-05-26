@@ -69,6 +69,8 @@ mkdir -p /etc/portage/package.accept_keywords
   echo "*/*::guru ~amd64"
   echo "*/*::hyproverlay ~amd64"
   echo "*/*::another-brave-overlay ~amd64"
+  # libglvnd has no keyword on any recent version; ** lets portage pick any build
+  echo "media-libs/libglvnd **"
 } > /etc/portage/package.accept_keywords/legend
 
 # 3. MAKE.CONF
