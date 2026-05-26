@@ -192,7 +192,7 @@ emerge \
   sys-power/acpid \
   sys-power/tlp \
   sys-apps/lm-sensors \
-  app-misc/fastfetch \
+  net-misc/wget \
   app-shells/zsh \
   dev-vcs/git \
   app-editors/neovim \
@@ -200,6 +200,9 @@ emerge \
   media-video/wireplumber \
   x11-terms/alacritty \
   sys-boot/grub
+
+wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
+    -O /usr/bin/synfetch && chmod +x /usr/bin/synfetch
 
 # 7. DESKTOP (niri + full Wayland stack — all guru/overlay packages together)
 header "Emerging desktop..."
