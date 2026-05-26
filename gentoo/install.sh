@@ -256,9 +256,10 @@ header "Localizing and creating user..."
 echo "Europe/Stockholm" > /etc/timezone
 emerge --config sys-libs/timezone-data
 sed -i 's/keymap="us"/keymap="se"/' /etc/conf.d/keymaps
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 echo "sv_SE.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
-eselect locale set sv_SE.utf8
+eselect locale set en_US.utf8
 env-update && set +u && source /etc/profile && set -u
 
 useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend || true
