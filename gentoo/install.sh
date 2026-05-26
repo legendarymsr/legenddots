@@ -115,8 +115,9 @@ echo "gui-apps/waybar tray" > /etc/portage/package.use/waybar
 # Only build JetBrains Mono; building all ~3.5GB of nerd fonts is impractical
 echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 
-# libglvnd has no X support; mesa requires it without X
+# Pure Wayland: no GLX needed, only EGL. mesa -X stops it requiring libglvnd[X].
 echo "media-libs/libglvnd -X" > /etc/portage/package.use/libglvnd
+echo "media-libs/mesa -X" > /etc/portage/package.use/mesa
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
