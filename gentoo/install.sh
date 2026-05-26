@@ -55,34 +55,15 @@ header "Syncing portage tree..."
 emerge-webrsync
 eselect profile set default/linux/amd64/23.0/hardened
 
-# 2. KEYWORDS & UNMASKING
-mkdir -p /etc/portage/package.accept_keywords /etc/portage/package.unmask
+# 2. KEYWORDS
+# ACCEPT_KEYWORDS="~amd64" in make.conf already accepts all testing packages.
+# Only need package.accept_keywords for the overlay wildcards so portage
+# knows to trust packages from those repos.
+mkdir -p /etc/portage/package.accept_keywords
 {
-  # hardened-sources was removed from the main tree; gentoo-sources patched
-  # with our manual hardening configs gives an equivalent security posture
-  echo "sys-kernel/gentoo-sources ~amd64"
-  echo "sys-kernel/genkernel ~amd64"
-  echo "net-wireless/broadcom-sta ~amd64"
-  # overlay-wide accepts — must come after overlays are synced but portage
-  # reads them lazily so writing them early is fine
   echo "*/*::guru ~amd64"
   echo "*/*::hyproverlay ~amd64"
   echo "*/*::another-brave-overlay ~amd64"
-  # main-tree packages that live on ~amd64 on the hardened profile
-  echo "x11-apps/igt-gpu-tools ~amd64"
-  echo "app-editors/neovim ~amd64"
-  echo "dev-lua/lua ~amd64"
-  echo "dev-lua/luajit ~amd64"
-  echo "x11-terms/alacritty ~amd64"
-  echo "x11-libs/libxkbcommon ~amd64"
-  echo "media-libs/mesa ~amd64"
-  echo "media-video/pipewire ~amd64"
-  echo "media-video/wireplumber ~amd64"
-  echo "gui-libs/xdg-desktop-portal-gtk ~amd64"
-  echo "x11-misc/dunst ~amd64"
-  echo "gnome-extra/polkit-gnome ~amd64"
-  echo "sys-auth/elogind ~amd64"
-  echo "media-sound/pavucontrol ~amd64"
 } > /etc/portage/package.accept_keywords/legend
 
 # 3. MAKE.CONF
@@ -95,6 +76,7 @@ EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 USE="wireless udev policykit elogind dbus networkmanager bluetooth pipewire -pulseaudio alsa wayland -systemd -gnome -kde -qt5 -cups"
+ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64"
 EOF
