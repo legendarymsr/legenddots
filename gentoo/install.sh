@@ -123,6 +123,9 @@ echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
 echo "x11-libs/pango X" >> /etc/portage/package.use/xlibs
 echo "x11-libs/libxkbcommon X" >> /etc/portage/package.use/xlibs
 echo "dev-libs/libdbusmenu gtk3" >> /etc/portage/package.use/xlibs
+# cairomm/atkmm wrap cairo and need the same X flag
+echo "dev-cpp/cairomm X" >> /etc/portage/package.use/xlibs
+echo "dev-cpp/atkmm X" >> /etc/portage/package.use/xlibs
 
 # 4. OVERLAYS
 header "Setting up overlays..."
