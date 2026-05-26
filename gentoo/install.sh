@@ -123,6 +123,17 @@ echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 echo "media-libs/mesa llvm_slot_21" > /etc/portage/package.use/mesa-llvm
 echo "dev-util/mesa_clc llvm_slot_21" >> /etc/portage/package.use/mesa-llvm
 
+# Mask entire LLVM 22 slot — something in the dep tree pulls it in and
+# it conflicts with mesa_clc:21. Stay on 21 for the whole system.
+mkdir -p /etc/portage/package.mask
+cat > /etc/portage/package.mask/llvm22 << 'MASK_EOF'
+>=llvm-core/llvm-22
+>=llvm-core/clang-22
+>=llvm-core/libcxx-22
+>=llvm-core/compiler-rt-22
+>=llvm-core/clang-runtime-22
+MASK_EOF
+
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
 echo "x11-libs/pango X" >> /etc/portage/package.use/xlibs
