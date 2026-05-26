@@ -68,6 +68,17 @@ mkdir -p /etc/portage/package.accept_keywords /etc/portage/package.unmask
   echo "*/*::guru ~amd64"
   echo "*/*::hyproverlay ~amd64"
   echo "*/*::another-brave-overlay ~amd64"
+  # main-tree packages that live on ~amd64 on the hardened profile
+  echo "x11-apps/igt-gpu-tools ~amd64"
+  echo "app-editors/neovim ~amd64"
+  echo "x11-terms/alacritty ~amd64"
+  echo "media-video/pipewire ~amd64"
+  echo "media-video/wireplumber ~amd64"
+  echo "gui-libs/xdg-desktop-portal-gtk ~amd64"
+  echo "x11-misc/dunst ~amd64"
+  echo "gnome-extra/polkit-gnome ~amd64"
+  echo "sys-auth/elogind ~amd64"
+  echo "media-sound/pavucontrol ~amd64"
 } > /etc/portage/package.accept_keywords/legend
 
 # 3. MAKE.CONF
