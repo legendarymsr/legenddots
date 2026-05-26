@@ -225,7 +225,6 @@ emerge \
   x11-misc/dunst \
   gui-libs/xdg-desktop-portal-wlr \
   gnome-extra/polkit-gnome \
-  sys-power/brightnessctl \
   media-sound/pavucontrol \
   app-misc/xdg-utils \
   x11-misc/xdg-user-dirs \
