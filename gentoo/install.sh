@@ -76,17 +76,22 @@ cat > /etc/portage/make.conf << 'EOF'
 COMMON_FLAGS="-march=haswell -O2 -pipe"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
-MAKEOPTS="-j2"
-EMERGE_DEFAULT_OPTS="--jobs=1"
+MAKEOPTS="-j4"
+EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5 --quiet-build=y"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
 LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio"
+FEATURES="ccache"
+CCACHE_DIR="/var/cache/ccache"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64"
 EOF
+
+mkdir -p /var/cache/ccache
+chown -R portage:portage /var/cache/ccache
 
 # package.use — set before any emerge so deps pick up the right flags
 mkdir -p /etc/portage/package.use
@@ -219,7 +224,8 @@ emerge \
   media-video/wireplumber \
   sys-boot/grub \
   llvm-core/llvm \
-  llvm-core/clang
+  llvm-core/clang \
+  dev-util/ccache
 
 wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
     -O /usr/bin/synfetch && chmod +x /usr/bin/synfetch
