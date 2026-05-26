@@ -117,6 +117,12 @@ echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 # libglvnd X flag is off by default; mesa requires libglvnd[X] for GLX/XWayland
 echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 
+# mesa LLVM_COMPAT=(18..22) auto-picks the highest available slot.
+# Base step installed LLVM 21; pin both mesa and mesa_clc to slot 21
+# so portage doesn't try to pull in LLVM 22 mid-install.
+echo "media-libs/mesa llvm_slot_21" > /etc/portage/package.use/mesa-llvm
+echo "dev-util/mesa_clc llvm_slot_21" >> /etc/portage/package.use/mesa-llvm
+
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
 echo "x11-libs/pango X" >> /etc/portage/package.use/xlibs
