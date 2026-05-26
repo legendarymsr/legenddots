@@ -71,7 +71,11 @@ mkdir -p /etc/portage/package.accept_keywords /etc/portage/package.unmask
   # main-tree packages that live on ~amd64 on the hardened profile
   echo "x11-apps/igt-gpu-tools ~amd64"
   echo "app-editors/neovim ~amd64"
+  echo "dev-lua/lua ~amd64"
+  echo "dev-lua/luajit ~amd64"
   echo "x11-terms/alacritty ~amd64"
+  echo "x11-libs/libxkbcommon ~amd64"
+  echo "media-libs/mesa ~amd64"
   echo "media-video/pipewire ~amd64"
   echo "media-video/wireplumber ~amd64"
   echo "gui-libs/xdg-desktop-portal-gtk ~amd64"
