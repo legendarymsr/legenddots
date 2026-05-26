@@ -183,7 +183,7 @@ emerge \
   sys-apps/usbutils \
   sys-process/procps \
   app-misc/figlet \
-  x11-apps/intel-gpu-tools \
+  x11-apps/igt-gpu-tools \
   sys-auth/elogind \
   net-misc/networkmanager \
   net-wireless/wpa_supplicant \
