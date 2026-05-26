@@ -322,7 +322,7 @@ ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlig
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
 EOF
 
-depmod -a
+depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
 # GRUB
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo --removable
