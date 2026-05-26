@@ -83,7 +83,8 @@ EMERGE_DEFAULT_OPTS="--jobs=1"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -X"
+LLVM_TARGETS="X86"
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
 GRUB_PLATFORMS="efi-64"
@@ -206,7 +207,6 @@ emerge \
   app-editors/neovim \
   media-video/pipewire \
   media-video/wireplumber \
-  x11-terms/alacritty \
   sys-boot/grub
 
 wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
@@ -215,6 +215,7 @@ wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
 # 7. DESKTOP (niri + full Wayland stack — all guru/overlay packages together)
 header "Emerging desktop..."
 emerge \
+  x11-terms/alacritty \
   gui-wm/niri \
   gui-apps/waybar \
   gui-apps/fuzzel \
