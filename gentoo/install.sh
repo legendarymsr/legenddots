@@ -117,22 +117,10 @@ echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 # libglvnd X flag is off by default; mesa requires libglvnd[X] for GLX/XWayland
 echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 
-# mesa LLVM_COMPAT=(18..22) auto-picks the highest available slot.
-# Base step installed LLVM 21; pin both mesa and mesa_clc to slot 21
-# so portage doesn't try to pull in LLVM 22 mid-install.
-echo "media-libs/mesa llvm_slot_21" > /etc/portage/package.use/mesa-llvm
-echo "dev-util/mesa_clc llvm_slot_21" >> /etc/portage/package.use/mesa-llvm
-
-# Mask entire LLVM 22 slot — something in the dep tree pulls it in and
-# it conflicts with mesa_clc:21. Stay on 21 for the whole system.
-mkdir -p /etc/portage/package.mask
-cat > /etc/portage/package.mask/llvm22 << 'MASK_EOF'
->=llvm-core/llvm-22
->=llvm-core/clang-22
->=llvm-core/libcxx-22
->=llvm-core/compiler-rt-22
->=llvm-core/clang-runtime-22
-MASK_EOF
+# mesa LLVM_COMPAT=(18..22) auto-picks highest slot; spirv-llvm-translator
+# only has version 22 in the tree so LLVM 22 is required end-to-end.
+echo "media-libs/mesa llvm_slot_22" > /etc/portage/package.use/mesa-llvm
+echo "dev-util/mesa_clc llvm_slot_22" >> /etc/portage/package.use/mesa-llvm
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
