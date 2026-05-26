@@ -325,7 +325,7 @@ EOF
 depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
 # GRUB
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo --removable
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot --bootloader-id=Gentoo --removable
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # Services
