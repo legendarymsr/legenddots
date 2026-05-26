@@ -69,8 +69,6 @@ mkdir -p /etc/portage/package.accept_keywords
   echo "*/*::guru ~amd64"
   echo "*/*::hyproverlay ~amd64"
   echo "*/*::another-brave-overlay ~amd64"
-  # libglvnd-1.7.0 has no keyword at all (not even ~amd64); needs ** to accept
-  echo "media-libs/libglvnd **"
 } > /etc/portage/package.accept_keywords/legend
 
 # 3. MAKE.CONF
@@ -115,9 +113,6 @@ echo "gui-apps/waybar tray" > /etc/portage/package.use/waybar
 # Only build JetBrains Mono; building all ~3.5GB of nerd fonts is impractical
 echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 
-# Pure Wayland: no GLX needed, only EGL. mesa -X stops it requiring libglvnd[X].
-echo "media-libs/libglvnd -X" > /etc/portage/package.use/libglvnd
-echo "media-libs/mesa -X" > /etc/portage/package.use/mesa
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
