@@ -226,7 +226,7 @@ emerge \
   gui-libs/xdg-desktop-portal-wlr \
   gnome-extra/polkit-gnome \
   media-sound/pavucontrol \
-  app-misc/xdg-utils \
+  x11-misc/xdg-utils \
   x11-misc/xdg-user-dirs \
   media-fonts/nerdfonts \
   www-client/brave-browser-nightly
