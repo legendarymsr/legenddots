@@ -296,11 +296,23 @@ ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlig
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
 EOF
 
-depmod -a
+depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
-# GRUB
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=Gentoo
+# GRUB — grub-mkstandalone embeds the root UUID search into the EFI binary so
+# Mac disk enumeration changes can't break boot (plain grub-install's embedded
+# prefix is fragile on Apple firmware).
 grub-mkconfig -o /boot/grub/grub.cfg
+ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
+cat > /tmp/grub-embed.cfg << EMBEOF
+search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
+set prefix=(\$root)/boot/grub
+source \$prefix/grub.cfg
+EMBEOF
+grub-mkstandalone \
+  --format=x86_64-efi \
+  --output=/boot/efi/EFI/BOOT/bootx64.efi \
+  --modules="part_gpt part_msdos fat ext2 normal search search_fs_uuid boot linux initrd" \
+  "boot/grub/grub.cfg=/tmp/grub-embed.cfg"
 
 # Services
 rc-update add NetworkManager default
