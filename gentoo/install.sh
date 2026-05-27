@@ -205,23 +205,18 @@ emerge \
   x11-terms/alacritty \
   sys-boot/grub
 
-# 7. DESKTOP (niri + full Wayland stack — all guru/overlay packages together)
+# 7. DESKTOP (openbox + minimal X11 stack)
 header "Emerging desktop..."
 emerge \
-  gui-wm/niri \
-  gui-apps/waybar \
-  gui-apps/fuzzel \
-  gui-apps/swaylock \
-  gui-apps/swaybg \
-  gui-apps/grim \
-  gui-apps/slurp \
-  gui-apps/wl-clipboard \
+  x11-base/xorg-server \
+  x11-wm/openbox \
+  x11-misc/tint2 \
+  x11-misc/rofi \
   x11-misc/dunst \
-  x11-misc/xdg-desktop-portal-gtk \
   gnome-extra/polkit-gnome \
   sys-power/brightnessctl \
   media-sound/pavucontrol \
-  app-misc/xdg-utils \
+  x11-misc/xdg-utils \
   x11-misc/xdg-user-dirs \
   media-fonts/nerdfonts \
   www-client/brave-browser-nightly
