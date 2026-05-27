@@ -203,7 +203,7 @@ emerge \
   media-video/pipewire \
   media-video/wireplumber \
   x11-terms/alacritty \
-  sys-boot/grub
+  sys-boot/refind
 
 # 7. DESKTOP (openbox + minimal X11 stack)
 header "Emerging desktop..."
@@ -293,21 +293,8 @@ EOF
 
 depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
-# GRUB — grub-mkstandalone embeds the root UUID search into the EFI binary so
-# Mac disk enumeration changes can't break boot (plain grub-install's embedded
-# prefix is fragile on Apple firmware).
-grub-mkconfig -o /boot/grub/grub.cfg
-ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
-cat > /tmp/grub-embed.cfg << EMBEOF
-search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
-set prefix=(\$root)/boot/grub
-source \$prefix/grub.cfg
-EMBEOF
-grub-mkstandalone \
-  --format=x86_64-efi \
-  --output=/boot/efi/EFI/BOOT/bootx64.efi \
-  --modules="part_gpt part_msdos fat ext2 normal search search_fs_uuid boot linux initrd" \
-  "boot/grub/grub.cfg=/tmp/grub-embed.cfg"
+# rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
+refind-install --usedefault /dev/sda1
 
 # Services
 rc-update add NetworkManager default
