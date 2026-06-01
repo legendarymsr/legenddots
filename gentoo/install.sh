@@ -87,7 +87,6 @@ FEATURES="ccache"
 CCACHE_DIR="/var/cache/ccache"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
-GRUB_PLATFORMS="efi-64"
 EOF
 
 mkdir -p /var/cache/ccache
@@ -241,7 +240,6 @@ emerge \
 # 7. DESKTOP (niri + full Wayland stack)
 header "Emerging desktop..."
 emerge \
-  x11-terms/alacritty \
   gui-wm/niri \
   gui-apps/waybar \
   gui-apps/fuzzel \
