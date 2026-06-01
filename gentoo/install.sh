@@ -222,15 +222,12 @@ emerge \
   app-editors/neovim \
   media-video/pipewire \
   media-video/wireplumber \
-  sys-boot/grub \
+  x11-terms/alacritty \
   llvm-core/llvm \
   llvm-core/clang \
-  dev-util/ccache
+  sys-boot/refind
 
-wget https://raw.githubusercontent.com/SXSLVT/synfetch/main/synfetch \
-    -O /usr/bin/synfetch && chmod +x /usr/bin/synfetch
-
-# 7. DESKTOP (niri + full Wayland stack — all guru/overlay packages together)
+# 7. DESKTOP (niri + full Wayland stack)
 header "Emerging desktop..."
 emerge \
   x11-terms/alacritty \
@@ -324,9 +321,8 @@ EOF
 
 depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
-# GRUB
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot --bootloader-id=Gentoo --removable
-grub-mkconfig -o /boot/grub/grub.cfg
+# rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
+refind-install --usedefault /dev/sda1
 
 # Services
 rc-update add NetworkManager default
