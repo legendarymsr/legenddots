@@ -93,6 +93,17 @@ EOF
 mkdir -p /var/cache/ccache
 chown -R portage:portage /var/cache/ccache
 
+# O1 env override for slow packages — halves compile time with no practical
+# runtime impact since these are build tools / shader compilers, not hot paths
+mkdir -p /etc/portage/env /etc/portage/package.env
+echo 'CFLAGS="-march=haswell -O1 -pipe"
+CXXFLAGS="-march=haswell -O1 -pipe"' > /etc/portage/env/O1.conf
+{
+  echo "llvm-core/llvm O1.conf"
+  echo "llvm-core/clang O1.conf"
+  echo "media-libs/mesa O1.conf"
+} > /etc/portage/package.env/O1
+
 # package.use — set before any emerge so deps pick up the right flags
 mkdir -p /etc/portage/package.use
 
