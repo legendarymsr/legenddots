@@ -203,16 +203,23 @@ emerge \
   media-video/pipewire \
   media-video/wireplumber \
   x11-terms/alacritty \
+  llvm-core/llvm \
+  llvm-core/clang \
   sys-boot/refind
 
-# 7. DESKTOP (openbox + minimal X11 stack)
+# 7. DESKTOP (niri + full Wayland stack)
 header "Emerging desktop..."
 emerge \
-  x11-base/xorg-server \
-  x11-wm/openbox \
-  x11-misc/tint2 \
-  x11-misc/rofi \
+  gui-wm/niri \
+  gui-apps/waybar \
+  gui-apps/fuzzel \
+  gui-apps/swaylock \
+  gui-apps/swaybg \
+  gui-apps/grim \
+  gui-apps/slurp \
+  gui-apps/wl-clipboard \
   x11-misc/dunst \
+  gui-libs/xdg-desktop-portal-wlr \
   gnome-extra/polkit-gnome \
   sys-power/brightnessctl \
   media-sound/pavucontrol \
