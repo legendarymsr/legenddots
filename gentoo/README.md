@@ -29,8 +29,19 @@ tmux new -s install   # so a dropped connection doesn't kill the build
 bash install.sh
 ```
 
-The script runs fully unattended. A full build takes **4–8 hours** on
-this hardware — kernel ~45 min, LLVM ~2–3 hrs, desktop packages ~1 hr.
+The script runs fully unattended. A full build takes roughly **4 hours**
+on this hardware:
+
+| Phase | Time |
+|-------|------|
+| Kernel | ~45 min |
+| LLVM + clang (O1) | ~1.5 hrs |
+| mesa (O1) | ~20 min |
+| Desktop packages | ~45 min |
+| Everything else | ~30 min |
+
+LLVM, clang, and mesa build with `-O1` to cut compile time roughly in
+half. ccache means any subsequent reinstall is significantly faster.
 
 ---
 
