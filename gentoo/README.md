@@ -94,6 +94,20 @@ brave-browser-nightly
 - Dotfiles cloned from `github.com/legendarymsr/legenddots` with symlinks
   for niri, waybar, fuzzel, dunst, swaylock, alacritty, zsh
 
+### Default credentials
+
+| Account | Password      |
+|---------|---------------|
+| legend  | `legendary`   |
+| root    | `legendary123`|
+
+**Change these immediately after first boot:**
+
+```sh
+passwd legend
+sudo passwd root
+```
+
 ---
 
 ## Bootloader
