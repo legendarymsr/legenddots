@@ -1,8 +1,13 @@
 # Gentoo Install Script — MacBook Air 6,2
 
+If you're still on Windows, close this tab, uninstall it, and come back
+when you're serious. If you're on a binary distro clicking "install"
+on precompiled blobs you didn't ask for — you can do better.
+
 Fully automated Gentoo installation script for the **MacBook Air 6,2
-(Mid 2013, Intel Core i5-4250U)**. Boot the live ISO, run the script,
-walk away. No prompts.
+(Mid 2013, Intel Core i5-4250U)**. Everything built from source, tuned
+for your exact hardware. Boot the live ISO, run the script, walk away.
+No prompts. No binary packages. No Microsoft.
 
 ---
 
