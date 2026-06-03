@@ -76,7 +76,7 @@ cat > /etc/portage/make.conf << 'EOF'
 COMMON_FLAGS="-march=haswell -O2 -pipe"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
-MAKEOPTS="-j4"
+MAKEOPTS="-j3"
 EMERGE_DEFAULT_OPTS="--jobs=2 --load-average=3.5 --quiet-build=y --usepkg=n --getbinpkg=n"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
