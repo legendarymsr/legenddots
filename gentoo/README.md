@@ -10,10 +10,20 @@ If you're on a binary distro clicking "install" on precompiled blobs
 you didn't ask for, built by people you don't know, with USE flags you
 never chose — you can do better.
 
+Apple dropped this machine at macOS Big Sur and called it a day. A
+perfectly capable Haswell i5 with years of life left in it, abandoned
+because a corporation decided your hardware's expiry date for you.
+Meanwhile they're charging you for a walled garden where you can't
+install what you want, can't see what's running, and can't own your own
+machine. Your MacBook Air is better than what Apple left it as.
+
+Take it back. Run a kernel released this week. Build everything for
+your exact CPU. Own your hardware completely.
+
 Fully automated Gentoo installation script for the **MacBook Air 6,2
 (Mid 2013, Intel Core i5-4250U)**. Everything built from source, tuned
 for your exact hardware. Boot the live ISO, run the script, walk away.
-No prompts. No binary packages. No Microsoft. No compromises.
+No prompts. No binary packages. No Microsoft. No Apple. No compromises.
 
 ---
 
