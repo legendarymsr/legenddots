@@ -2,6 +2,12 @@
 
 A collection of custom tools and configs. Tokyo Night themed throughout.
 
+If you're using Chrome: a browser that reports everything you do back to
+Google, exists solely to serve you ads, and treats you as the product —
+you deserve better. If you're using Edge: a browser Microsoft force-installs
+on your machine, nags you to set as default every 3 days, and is just Chrome
+with extra telemetry and a Bing infestation. Both are spyware with a UI.
+
 ---
 
 ## browser
