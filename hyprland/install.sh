@@ -24,7 +24,7 @@ PACMAN_PKGS=(
     fuzzel
     alacritty
     dunst
-    waybar
+    waybar-git
     grim
     slurp
     wl-clipboard
