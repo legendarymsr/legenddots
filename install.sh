@@ -132,6 +132,13 @@ if [[ "$CHOICE" == "2" || "$CHOICE" == "3" ]]; then
     link "$REPO_DIR/hyprland/dunst"          "$HOME/.config/dunst"  2>/dev/null || true
 fi
 
+# ── Shell ─────────────────────────────────────────────────────────────────────
+if [[ "$SHELL" != "$(which zsh)" ]]; then
+    info "Setting zsh as default shell..."
+    chsh -s "$(which zsh)"
+    success "Default shell set to zsh. Open a new terminal to apply."
+fi
+
 # ── Pipewire ──────────────────────────────────────────────────────────────────
 info "Enabling pipewire..."
 systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
