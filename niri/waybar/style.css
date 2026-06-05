@@ -26,7 +26,7 @@ window#waybar {
   transition: all 0.2s ease;
 }
 
-#workspaces button.active {
+#workspaces button.active, #workspaces button.focused {
   color: #7aa2f7;
   background: rgba(122, 162, 247, 0.15);
 }
