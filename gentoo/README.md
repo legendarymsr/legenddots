@@ -10,6 +10,15 @@ If you're on a binary distro clicking "install" on precompiled blobs
 you didn't ask for, built by people you don't know, with USE flags you
 never chose — you can do better.
 
+And if you're on a Chromebook: congratulations, you're technically
+running Gentoo. ChromeOS is built on Gentoo. The portage package
+manager, the USE flags, the entire foundation — all Gentoo, all the
+way down. Google took the most customisable Linux distribution ever
+made and used it to build a locked-down browser with a keyboard.
+How does it feel to be running one of the most powerful and
+configurable operating systems ever conceived, and all you can do
+with it is open a tab?
+
 Apple dropped this machine at macOS Big Sur and called it a day. A
 perfectly capable Haswell i5 with years of life left in it, abandoned
 because a corporation decided your hardware's expiry date for you.
