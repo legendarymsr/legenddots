@@ -39,6 +39,24 @@
         ];
       };
 
+      nixosConfigurations.nixos-btw = lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./hosts/nixos-btw
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs    = true;
+            home-manager.useUserPackages  = true;
+            home-manager.extraSpecialArgs = { inherit inputs; };
+            home-manager.users.legend.imports = [
+              nixvim.homeManagerModules.nixvim
+              ./hosts/nixos-btw/home.nix
+            ];
+          }
+        ];
+      };
+
       homeConfigurations."legend@legend-box" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         extraSpecialArgs = { inherit inputs; };
