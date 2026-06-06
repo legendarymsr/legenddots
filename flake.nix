@@ -43,7 +43,7 @@
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
-          ./hosts/nixos-btw
+          ./hosts/nixosbtw
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs    = true;
@@ -51,7 +51,7 @@
             home-manager.extraSpecialArgs = { inherit inputs; };
             home-manager.users.legend.imports = [
               nixvim.homeManagerModules.nixvim
-              ./hosts/nixos-btw/home.nix
+              ./hosts/nixosbtw/home.nix
             ];
           }
         ];
