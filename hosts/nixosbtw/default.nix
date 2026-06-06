@@ -38,7 +38,6 @@
 
   # ── VM guest utils ────────────────────────────────────────────────────────
   services.qemuGuest.enable = true;
-  services.spice-vdagentd.enable = true;
 
   networking.networkmanager.enable = true;
   time.timeZone = "Europe/Stockholm";
