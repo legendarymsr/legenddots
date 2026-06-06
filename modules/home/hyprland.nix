@@ -4,7 +4,8 @@
   wayland.windowManager.hyprland = {
     enable = true;
     xwayland.enable = true;
-    extraConfig = builtins.readFile ../../hyprland/hyprland.conf;
+    configType   = "hyprland";
+    extraConfig  = builtins.readFile ../../hyprland/hyprland.conf;
   };
 
   xdg.configFile = {
