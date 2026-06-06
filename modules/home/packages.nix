@@ -4,7 +4,7 @@
   home.packages = with pkgs; [
     inputs.synfetch.packages.${pkgs.system}.default
     # Core utilities
-    git tmux htop btop ripgrep fd fzf fastfetch figlet
+    git tmux htop btop ripgrep fd fzf fastfetch figlet microfetch
 
     # Browser
     brave
