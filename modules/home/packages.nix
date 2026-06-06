@@ -4,7 +4,7 @@
   home.packages = with pkgs; [
     inputs.synfetch.packages.${pkgs.system}.default
     # Core utilities
-    git tmux htop btop ripgrep fd fzf
+    git tmux htop btop ripgrep fd fzf fastfetch
 
     # Browser
     brave
@@ -29,4 +29,6 @@
     nmap john wireshark-qt sqlmap ffuf
     radare2 bettercap aircrack-ng android-tools
   ];
+
+  home.file."Pictures/Screenshots/.keep".text = "";
 }
