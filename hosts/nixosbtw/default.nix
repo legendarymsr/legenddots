@@ -47,6 +47,8 @@
   # ── VM guest utils ────────────────────────────────────────────────────────
   services.qemuGuest.enable = true;
 
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   networking.networkmanager.enable = true;
   time.timeZone = "Europe/Stockholm";
 
