@@ -39,7 +39,7 @@
         ];
       };
 
-      nixosConfigurations.nixos-btw = lib.nixosSystem {
+      nixosConfigurations.nixosbtw = lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
