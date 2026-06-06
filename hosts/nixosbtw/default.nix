@@ -1,6 +1,14 @@
 { pkgs, ... }:
 
 {
+  imports = [ ./hardware-configuration.nix ];
+
+  # ── Boot ──────────────────────────────────────────────────────────────────
+  boot.loader.grub = {
+    enable = true;
+    device = "/dev/vda";
+  };
+
   # ── User ──────────────────────────────────────────────────────────────────
   users.users.legend = {
     isNormalUser = true;
