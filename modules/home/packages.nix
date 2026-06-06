@@ -1,7 +1,8 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 
 {
   home.packages = with pkgs; [
+    inputs.synfetch.packages.${pkgs.system}.default
     # Core utilities
     git tmux htop btop ripgrep fd fzf
 
