@@ -8,6 +8,7 @@
     enable = true;
     device = "/dev/vda";
   };
+  boot.kernelPackages = pkgs.linuxPackages_latest;
 
   # ── User ──────────────────────────────────────────────────────────────────
   users.users.legend = {

@@ -15,7 +15,7 @@
 
   services.fail2ban.enable   = true;
   networking.firewall.enable = true;
-  boot.kernelPackages        = pkgs.linuxPackages_hardened;
+  boot.kernelPackages        = pkgs.linuxPackages_latest;
 
   # ── Audio ────────────────────────────────────────────────────────────────────────────
   services.pipewire = {
