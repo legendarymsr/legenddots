@@ -58,18 +58,6 @@ legenddots/
 
 ---
 
-## Fetch
-
-System info is displayed with [synfetch](https://github.com/SXSLVT/synfetch).
-
-For those on Nix systems, make sure to have flakes enabled and you can just run:
-
-```bash
-nix run github:SXSLVT/synfetch
-```
-
----
-
 ## Manifesto
 
 Your editor should not phone home. Your OS should not require a Microsoft account. Your tools should not need 40GB of RAM to open a text file.
