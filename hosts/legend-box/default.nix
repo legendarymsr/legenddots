@@ -1,6 +1,12 @@
 { pkgs, ... }:
 
 {
+  imports = [ ./hardware-configuration.nix ];
+
+  # ── Boot ──────────────────────────────────────────────────────────────────────────
+  boot.loader.systemd-boot.enable        = true;
+  boot.loader.efi.canTouchEfiVariables   = true;
+
   # ── User ──────────────────────────────────────────────────────────────────────────
   users.users.legend = {
     isNormalUser = true;
