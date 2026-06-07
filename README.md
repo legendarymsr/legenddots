@@ -87,7 +87,7 @@ The NixOS setup is a fully declarative desktop. Everything — packages, service
 - **Theme**: Tokyo Night throughout
 
 ```bash
-nixos-rebuild switch --flake .#legend-box
+sudo nixos-rebuild switch --flake github:legendarymsr/legenddots#legend-box --no-write-lock-file --refresh
 ```
 
 Home-manager is integrated into the flake. NixVim handles Neovim declaratively — plugins, LSPs, and keymaps are all in `home/nixvim.nix`, no manual `:PackerSync` or `:Mason` needed.
