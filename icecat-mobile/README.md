@@ -11,8 +11,10 @@ This folder is self-contained: all paths below are relative to
 
 ## How this works
 
-1. `scripts/download-apk.sh` downloads the prebuilt Mull APK from
-   `MULL_APK_URL` (see `config/branding.env`) to `build/mull.apk`.
+1. `scripts/download-apk.sh` looks up the latest Mull APK for
+   `MULL_PACKAGE_ID`/`MULL_ABI` in DivestOS's F-Droid repo
+   (`MULL_FDROID_REPO`, see `config/branding.env`) and downloads it to
+   `build/mull.apk`.
 2. `scripts/rebrand-apk.sh` decompiles it with `apktool`, rewrites the
    `app_name` string to `APP_NAME`, copies in custom launcher icons from
    `branding/icons/` if present, and rebuilds it to `build/icecat-unsigned.apk`.
@@ -52,12 +54,11 @@ place (same signing key) without uninstalling first.
 
 ## Before you rely on this — things to verify/finish
 
-- **`MULL_APK_URL`** in `config/branding.env` points at Mull's `latest`
-  release asset for `arm64-v8a`. Check
-  [Mull's releases](https://github.com/divested-mobile/Mull/releases) (or
-  [DivestOS's F-Droid repo](https://fdroid.divestos.org/)) for the current
-  build, pick the asset matching your device's ABI, and pin to a specific
-  version/tag for reproducible builds.
+- **`MULL_ABI`** in `config/branding.env` defaults to `arm64-v8a` (most modern
+  phones). Mull doesn't publish APKs via GitHub — `scripts/download-apk.sh`
+  always pulls the latest build straight from
+  [DivestOS's F-Droid repo](https://fdroid.divestos.org/) (`MULL_FDROID_REPO`)
+  for `MULL_PACKAGE_ID`/`MULL_ABI`, so no URL pinning is needed.
 - **Package ID/applicationId is unchanged** — this rebrand only changes the
   display name (and optionally the icon), not the Android package ID. It
   remains installable alongside or as an update path for upstream Mull only if
@@ -98,7 +99,7 @@ Edit `config/branding.env`:
 
 ```bash
 APP_NAME="IceCat"
-MULL_APK_URL="https://github.com/divested-mobile/Mull/releases/latest/download/Mull-FOSS-arm64-v8a.apk"
+MULL_ABI="arm64-v8a"
 ```
 
 Drop launcher icon replacements into `branding/icons/<mipmap-density>/`,
