@@ -1,0 +1,5 @@
+/src/
+/dist/
+*.keystore
+*.jks
+local.properties
