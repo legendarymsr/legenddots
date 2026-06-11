@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Reference checklist of strings worth reviewing for the IceCat rebrand.
+  NOT applied automatically — apply-branding.sh only rewrites `app_name`
+  (driven by config/branding.env). Use this as a starting point when
+  grepping src/**/res/values*/strings.xml for remaining "Mull"/"Fenix"/
+  "Firefox" mentions (about screen, onboarding, update-checker URLs, crash
+  reporter labels, etc.) and editing them by hand.
+-->
+<resources>
+    <string name="app_name">IceCat</string>
+    <string name="firefox_logo_long">IceCat</string>
+</resources>
