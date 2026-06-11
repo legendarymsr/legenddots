@@ -34,6 +34,10 @@ seconds, with nothing to compile.
 
 ## Getting the APK
 
+- **Direct download (no build, no login)**: every push to `master` publishes
+  `icecat.apk` to the
+  [`icecat-latest` release](../../releases/tag/icecat-latest) as a release
+  asset — grab it straight from the Releases page on your phone.
 - **From CI**: open the "Build IceCat APK" workflow run in the Actions tab and
   download the `icecat-apk` artifact, which contains `icecat.apk`.
 - **Locally**: run `./scripts/package.sh` (requires `apktool`, `zipalign`, and
@@ -103,7 +107,8 @@ mirroring Android's resource layout — see `branding/icons/README.md`.
 ## CI
 
 `.github/workflows/icecat-mobile.yml` runs the full pipeline on
-`ubuntu-latest` (installing JDK, Android build-tools, and `apktool`) and
-uploads `dist/icecat.apk` as a workflow artifact named `icecat-apk`. Trigger
-it manually from the Actions tab (`workflow_dispatch`) or by pushing changes
-under `icecat-mobile/` to `master`.
+`ubuntu-latest` (installing JDK, Android build-tools, and `apktool`), uploads
+`dist/icecat.apk` as a workflow artifact named `icecat-apk`, and publishes it
+to the rolling `icecat-latest` GitHub release. Trigger it manually from the
+Actions tab (`workflow_dispatch`) or by pushing changes under `icecat-mobile/`
+to `master`.

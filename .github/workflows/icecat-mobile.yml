@@ -7,6 +7,9 @@ on:
     paths:
       - 'icecat-mobile/**'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,3 +48,16 @@ jobs:
         with:
           name: icecat-apk
           path: icecat-mobile/dist/icecat.apk
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: icecat-latest
+          name: IceCat (latest)
+          body: |
+            Automatically rebuilt from the upstream Mull APK. Download
+            `icecat.apk` below and sideload it. See `icecat-mobile/README.md`
+            for details and caveats.
+          make_latest: true
+          files: icecat-mobile/dist/icecat.apk
