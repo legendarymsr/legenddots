@@ -3,7 +3,7 @@
   Reference checklist of strings worth reviewing for the IceCat rebrand.
   NOT applied automatically — scripts/rebrand-apk.sh only rewrites `app_name`
   (driven by config/branding.env). Use this as a starting point when
-  grepping build/src/**/res/values*/strings.xml for remaining "Mull"/"Fenix"/
+  grepping build/src/**/res/values*/strings.xml for remaining "Fennec"/"Fenix"/
   "Firefox" mentions (about screen, onboarding, update-checker URLs, crash
   reporter labels, etc.) and editing them by hand.
 -->

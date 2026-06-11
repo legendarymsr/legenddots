@@ -30,4 +30,4 @@ branding/icons/
 ```
 
 Nothing is bundled here yet — until you add IceCat-branded icons, the build
-keeps Mull's stock icons.
+keeps Fennec F-Droid's stock icons.
