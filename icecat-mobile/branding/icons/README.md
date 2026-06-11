@@ -1,8 +1,9 @@
 # Custom launcher icons
 
 Drop replacement launcher icons here, mirroring Android's resource layout
-under `mipmap-*dpi/`. `apply-branding.sh` copies any file placed here onto a
-same-named, same-relative-path file under `src/**/res/`.
+under `mipmap-*dpi/`. `scripts/rebrand-apk.sh` copies any file placed here onto
+a same-named, same-relative-path file under `build/src/**/res/` (the
+apktool-decompiled APK).
 
 Expected sizes (legacy + adaptive icon foreground/background layers):
 
