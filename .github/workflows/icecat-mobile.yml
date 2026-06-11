@@ -56,8 +56,8 @@ jobs:
           tag_name: icecat-latest
           name: IceCat (latest)
           body: |
-            Automatically rebuilt from the upstream Mull APK. Download
-            `icecat.apk` below and sideload it. See `icecat-mobile/README.md`
-            for details and caveats.
+            Automatically rebuilt from the upstream Fennec F-Droid APK.
+            Download `icecat.apk` below and sideload it. See
+            `icecat-mobile/README.md` for details and caveats.
           make_latest: true
           files: icecat-mobile/dist/icecat.apk
