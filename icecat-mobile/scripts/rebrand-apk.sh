@@ -23,6 +23,21 @@ else
   echo "==> No custom icons in branding/icons/, keeping upstream icons"
 fi
 
+if [ "$ENABLE_HARDENING" = "true" ]; then
+  echo "==> Applying hardening prefs from branding/hardening-prefs.js"
+  OMNI="$(realpath "$WORK_DIR/src/assets/omni.ja")"
+  PREFS_REL="defaults/pref/${UPSTREAM_ABI}/geckoview-prefs.js"
+  TMP_DIR=$(mktemp -d)
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  unzip -oq "$OMNI" "$PREFS_REL" -d "$TMP_DIR"
+  cat branding/hardening-prefs.js >> "$TMP_DIR/$PREFS_REL"
+  (cd "$TMP_DIR" && zip -q "$OMNI" "$PREFS_REL")
+  rm -rf "$TMP_DIR"
+  trap - EXIT
+else
+  echo "==> ENABLE_HARDENING=false, skipping hardening prefs"
+fi
+
 echo "==> Rebuilding APK"
 apktool b "$WORK_DIR/src" -o "$WORK_DIR/icecat-unsigned.apk"
 echo "==> Unsigned APK at $WORK_DIR/icecat-unsigned.apk"
