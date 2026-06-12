@@ -32,6 +32,9 @@ This folder is self-contained: all paths below are relative to
      `DEFAULT_SEARCH_ENGINE`;
    - recolors Fenix's primary accent color (`res/values/colors.xml`) to
      `ICECAT_ACCENT_COLOR`;
+   - points the **Settings → Add-ons → Recommended** list at
+     `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` (see "Recommended add-ons"
+     below);
    - copies in custom launcher icons from `branding/icons/` if present;
    - applies the hardening prefs from `branding/hardening-prefs.js` to
      GeckoView's bundled default preferences (unless
@@ -278,12 +281,22 @@ doesn't require the currently-installed app to run. If a
 ## Recommended add-ons (default build)
 
 With `BUNDLE_EXTENSIONS="false"` (the default), GNU LibreJS, uBlock Origin,
-Privacy Badger, and Dark Reader are not pre-installed. Three of the four —
-uBlock Origin, Privacy Badger, and Dark Reader — are already in Mozilla's
-curated "Recommended" extension collection for Firefox for Android (the same
-list Fennec F-Droid's **Settings → Add-ons** screen shows), so they're a
-couple of taps away with no AMO browsing needed. LibreJS isn't in that
-curated list but is still installable via "Find more add-ons" in the same
+Privacy Badger, and Dark Reader are not pre-installed. Fennec F-Droid's
+**Settings → Add-ons → Recommended** screen is populated from an AMO
+collection (`AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` in
+`config/branding.env`, patched into the same `AMOAddonsProvider` call Fenix
+itself makes). By default this still points at Mozilla's own curated
+"Extensions-for-Android" collection, which already features uBlock Origin,
+Privacy Badger, and Dark Reader — so those three are a couple of taps away
+with no AMO browsing needed. LibreJS isn't in Mozilla's collection.
+
+To make **all four** (including LibreJS) show up under Recommended, create a
+free collection under your own AMO account at
+<https://addons.mozilla.org/collections/> containing the add-ons you want,
+then set `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` to that collection's
+owner username and slug (both appear in its URL,
+`addons.mozilla.org/<locale>/android/collections/<user>/<slug>/`). Until
+then, LibreJS is still installable via "Find more add-ons" on the same
 screen.
 
 All four are available for Firefox for Android on addons.mozilla.org:
@@ -383,6 +396,8 @@ UPSTREAM_ABI="arm64-v8a"
 ENABLE_HARDENING="true"
 DEFAULT_SEARCH_ENGINE="Brave"
 ICECAT_ACCENT_COLOR="0EA5E9"
+AMO_COLLECTION_USER="mozilla"
+AMO_COLLECTION_NAME="Extensions-for-Android"
 BUNDLE_EXTENSIONS="false"
 ```
 
