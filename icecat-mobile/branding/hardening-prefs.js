@@ -54,7 +54,7 @@ pref("network.IDN_show_punycode", true);
 // DoH fails or is unavailable, so DNS lookups aren't plaintext on the
 // network path.
 pref("network.trr.mode", 2);
-pref("network.trr.uri", "https://mozilla.cloudflare-dns.com/dns-query");
+pref("network.trr.uri", "https://base.dns.mullvad.net/dns-query");
 
 // --- Reduce notification-permission prompts ---------------------------------
 // New sites are denied notification permission by default instead of

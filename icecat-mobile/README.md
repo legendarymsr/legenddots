@@ -99,8 +99,8 @@ up-to-date list):
 - Autoplaying media with sound blocked by default
 - Internationalized domain names (IDNs) shown as punycode (`xn--...`) to
   resist script-mixing phishing/homograph attacks
-- DNS over HTTPS ("increased" mode, via Mozilla's Cloudflare TRR endpoint),
-  falling back to the system resolver only if DoH is unreachable
+- DNS over HTTPS ("increased" mode, via Mullvad's base DoH endpoint), falling
+  back to the system resolver only if DoH is unreachable
 - Notification permission requests denied by default (sites can still be
   allowed individually from their site-permissions page)
 - Credit card, address, and form-fill-history autofill disabled
@@ -122,10 +122,10 @@ up-to-date list):
 - `network.IDN_show_punycode` means legitimate non-Latin-script domains
   (e.g. your bank's site in a language using Cyrillic, CJK, etc.) will also
   display as `xn--...` punycode instead of native script.
-- DNS over HTTPS sends DNS lookups to Cloudflare (`mozilla.cloudflare-dns.com`)
-  instead of your network's configured resolver. Set
-  `network.trr.mode=0` in `about:config` to disable, or change
-  `network.trr.uri` to a different DoH resolver.
+- DNS over HTTPS sends DNS lookups to Mullvad (`base.dns.mullvad.net`) instead
+  of your network's configured resolver. Set `network.trr.mode=0` in
+  `about:config` to disable, or change `network.trr.uri` to a different DoH
+  resolver.
 - Forcing `prefers-color-scheme: dark` for web content
   (`layout.css.prefers-color-scheme.content-override=0`) only affects sites
   that implement a dark theme via CSS — it doesn't recolor sites that don't.
