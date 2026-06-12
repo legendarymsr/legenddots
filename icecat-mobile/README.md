@@ -293,33 +293,9 @@ doesn't require the currently-installed app to run. If a
 ## Recommended add-ons (default build)
 
 With `BUNDLE_EXTENSIONS="false"` (the default), GNU LibreJS, uBlock Origin,
-Privacy Badger, and Dark Reader are not pre-installed. Fennec F-Droid's
-**Settings → Add-ons → Recommended** screen is populated from an AMO
-collection (`AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` in
-`config/branding.env`, patched into the same `AMOAddonsProvider` call Fenix
-itself makes). By default this still points at Mozilla's own curated
-"Extensions-for-Android" collection, which already features uBlock Origin,
-Privacy Badger, and Dark Reader — so those three are a couple of taps away
-with no AMO browsing needed. LibreJS isn't in Mozilla's collection.
-
-To make **all four** (including LibreJS) show up under Recommended, create a
-free collection under your own AMO account at
-<https://addons.mozilla.org/collections/> containing the add-ons you want,
-then either:
-
-- set `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` in `config/branding.env` to
-  that collection's owner username and slug (both appear in its URL,
-  `addons.mozilla.org/<locale>/android/collections/<user>/<slug>/`) and
-  rebuild, or
-- on an already-installed IceCat, this rebrand also unhides Fenix's built-in
-  **Settings → Advanced → Custom extension collection** option (normally
-  Nightly/Beta-only) — enter the same username/slug there directly, no
-  rebuild needed.
-
-Until then, LibreJS is still installable via "Find more add-ons" on the same
-screen.
-
-All four are available for Firefox for Android on addons.mozilla.org:
+Privacy Badger, and Dark Reader are not pre-installed, but each is a couple of
+taps away — open the link on the device (it'll launch IceCat) and tap
+"Add to Firefox":
 
 - [GNU LibreJS](https://addons.mozilla.org/en-US/android/addon/librejs/) —
   blocks nonfree/nontrivial JavaScript
@@ -330,6 +306,16 @@ All four are available for Firefox for Android on addons.mozilla.org:
 - [Dark Reader](https://addons.mozilla.org/en-US/android/addon/darkreader/) —
   force-dark for sites without a native dark theme (the hardening prefs above
   already force `prefers-color-scheme: dark` for sites that *do* have one)
+
+uBlock Origin, Privacy Badger, and Dark Reader also show up directly under
+**Settings → Add-ons → Recommended** (Mozilla's default
+"Extensions-for-Android" AMO collection); LibreJS isn't in that collection, so
+grab it via the link above or "Find more add-ons" on the same screen.
+
+Advanced: `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` in
+`config/branding.env`, plus the unhidden **Settings → Advanced → Custom
+extension collection** setting, let you point the Recommended tab at your own
+AMO collection if you'd rather have all four show up there too.
 
 ## Getting the APK
 
