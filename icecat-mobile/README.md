@@ -132,6 +132,28 @@ links, and similar accented UI in both light and dark mode. Private
 browsing's distinct purple accent (`photonViolet*`) is intentionally left
 unchanged.
 
+## Logo and wordmark
+
+The Fennec fox-head icon and "Fennec F-Droid" wordmark (shown on the new-tab
+homepage and the in-app About screen) are raster images, not strings, so the
+string-based debranding below doesn't touch them. `branding/icons/` ships a
+full replacement set — an original cat-head icon in `ICECAT_ACCENT_COLOR` and
+an "IceCat" wordmark (IBM Plex Serif Bold) — covering every density and
+light/dark ("normal"/"private") variant Fenix references:
+
+- `drawable-{m,h,xh,xxh,xxx}hdpi/ic_logo_wordmark_{normal,private}.webp` —
+  combined icon+wordmark shown on the About screen
+- `drawable/ic_wordmark_logo.webp`,
+  `ic_wordmark_text_{normal,private}.webp` — icon and wordmark text shown
+  separately on the homepage header
+- `drawable/ic_wordmark_sport_logo.webp` — seasonal/sport variant of the icon
+
+These are deployed by the same `branding/icons/` copy mechanism as launcher
+icons (see "Customizing the rebrand" below); regenerate or replace any of
+these files to use different artwork. `drawable-night/ic_logo_wordmark_normal.xml`
+just insets `ic_logo_wordmark_private`, so no XML changes are needed for dark
+mode.
+
 ## Removing Firefox/Fennec branding
 
 In addition to `app_name`, `scripts/rebrand-apk.sh` replaces remaining
@@ -145,7 +167,8 @@ provide. Add more `<string name="...">` entries to that file if a future
 Fennec F-Droid release adds other strings that shouldn't be renamed.
 
 This is a best-effort find/replace of UI text, not a rebuild — anything
-baked into images, the update checker, or crash-reporter URLs is unaffected.
+baked into images (besides the wordmark/logo replaced above), the update
+checker, or crash-reporter URLs is unaffected.
 
 ## Recommended add-ons (not pre-installed)
 
@@ -197,10 +220,11 @@ place (same signing key) without uninstalling first.
   remains installable alongside or as an update path for upstream Fennec
   F-Droid only if signatures match (they won't, since this repo re-signs with
   its own key) — treat it as a separate app for update purposes.
-- **Branding is best-effort**: `app_name`, launcher icons, and
-  "Fennec"/"Firefox" mentions in `res/values*/strings.xml` are rewritten (see
+- **Branding is best-effort**: `app_name`, launcher icons, the homepage/About
+  logo and wordmark, and "Fennec"/"Firefox" mentions in
+  `res/values*/strings.xml` are rewritten (see "Logo and wordmark" and
   "Removing Firefox/Fennec branding" above), but the update checker, crash
-  reporter URLs, and anything baked into images are unaffected. After a
+  reporter URLs, and anything else baked into images are unaffected. After a
   rebrand, grep `build/src/res/values*/strings.xml` for any remaining
   "Fennec"/"Fenix"/"Firefox" mentions if you want to track down more.
 - **Hardening is a default-prefs patch, not a source rebuild**:
@@ -246,8 +270,9 @@ DEFAULT_SEARCH_ENGINE="Brave"
 ICECAT_ACCENT_COLOR="0EA5E9"
 ```
 
-Drop launcher icon replacements into `branding/icons/<mipmap-density>/`,
-mirroring Android's resource layout — see `branding/icons/README.md`.
+Drop launcher icon replacements into `branding/icons/<mipmap-density>/`, and
+logo/wordmark replacements into `branding/icons/drawable*/`, mirroring
+Android's resource layout — see `branding/icons/README.md`.
 
 Edit `branding/hardening-prefs.js` to add, remove, or tune the hardening
 preferences applied to GeckoView's defaults (see "Privacy & security
