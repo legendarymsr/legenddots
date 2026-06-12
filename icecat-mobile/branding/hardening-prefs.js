@@ -64,3 +64,30 @@ pref("permissions.default.desktop-notification", 2);
 
 // --- Don't offer to save/autofill payment card details ----------------------
 pref("extensions.formautofill.creditCards.enabled", false);
+
+// --- Don't store form-fill history or autofill addresses ---------------------
+// Pairs with the credit-card setting above: nothing typed into forms (search
+// boxes, signup fields, shipping addresses, etc.) is remembered for autofill
+// suggestions.
+pref("browser.formfill.enable", false);
+pref("extensions.formautofill.addresses.enabled", false);
+
+// --- WebRTC: hide local network IPs from peers -------------------------------
+// Keeps WebRTC working for video/voice calls, but stops it from leaking
+// local-network IP addresses (and host candidates) to remote peers via ICE.
+pref("media.peerconnection.ice.default_address_only", true);
+pref("media.peerconnection.ice.no_host", true);
+
+// --- De-Google the downloads Safe Browsing check ------------------------------
+// Stops Firefox from sending hashes of downloaded files to Google Safe
+// Browsing. URL-based phishing/malware blocklists (privacy-preserving local
+// hash-prefix lookups) are left enabled.
+pref("browser.safebrowsing.downloads.remote.enabled", false);
+
+// --- Force dark color scheme for web content ----------------------------------
+// Tells every site `prefers-color-scheme: dark`, so sites with a dark theme
+// use it regardless of system theme. Sites without a dark theme are
+// unaffected (full force-dark recoloring of any page needs an extension like
+// Dark Reader - see README's "Recommended add-ons"). Set to 3 in about:config
+// to follow the browser theme instead, or 1 to force light.
+pref("layout.css.prefers-color-scheme.content-override", 0);

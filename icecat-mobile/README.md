@@ -90,7 +90,13 @@ up-to-date list):
   falling back to the system resolver only if DoH is unreachable
 - Notification permission requests denied by default (sites can still be
   allowed individually from their site-permissions page)
-- Credit card autofill/storage disabled
+- Credit card, address, and form-fill-history autofill disabled
+- WebRTC local-network IP addresses hidden from peers (calls still work)
+- Downloaded-file hashes no longer sent to Google Safe Browsing (URL-based
+  phishing/malware blocklists stay on)
+- Web content forced to `prefers-color-scheme: dark` — sites with a dark
+  theme use it regardless of system theme (a built-in, prefs-only
+  approximation of "Dark Reader" for sites that support it)
 
 **Trade-offs to know about:**
 
@@ -107,6 +113,11 @@ up-to-date list):
   instead of your network's configured resolver. Set
   `network.trr.mode=0` in `about:config` to disable, or change
   `network.trr.uri` to a different DoH resolver.
+- Forcing `prefers-color-scheme: dark` for web content
+  (`layout.css.prefers-color-scheme.content-override=0`) only affects sites
+  that implement a dark theme via CSS — it doesn't recolor sites that don't.
+  Set it to `3` in `about:config` to follow the browser theme instead, or
+  install the Dark Reader extension (below) for force-dark on any site.
 - None of these prefs are `locked` — anything here can be changed at runtime
   in `about:config` if it causes problems on a site.
 - Set `ENABLE_HARDENING="false"` in `config/branding.env` for a pure rebrand
@@ -172,15 +183,18 @@ checker, or crash-reporter URLs is unaffected.
 
 ## Recommended add-ons (not pre-installed)
 
-GNU LibreJS, uBlock Origin, and Privacy Badger can't be bundled as
-pre-installed/auto-enabled extensions by this repackaging approach: Fenix's
+GNU LibreJS, uBlock Origin, Privacy Badger, and Dark Reader can't be bundled
+as pre-installed/auto-enabled extensions by this repackaging approach: Fenix's
 "built-in" extensions (`assets/extensions/` — search, webcompat, etc.) are
-registered by ID in compiled app code, not from a resource file this pipeline
-can extend without a full source build.
+registered by hardcoded string literals in compiled app code
+(`org.mozilla.fenix.components.Core`), not from a resource file this pipeline
+can extend. Patching that smali to register more extensions, or vendoring
+their source as new "privileged" built-ins, would risk crashing the browser
+on startup and break on every Fennec F-Droid update — not worth the risk for
+extensions that are a couple of taps away anyway.
 
-All three are, however, available for Firefox for Android on
-addons.mozilla.org and install in a couple of taps from **Settings → Add-ons**
-in the app:
+All four are available for Firefox for Android on addons.mozilla.org and
+install in a couple of taps from **Settings → Add-ons** in the app:
 
 - [GNU LibreJS](https://addons.mozilla.org/en-US/android/addon/librejs/) —
   blocks nonfree/nontrivial JavaScript
@@ -188,6 +202,9 @@ in the app:
   — wide-spectrum content/ad blocker
 - [Privacy Badger](https://addons.mozilla.org/en-US/android/addon/privacy-badger17/)
   — learns to block hidden trackers
+- [Dark Reader](https://addons.mozilla.org/en-US/android/addon/darkreader/) —
+  force-dark for sites without a native dark theme (the hardening prefs above
+  already force `prefers-color-scheme: dark` for sites that *do* have one)
 
 ## Getting the APK
 
