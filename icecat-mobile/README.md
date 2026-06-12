@@ -341,13 +341,28 @@ normally:
 │ addons.mozilla.org/.../librejs/  ⋮ │
 ├────────────────────────────────────┤
 │                                      │
+│  To use Android extensions, you'll  │
+│  need Firefox for Android. To       │
+│  explore Firefox for desktop        │
+│  add-ons, please visit our          │
+│  ┌────────────────────────┐        │
+│  │ visit our desktop site  │◄── tap │
+│  └────────────────────────┘        │
+└────────────────────────────────────┘
+        3. tap "visit our desktop site"
+                  │
+                  ▼
+┌────────────────────────────────────┐
+│ addons.mozilla.org/.../librejs/  ⋮ │
+├────────────────────────────────────┤
+│                                      │
 │  GNU LibreJS                        │
 │  by Ruben Rodriguez                 │
 │                                      │
 │  [ + Add to Firefox ]        ◄── tap│
 │                                      │
 └────────────────────────────────────┘
-        3. tap "Add to Firefox" → "Add"
+        4. tap "Add to Firefox" → "Add"
 ```
 
 uBlock Origin, Privacy Badger, and Dark Reader also show up directly under
