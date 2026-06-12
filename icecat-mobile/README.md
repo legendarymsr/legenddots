@@ -307,6 +307,49 @@ taps away — open the link on the device (it'll launch IceCat) and tap
   force-dark for sites without a native dark theme (the hardening prefs above
   already force `prefers-color-scheme: dark` for sites that *do* have one)
 
+**GNU LibreJS note**: AMO doesn't list LibreJS as Android-compatible, so its
+page shows "This add-on is not available on your platform" instead of an
+install button. Request the desktop site first — IceCat will still install it
+normally:
+
+```
+┌────────────────────────────────────┐
+│ addons.mozilla.org/.../librejs/  ⋮ │
+├────────────────────────────────────┤
+│                                      │
+│  GNU LibreJS                        │
+│  by Ruben Rodriguez                 │
+│                                      │
+│  ⚠ This add-on is not available     │
+│    on your platform.                │
+│                                      │
+└────────────────────────────────────┘
+        1. tap ⋮ (top-right menu)
+                  │
+                  ▼
+┌────────────────────────────────────┐
+│  ↻  Reload                          │
+│  ☆  Add to bookmarks                │
+│  ⬇  Downloads                       │
+│  ▢  Desktop site            ◄── tap │
+│  ⚙  Settings                        │
+└────────────────────────────────────┘
+        2. enable "Desktop site" (page reloads)
+                  │
+                  ▼
+┌────────────────────────────────────┐
+│ addons.mozilla.org/.../librejs/  ⋮ │
+├────────────────────────────────────┤
+│                                      │
+│  GNU LibreJS                        │
+│  by Ruben Rodriguez                 │
+│                                      │
+│  [ + Add to Firefox ]        ◄── tap│
+│                                      │
+└────────────────────────────────────┘
+        3. tap "Add to Firefox" → "Add"
+```
+
 uBlock Origin, Privacy Badger, and Dark Reader also show up directly under
 **Settings → Add-ons → Recommended** (Mozilla's default
 "Extensions-for-Android" AMO collection); LibreJS isn't in that collection, so
