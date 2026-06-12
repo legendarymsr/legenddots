@@ -41,3 +41,26 @@ pref("datareporting.policy.dataSubmissionEnabled", false);
 
 // --- Sane default: block autoplaying media with sound -----------------------
 pref("media.autoplay.default", 1);
+
+// --- Anti-phishing: show IDNs as punycode (xn--...) ------------------------
+// Stops a domain that mixes scripts to imitate a trusted site (e.g.
+// Cyrillic "а" for Latin "a") from hiding behind a convincing native-script
+// label in the address bar. Trade-off: legitimate non-Latin domains will
+// also display as punycode.
+pref("network.IDN_show_punycode", true);
+
+// --- DNS over HTTPS ----------------------------------------------------------
+// "Increased" mode: try DoH first, fall back to the system resolver only if
+// DoH fails or is unavailable, so DNS lookups aren't plaintext on the
+// network path.
+pref("network.trr.mode", 2);
+pref("network.trr.uri", "https://mozilla.cloudflare-dns.com/dns-query");
+
+// --- Reduce notification-permission prompts ---------------------------------
+// New sites are denied notification permission by default instead of
+// prompting; users can still allow individual sites from their
+// site-permissions page.
+pref("permissions.default.desktop-notification", 2);
+
+// --- Don't offer to save/autofill payment card details ----------------------
+pref("extensions.formautofill.creditCards.enabled", false);

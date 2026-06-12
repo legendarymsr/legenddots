@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Reference checklist of strings worth reviewing for the IceCat rebrand.
-  NOT applied automatically — scripts/rebrand-apk.sh only rewrites `app_name`
-  (driven by config/branding.env). Use this as a starting point when
-  grepping build/src/**/res/values*/strings.xml for remaining "Fennec"/"Fenix"/
-  "Firefox" mentions (about screen, onboarding, update-checker URLs, crash
-  reporter labels, etc.) and editing them by hand.
+  String names excluded from the blanket "Fennec"/"Firefox" -> APP_NAME
+  rename that scripts/rebrand-apk.sh applies across res/values*/strings.xml
+  (config/branding.env's APP_NAME). These name real external Mozilla
+  products/services that keep their own name no matter what this browser is
+  rebranded to, so renaming them would be misleading.
+
+  Only the `name` attribute is read by rebrand-apk.sh; the string content
+  here is just documentation of why each one is excluded.
 -->
 <resources>
-    <string name="app_name">IceCat</string>
-    <string name="firefox_logo_long">IceCat</string>
+    <!-- "Firefox Relay" is Mozilla's email-masking service at
+         relay.firefox.com, not part of this app. -->
+    <string name="firefox_relay">Firefox Relay</string>
 </resources>
