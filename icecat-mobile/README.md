@@ -33,8 +33,10 @@ This folder is self-contained: all paths below are relative to
    - recolors Fenix's primary accent color (`res/values/colors.xml`) to
      `ICECAT_ACCENT_COLOR`;
    - points the **Settings → Add-ons → Recommended** list at
-     `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` (see "Recommended add-ons"
-     below);
+     `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME`, and unhides the
+     **Settings → Advanced → Custom extension collection** option (normally
+     Nightly/Beta-only) so users can also point it there themselves (see
+     "Recommended add-ons" below);
    - copies in custom launcher icons from `branding/icons/` if present;
    - applies the hardening prefs from `branding/hardening-prefs.js` to
      GeckoView's bundled default preferences (unless
@@ -260,10 +262,20 @@ code.
 2. Run `./scripts/package.sh` (the new `scripts/download-extensions.sh` step
    runs automatically between `download-apk.sh` and `rebrand-apk.sh`, and is
    a no-op when `BUNDLE_EXTENSIONS="false"`).
-3. Install `dist/icecat.apk` on a device and open the app. If it launches
-   normally, check **Settings → Add-ons** — LibreJS, uBlock Origin, Privacy
-   Badger, and Dark Reader should already be listed as installed/enabled,
-   with no Add-ons-page visit needed.
+3. Install `dist/icecat.apk` on a device and open the app.
+
+**Known issue**: the app launches normally (no crash), but the four
+extensions do **not** appear in **Settings → Add-ons**. `WebExtensionRuntime.
+installBuiltInWebExtension()` registers them directly with GeckoView, which is
+how Fenix's own hidden built-ins (e.g. `icons@mozac.org`) work — but Fenix's
+Add-ons screen is populated separately, by `WebExtensionSupport`/`AddonManager`
+correlating AMO collection metadata with extensions installed through Fenix's
+normal install flow. Extensions added via `installBuiltInWebExtension` outside
+that flow aren't picked up by the screen, even if GeckoView has loaded them.
+Whether they're nonetheless functionally active (e.g. uBlock0 actually
+blocking requests) hasn't been verified. Making them appear/manageable in
+**Settings → Add-ons** would need additional changes to register them with
+`WebExtensionSupport` too — not yet implemented.
 
 ### Recovery if it breaks
 
@@ -293,10 +305,18 @@ with no AMO browsing needed. LibreJS isn't in Mozilla's collection.
 To make **all four** (including LibreJS) show up under Recommended, create a
 free collection under your own AMO account at
 <https://addons.mozilla.org/collections/> containing the add-ons you want,
-then set `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` to that collection's
-owner username and slug (both appear in its URL,
-`addons.mozilla.org/<locale>/android/collections/<user>/<slug>/`). Until
-then, LibreJS is still installable via "Find more add-ons" on the same
+then either:
+
+- set `AMO_COLLECTION_USER`/`AMO_COLLECTION_NAME` in `config/branding.env` to
+  that collection's owner username and slug (both appear in its URL,
+  `addons.mozilla.org/<locale>/android/collections/<user>/<slug>/`) and
+  rebuild, or
+- on an already-installed IceCat, this rebrand also unhides Fenix's built-in
+  **Settings → Advanced → Custom extension collection** option (normally
+  Nightly/Beta-only) — enter the same username/slug there directly, no
+  rebuild needed.
+
+Until then, LibreJS is still installable via "Find more add-ons" on the same
 screen.
 
 All four are available for Firefox for Android on addons.mozilla.org:

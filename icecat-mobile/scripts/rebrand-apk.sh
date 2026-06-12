@@ -39,6 +39,19 @@ sed -i -E \
     -e "s|(const-string v4, \")mozilla(\")|\1${AMO_COLLECTION_USER}\2|" \
     "$AMO_FILE"
 
+echo "==> Exposing the 'Custom Add-on collection' setting (Settings -> Add-ons)"
+FEATUREFLAGS_FILE=$(grep -rl 'sput-boolean v1, Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
+[ -n "$FEATUREFLAGS_FILE" ] || { echo "ERROR: could not locate customExtensionCollectionFeature (Fenix internals may have changed)"; exit 1; }
+awk '
+  /sput-boolean v1, Lorg\/mozilla\/fenix\/FeatureFlags;->customExtensionCollectionFeature:Z/ && !done {
+    print "    const/4 v1, 0x1"
+    print ""
+    done = 1
+  }
+  { print }
+' "$FEATUREFLAGS_FILE" > "$FEATUREFLAGS_FILE.tmp"
+mv "$FEATUREFLAGS_FILE.tmp" "$FEATUREFLAGS_FILE"
+
 if find branding/icons -type f \( -name '*.png' -o -name '*.webp' \) 2>/dev/null | grep -q .; then
   echo "==> Copying custom launcher icons"
   while IFS= read -r icon; do
