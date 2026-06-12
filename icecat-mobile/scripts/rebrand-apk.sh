@@ -39,7 +39,7 @@ sed -i -E \
     -e "s|(const-string v4, \")mozilla(\")|\1${AMO_COLLECTION_USER}\2|" \
     "$AMO_FILE"
 
-echo "==> Exposing the 'Custom Add-on collection' setting (Settings -> Add-ons)"
+echo "==> Exposing the 'Custom extension collection' setting (Settings -> Advanced)"
 FEATUREFLAGS_FILE=$(grep -rl 'sput-boolean v1, Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
 [ -n "$FEATUREFLAGS_FILE" ] || { echo "ERROR: could not locate customExtensionCollectionFeature (Fenix internals may have changed)"; exit 1; }
 awk '
