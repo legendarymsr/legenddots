@@ -56,6 +56,42 @@ else
   echo "==> ENABLE_HARDENING=false, skipping hardening prefs"
 fi
 
+if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
+  echo "==> [EXPERIMENTAL] Bundling built-in extensions (BUNDLE_EXTENSIONS=true)"
+  [ -d "$WORK_DIR/extensions" ] || { echo "Run scripts/download-extensions.sh first"; exit 1; }
+
+  for ext in ublock0 privacy-badger darkreader librejs; do
+    echo "==> Copying $ext into assets/extensions/"
+    rm -rf "$WORK_DIR/src/assets/extensions/$ext"
+    cp -r "$WORK_DIR/extensions/$ext" "$WORK_DIR/src/assets/extensions/$ext"
+  done
+
+  echo "==> Adding IcecatExtensions smali class"
+  mkdir -p "$WORK_DIR/src/smali_classes2/org/mozilla/fenix/icecat"
+  cp branding/smali/IcecatExtensions.smali "$WORK_DIR/src/smali_classes2/org/mozilla/fenix/icecat/IcecatExtensions.smali"
+
+  echo "==> Registering built-in extensions alongside Fenix's own (browser-icons)"
+  LAMBDA_FILE=$(grep -rl 'resource://android/assets/extensions/browser-icons/' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
+  [ -n "$LAMBDA_FILE" ] || { echo "ERROR: could not locate Core's built-in-extension installer (Fenix internals may have changed)"; exit 1; }
+
+  MARKER='Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;->installBuiltInWebExtension'
+  CALL_LINE=$(grep -m1 "$MARKER" "$LAMBDA_FILE")
+  REG=$(echo "$CALL_LINE" | grep -oP '(?<=\{)v[0-9]+' | head -1)
+  [ -n "$REG" ] || { echo "ERROR: could not find installBuiltInWebExtension call in $LAMBDA_FILE"; exit 1; }
+
+  awk -v reg="$REG" -v marker="$MARKER" '
+    { print }
+    index($0, marker) && !done {
+      print ""
+      print "    invoke-static {" reg "}, Lorg/mozilla/fenix/icecat/IcecatExtensions;->installAll(Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;)V"
+      done = 1
+    }
+  ' "$LAMBDA_FILE" > "$LAMBDA_FILE.tmp"
+  mv "$LAMBDA_FILE.tmp" "$LAMBDA_FILE"
+else
+  echo "==> BUNDLE_EXTENSIONS=false, skipping built-in extension bundling"
+fi
+
 echo "==> Rebuilding APK"
 apktool b "$WORK_DIR/src" -o "$WORK_DIR/icecat-unsigned.apk"
 echo "==> Unsigned APK at $WORK_DIR/icecat-unsigned.apk"

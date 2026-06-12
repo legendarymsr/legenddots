@@ -17,7 +17,12 @@ This folder is self-contained: all paths below are relative to
    `UPSTREAM_PACKAGE_ID`/`UPSTREAM_ABI` in the F-Droid repo
    (`UPSTREAM_FDROID_REPO`, see `config/branding.env`) and downloads it to
    `build/upstream.apk`.
-2. `scripts/rebrand-apk.sh` decompiles it with `apktool`, then:
+2. `scripts/download-extensions.sh` is a no-op unless `BUNDLE_EXTENSIONS="true"`
+   (see "Bundled extensions (experimental)" below), in which case it
+   downloads GNU LibreJS, uBlock Origin, Privacy Badger, and Dark Reader from
+   addons.mozilla.org into `build/extensions/`.
+3. `scripts/rebrand-apk.sh` decompiles `build/upstream.apk` with `apktool`,
+   then:
    - rewrites the `app_name` string to `APP_NAME` and replaces remaining
      "Fennec"/"Firefox" mentions across `res/values*/strings.xml` with
      `APP_NAME` (skipping the entries listed in
@@ -31,12 +36,15 @@ This folder is self-contained: all paths below are relative to
    - applies the hardening prefs from `branding/hardening-prefs.js` to
      GeckoView's bundled default preferences (unless
      `ENABLE_HARDENING="false"`);
+   - if `BUNDLE_EXTENSIONS="true"`, bundles the extensions fetched in step 2
+     as built-in WebExtensions (see "Bundled extensions (experimental)"
+     below);
 
    then rebuilds everything to `build/icecat-unsigned.apk`.
-3. `scripts/sign-apk.sh` runs `zipalign` and re-signs the APK with the
+4. `scripts/sign-apk.sh` runs `zipalign` and re-signs the APK with the
    throwaway keystore in `keystore/`, producing `dist/icecat.apk`.
-4. `scripts/package.sh` runs the three steps above in order.
-5. `.github/workflows/icecat-mobile.yml` (repo root) runs the same pipeline on
+5. `scripts/package.sh` runs the four steps above in order.
+6. `.github/workflows/icecat-mobile.yml` (repo root) runs the same pipeline on
    every push to `master` that touches this folder (and on demand) and
    uploads `dist/icecat.apk` as a workflow artifact.
 
@@ -181,20 +189,104 @@ This is a best-effort find/replace of UI text, not a rebuild — anything
 baked into images (besides the wordmark/logo replaced above), the update
 checker, or crash-reporter URLs is unaffected.
 
-## Recommended add-ons (not pre-installed)
+## Bundled extensions (experimental)
 
-GNU LibreJS, uBlock Origin, Privacy Badger, and Dark Reader can't be bundled
-as pre-installed/auto-enabled extensions by this repackaging approach: Fenix's
-"built-in" extensions (`assets/extensions/` — search, webcompat, etc.) are
-registered by hardcoded string literals in compiled app code
-(`org.mozilla.fenix.components.Core`), not from a resource file this pipeline
-can extend. Patching that smali to register more extensions, or vendoring
-their source as new "privileged" built-ins, would risk crashing the browser
-on startup and break on every Fennec F-Droid update — not worth the risk for
-extensions that are a couple of taps away anyway.
+**Status: experimental, opt-in, default off, untested on a real device.**
+Set `BUNDLE_EXTENSIONS="true"` in `config/branding.env` to have
+`scripts/package.sh` pre-install GNU LibreJS, uBlock Origin, Privacy Badger,
+and Dark Reader as **built-in, auto-enabled WebExtensions** — no taps, no
+visit to Settings → Add-ons required. The published `icecat-latest` release
+is built with `BUNDLE_EXTENSIONS="false"` (the default); this is something
+you opt into for your own sideloaded build.
 
-All four are available for Firefox for Android on addons.mozilla.org and
-install in a couple of taps from **Settings → Add-ons** in the app:
+### How it works
+
+Fenix ships a handful of "built-in" extensions of its own (reader view,
+favicon fetching, web-compat shims, etc.) as unpacked extension folders under
+`assets/extensions/`, registered at startup with a single call —
+`WebExtensionRuntime.installBuiltInWebExtension(id, "resource://android/assets/extensions/<name>/", onSuccess, onError)`
+— from compiled app code (`org.mozilla.fenix.components.Core`'s
+`BrowserStore` initializer). There's no resource file or config flag driving
+this list, so extending it means patching that compiled code.
+
+When `BUNDLE_EXTENSIONS="true"`, `scripts/rebrand-apk.sh`:
+
+1. Unpacks the four extensions' XPIs (fetched by the new
+   `scripts/download-extensions.sh` from addons.mozilla.org) into
+   `assets/extensions/<name>/`, alongside Fenix's own built-ins.
+2. Adds one new decompiled-bytecode (smali) class,
+   `org.mozilla.fenix.icecat.IcecatExtensions`
+   (`branding/smali/IcecatExtensions.smali`), whose `installAll()` method
+   calls `installBuiltInWebExtension()` once per bundled extension — reusing
+   the same no-op success/error callback classes
+   (`BuiltInWebExtensionController$$ExternalSyntheticLambda2`/`Lambda3`) Fenix
+   already ships for this purpose.
+3. Finds the line where Fenix registers its own `icons@mozac.org` built-in
+   and inserts one call to `IcecatExtensions.installAll()` immediately after
+   it, passing along the same live `WebExtensionRuntime` reference.
+
+This bytecode patch is the *only* way to get zero-tap, auto-enabled, unsigned
+extensions out of a repackaging-only pipeline — everything else this pipeline
+does is a resource/string/asset rewrite, but this one step edits compiled app
+code.
+
+### Why this is risky
+
+- **Not verified on a real device.** This has been confirmed to produce a
+  syntactically valid patch that survives `apktool b`'s rebuild (and a
+  round-trip re-decompile with the patch intact) and yields an
+  installable-sized APK — but it has *not* been launched on an Android
+  device or emulator. If the patched initializer doesn't behave as expected
+  at runtime, the app could crash on startup.
+- **Fragile across Fennec F-Droid updates.** The insertion point is found by
+  searching the decompiled smali for the literal string
+  `resource://android/assets/extensions/browser-icons/` (Fenix's own
+  `icons@mozac.org` registration) and patching that line. If a future Fenix
+  release restructures this initializer so that string/line no longer exists
+  in this form, `rebrand-apk.sh` fails loudly (`ERROR: could not locate
+  Core's built-in-extension installer`) instead of silently producing a
+  broken APK — but the patch will then need re-checking against the new
+  Fenix internals.
+- **LibreJS isn't in Fenix's curated extension collection** at all (the other
+  three are — see below), so its Android compatibility is less battle-tested.
+  It's bundled using its declared extension ID, `jid1-KtlZuoiikVfFew@jetpack`.
+
+### Enabling and verifying
+
+1. Set `BUNDLE_EXTENSIONS="true"` in `config/branding.env`.
+2. Run `./scripts/package.sh` (the new `scripts/download-extensions.sh` step
+   runs automatically between `download-apk.sh` and `rebrand-apk.sh`, and is
+   a no-op when `BUNDLE_EXTENSIONS="false"`).
+3. Install `dist/icecat.apk` on a device and open the app. If it launches
+   normally, check **Settings → Add-ons** — LibreJS, uBlock Origin, Privacy
+   Badger, and Dark Reader should already be listed as installed/enabled,
+   with no Add-ons-page visit needed.
+
+### Recovery if it breaks
+
+The repo's throwaway signing key (see "Throwaway signing key" below) means a
+new build can always be installed *over* a broken one — APK installation
+doesn't require the currently-installed app to run. If a
+`BUNDLE_EXTENSIONS="true"` build crashes on launch:
+
+1. Set `BUNDLE_EXTENSIONS="false"` (or just leave it unset — that's the
+   default).
+2. Re-run `./scripts/package.sh`.
+3. Install the resulting `dist/icecat.apk` over the broken one — same signing
+   key, no uninstall needed.
+
+## Recommended add-ons (default build)
+
+With `BUNDLE_EXTENSIONS="false"` (the default), GNU LibreJS, uBlock Origin,
+Privacy Badger, and Dark Reader are not pre-installed. Three of the four —
+uBlock Origin, Privacy Badger, and Dark Reader — are already in Mozilla's
+curated "Recommended" extension collection for Firefox for Android (the same
+list Fennec F-Droid's **Settings → Add-ons** screen shows), so they're a
+couple of taps away with no AMO browsing needed. LibreJS isn't in that
+curated list but is still installable via "Find more add-ons" in the same
+screen.
+
+All four are available for Firefox for Android on addons.mozilla.org:
 
 - [GNU LibreJS](https://addons.mozilla.org/en-US/android/addon/librejs/) —
   blocks nonfree/nontrivial JavaScript
@@ -255,6 +347,11 @@ place (same signing key) without uninstalling first.
   to this repo specifically so sideloaded builds can be reinstalled/updated
   without uninstalling. It carries no trust beyond "built from this repo" —
   do not treat `icecat.apk` as officially signed by Mozilla/F-Droid.
+- **`BUNDLE_EXTENSIONS` (default `"false"`) is experimental and untested on a
+  real device** — it patches compiled app bytecode to pre-install four
+  extensions, rather than just rewriting resources/strings like everything
+  else here. See "Bundled extensions (experimental)" above before enabling
+  it. The published `icecat-latest` release always has this off.
 - **Licensing**: these scripts/config are covered by this repo's top-level
   GPL-3.0 `LICENSE`. The resulting app is Fennec F-Droid/Fenix repackaged and
   stays under their licenses (MPL-2.0, with some AGPL-3.0 components) — keep
@@ -270,9 +367,10 @@ place (same signing key) without uninstalling first.
 Run the steps individually for debugging:
 
 ```bash
-./scripts/download-apk.sh   # fetch the upstream Fennec F-Droid APK into build/
-./scripts/rebrand-apk.sh    # decompile, rewrite app name/icons, rebuild
-./scripts/sign-apk.sh       # zipalign + sign into dist/
+./scripts/download-apk.sh        # fetch the upstream Fennec F-Droid APK into build/
+./scripts/download-extensions.sh # fetch bundled extensions into build/ (no-op unless BUNDLE_EXTENSIONS=true)
+./scripts/rebrand-apk.sh         # decompile, rewrite app name/icons, rebuild
+./scripts/sign-apk.sh            # zipalign + sign into dist/
 ```
 
 ## Customizing the rebrand
@@ -285,6 +383,7 @@ UPSTREAM_ABI="arm64-v8a"
 ENABLE_HARDENING="true"
 DEFAULT_SEARCH_ENGINE="Brave"
 ICECAT_ACCENT_COLOR="0EA5E9"
+BUNDLE_EXTENSIONS="false"
 ```
 
 Drop launcher icon replacements into `branding/icons/<mipmap-density>/`, and
