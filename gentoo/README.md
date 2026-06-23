@@ -152,6 +152,31 @@ brave-browser-nightly
 - Dotfiles cloned from `github.com/legendarymsr/legenddots` with symlinks
   for niri, waybar, fuzzel, dunst, swaylock, alacritty, zsh
 
+### doas vs sudo
+
+This install uses `app-admin/doas` (OpenDoas) instead of `app-admin/sudo`.
+
+| | doas | sudo |
+|---|---|---|
+| Codebase size | ~600 lines | ~fitting plus its plugins; tens of thousands of lines |
+| Config | `/etc/doas.conf`, one-line rules | `/etc/sudoers`, its own grammar + `visudo` |
+| Attack surface | Minimal — one job, no plugin system | Larger — PAM stack, plugins, logging subsystems |
+| CVE history | Rare | Multiple privilege-escalation CVEs over the years (e.g. CVE-2021-3156) |
+| Features | Deliberately bare: run a command as another user, optionally `persist` the auth timestamp | Lecture messages, command logging, per-command timeouts, LDAP/SSSD integration, extensive option matrix |
+
+Config here is one line in `/etc/doas.conf`:
+
+```
+permit persist legend as root
+```
+
+`persist` mirrors sudo's timestamp caching so you're not re-entering
+your password every command. doas trades sudo's feature depth for a
+much smaller, easier-to-audit codebase — fewer features means fewer
+places for a privilege-escalation bug to hide. If you need sudo's
+extras (lecture messages, fine-grained logging, LDAP-backed rules),
+swap `app-admin/doas` back for `app-admin/sudo` in the package list.
+
 ### Default credentials
 
 | Account | Password      |
