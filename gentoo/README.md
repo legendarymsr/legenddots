@@ -100,10 +100,27 @@ COMMON_FLAGS="-march=haswell -O2 -pipe"
 MAKEOPTS="-j4"
 VIDEO_CARDS="intel iris"
 LLVM_TARGETS="X86"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio"
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
 FEATURES="ccache"
 ACCEPT_KEYWORDS="~amd64"
 ```
+
+### WD-40 (de-rust the profile)
+
+Gentoo ships a `features/wd40` profile fragment that masks the optional
+`rust` USE flag wherever a package can be built without it — fewer
+packages pull in `dev-lang/rust`, which is a slow build. The script
+creates a local profile (`local:wd40-hardened`) that inherits from both
+`gentoo:default/linux/amd64/23.0/hardened` and `gentoo:features/wd40`
+and activates it via `eselect profile set`.
+
+This only suppresses *optional* Rust dependencies — it can't eliminate
+Rust entirely. `x11-terms/alacritty` (in the base package list) is
+itself written in Rust and needs `dev-lang/rust` regardless.
+
+If you'd rather keep optional Rust-using packages available (or just
+don't want the extra local profile/repo), fork the script and remove
+the "WD-40" step.
 
 ### Overlays
 
