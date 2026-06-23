@@ -116,7 +116,7 @@ ACCEPT_KEYWORDS="~amd64"
 ### Base packages (step 6)
 
 NetworkManager, bluez, broadcom-sta, elogind, pipewire, wireplumber,
-sudo, polkit, acpid, tlp, zsh, neovim, git, alacritty,
+doas, polkit, acpid, tlp, zsh, neovim, git, alacritty,
 **llvm-core/llvm**, **llvm-core/clang**, rEFInd
 
 ### Desktop packages (step 7)
@@ -146,7 +146,7 @@ brave-browser-nightly
 
 ```sh
 passwd legend
-sudo passwd root
+doas passwd root
 ```
 
 ---
@@ -201,7 +201,7 @@ NetworkManager handles the connection automatically.
 If WiFi doesn't come up:
 
 ```sh
-sudo modprobe wl
+doas modprobe wl
 nmtui
 ```
 

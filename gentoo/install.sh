@@ -82,7 +82,8 @@ CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
 LLVM_TARGETS="X86"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio"
+# -cuda/-rocm/-vdpau: Intel-only hardware, no Nvidia/AMD GPU stack needed
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
 PYTHON_TARGETS="python3_12 python3_13 python3_14"
 PYTHON_SINGLE_TARGET="python3_13"
 FEATURES="ccache"
@@ -222,7 +223,7 @@ emerge \
   net-wireless/wpa_supplicant \
   net-wireless/broadcom-sta \
   net-wireless/bluez \
-  app-admin/sudo \
+  app-admin/doas \
   sys-apps/dbus \
   sys-auth/polkit \
   sys-power/acpid \
@@ -274,11 +275,8 @@ useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend |
 echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
 echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
 
-mkdir -p /etc/sudoers.d
-echo 'legend ALL=(ALL:ALL) ALL' > /etc/sudoers.d/legend
-echo 'Defaults lecture_msg="mommy is very proud of you\ngood job, Legend~"' \
-    >> /etc/sudoers.d/legend
-chmod 0440 /etc/sudoers.d/legend
+echo 'permit persist legend as root' > /etc/doas.conf
+chmod 0400 /etc/doas.conf
 
 # Dotfiles
 su - legend -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
