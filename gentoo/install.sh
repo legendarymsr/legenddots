@@ -157,7 +157,24 @@ emaint sync --repo guru                  || true
 emaint sync --repo another-brave-overlay || true
 emaint sync --repo hyproverlay           || true
 
-# 5. KERNEL (gentoo-sources + manual hardening; hardened-sources was removed
+# 5. WD-40 (de-rust the profile): masks the "rust" USE flag wherever a
+#    package can be built without it. Can't eliminate rust entirely --
+#    x11-terms/alacritty below is itself written in Rust and needs
+#    dev-lang/rust regardless of this.
+header "Applying WD-40..."
+eselect repository create local || true
+echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
+mkdir -p /var/db/repos/local/profiles/wd40-hardened
+echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
+{
+  echo "gentoo:default/linux/amd64/23.0/hardened"
+  echo "gentoo:features/wd40"
+} > /var/db/repos/local/profiles/wd40-hardened/parent
+echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
+WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
+eselect profile set "${WD40_NUM}"
+
+# 6. KERNEL (gentoo-sources + manual hardening; hardened-sources was removed
 #    from the Gentoo tree in 2024/2025)
 header "Building kernel..."
 emerge sys-kernel/gentoo-sources sys-kernel/genkernel \
@@ -200,7 +217,7 @@ make olddefconfig
 make -j4 && make modules_install && make install
 genkernel --no-clean --no-mrproper initramfs
 
-# 6. BASE SYSTEM
+# 7. BASE SYSTEM
 header "Emerging base system..."
 echo "mba" > /etc/hostname
 cat > /etc/hosts << 'EOF'
@@ -240,7 +257,7 @@ emerge \
   llvm-core/clang \
   sys-boot/refind
 
-# 7. DESKTOP (niri + full Wayland stack)
+# 8. DESKTOP (niri + full Wayland stack)
 header "Emerging desktop..."
 emerge \
   gui-wm/niri \
@@ -260,7 +277,7 @@ emerge \
   media-fonts/nerdfonts \
   www-client/brave-browser-nightly
 
-# 8. LOCALIZATION & USER
+# 9. LOCALIZATION & USER
 header "Localizing and creating user..."
 echo "Europe/Stockholm" > /etc/timezone
 emerge --config sys-libs/timezone-data
@@ -294,7 +311,7 @@ su - legend -c "
 
 xdg-user-dirs-update || true
 
-# 9. FINALIZE
+# 10. FINALIZE
 header "Finalizing..."
 
 # fstab
