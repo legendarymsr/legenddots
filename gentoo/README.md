@@ -30,10 +30,9 @@ Take it back. Run a kernel released this week. Build everything for
 your exact CPU. Own your hardware completely.
 
 Fully automated Gentoo installation script for the **MacBook Air 6,2
-(Mid 2013, Intel Core i5-4250U)**, tuned for your exact hardware. Boot the
-live ISO, run the script, walk away. Pulls binary packages from Gentoo's
-official binhost where one matches, and compiles from source otherwise.
-No prompts. No Microsoft. No Apple. No compromises.
+(Mid 2013, Intel Core i5-4250U)**. Everything built from source, tuned
+for your exact hardware. Boot the live ISO, run the script, walk away.
+No prompts. No binary packages. No Microsoft. No Apple. No compromises.
 
 ---
 

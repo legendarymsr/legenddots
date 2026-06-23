@@ -77,7 +77,7 @@ COMMON_FLAGS="-march=haswell -O2 -pipe"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
 MAKEOPTS="-j4"
-EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=4 --quiet-build=y --usepkg=y --getbinpkg=y --backtrack=100"
+EMERGE_DEFAULT_OPTS="--jobs=4 --load-average=4 --quiet-build=y --usepkg=n --getbinpkg=n --backtrack=100"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
@@ -85,21 +85,10 @@ LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio"
 PYTHON_TARGETS="python3_12 python3_13 python3_14"
 PYTHON_SINGLE_TARGET="python3_13"
-FEATURES="ccache getbinpkg binpkg-request-signature"
+FEATURES="ccache"
 CCACHE_DIR="/var/cache/ccache"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
-EOF
-
-# Official Gentoo binhost (hardened/x86-64 variant, matching our profile) —
-# emerge tries this first for every package and only compiles locally when
-# no binpkg matches our USE flags (--usepkg=y, not --usepkgonly, above).
-mkdir -p /etc/portage/binrepos.conf
-cat > /etc/portage/binrepos.conf/gentoobinhost.conf << 'EOF'
-[gentoo]
-priority = 9999
-sync-uri = https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64_hardened/
-verify-signature = true
 EOF
 
 mkdir -p /var/cache/ccache
