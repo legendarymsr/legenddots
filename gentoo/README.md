@@ -161,6 +161,17 @@ Creating filesystem with 28311552 4k blocks and 7077888 inodes
  * Added repository 'local'
 ```
 
+Right after activating the profile, alacritty is unmasked again —
+without this, step 7's emerge fails with:
+
+```
+!!! All ebuilds that could satisfy "x11-terms/alacritty" have been masked.
+!!! One of the following masked packages is required to complete your request:
+- x11-terms/alacritty-9999::gentoo (masked by: package.mask, missing keyword)
+/var/db/repos/gentoo/profiles/features/wd40/package.mask:
+# alacritty requires rust unconditionally
+```
+
 or, if declined:
 
 ```
@@ -274,6 +285,13 @@ and activates it via `eselect profile set`.
 This only suppresses *optional* Rust dependencies — it can't eliminate
 Rust entirely. `x11-terms/alacritty` (in the base package list) is
 itself written in Rust and needs `dev-lang/rust` regardless.
+
+`features/wd40/package.mask` goes further than just the USE flag: it
+blanket-masks packages that hard-require rust with no way to build
+around it, alacritty included. The script unmasks alacritty
+specifically via `/etc/portage/package.unmask/alacritty` right after
+activating the profile, so the base-system emerge doesn't fail on a
+masked package.
 
 Toggle it with the `ENABLE_WD40` env var (default `true`):
 

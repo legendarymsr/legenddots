@@ -195,6 +195,13 @@ if [[ "$ENABLE_WD40" == "true" ]]; then
   echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
   WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
   eselect profile set "${WD40_NUM}"
+
+  # features/wd40/package.mask blanket-masks packages that hard-require rust
+  # (no optional USE flag to strip) instead of leaving them buildable --
+  # alacritty is one of them, but it's in the base package list regardless,
+  # so unmask it specifically rather than disabling WD-40 wholesale.
+  mkdir -p /etc/portage/package.unmask
+  echo "x11-terms/alacritty" > /etc/portage/package.unmask/alacritty
 else
   header "Skipping WD-40 (ENABLE_WD40=false)..."
 fi
