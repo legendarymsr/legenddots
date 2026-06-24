@@ -239,7 +239,7 @@ make defconfig
 ./scripts/config -d CONFIG_MODULE_SIG_FORCE
 
 make olddefconfig
-make -j4 && make modules_install && make install
+make -j3 && make modules_install && make install
 genkernel --no-clean --no-mrproper initramfs
 
 # 7. BASE SYSTEM
