@@ -59,8 +59,16 @@ tmux new -s install   # so a dropped connection doesn't kill the build
 bash install.sh
 ```
 
-Two choices are configurable via environment variables before running
-(no interactive prompts — set these or take the defaults):
+The script asks two questions up front, each with a 10-second timeout —
+leave it untouched and it defaults to WD-40 enabled and doas:
+
+```
+Apply WD-40 (mask optional rust USE flag)? [Y/n] (10s, default: Y)
+Privilege escalation tool? [doas/sudo] (10s, default: doas)
+```
+
+You can also skip the prompts entirely by setting the env vars before
+running:
 
 ```sh
 ENABLE_WD40=false PRIV_ESC=sudo bash install.sh
@@ -71,7 +79,8 @@ ENABLE_WD40=false PRIV_ESC=sudo bash install.sh
 | `ENABLE_WD40` | `true` | `true` / `false` | Mask the optional `rust` USE flag via the WD-40 profile |
 | `PRIV_ESC` | `doas` | `doas` / `sudo` | Privilege-escalation tool installed and configured |
 
-The script runs fully unattended. A full build takes roughly **4 hours**
+After those two questions, the rest of the script runs fully
+unattended. A full build takes roughly **4 hours**
 on this hardware:
 
 | Phase | Time |

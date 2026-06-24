@@ -8,9 +8,24 @@ set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 
-# ── Configuration (override via env before running, e.g. ENABLE_WD40=false bash install.sh) ──
-ENABLE_WD40="${ENABLE_WD40:-true}"   # true: mask optional rust USE flag via the WD-40 profile
-PRIV_ESC="${PRIV_ESC:-doas}"         # doas or sudo
+# ── Configuration (10s prompts, defaults to WD-40 + doas if untouched) ───────
+if [[ -z "${ENABLE_WD40:-}" ]]; then
+  echo -e "${CYAN}Apply WD-40 (mask optional rust USE flag)? [Y/n] (10s, default: Y)${NC}"
+  read -t 10 -r WD40_ANSWER || true; echo
+  case "${WD40_ANSWER,,}" in
+    n|no) ENABLE_WD40="false" ;;
+    *)    ENABLE_WD40="true" ;;
+  esac
+fi
+
+if [[ -z "${PRIV_ESC:-}" ]]; then
+  echo -e "${CYAN}Privilege escalation tool? [doas/sudo] (10s, default: doas)${NC}"
+  read -t 10 -r PRIV_ANSWER || true; echo
+  case "${PRIV_ANSWER,,}" in
+    sudo) PRIV_ESC="sudo" ;;
+    *)    PRIV_ESC="doas" ;;
+  esac
+fi
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 [[ $EUID -eq 0 ]] || exit 1
