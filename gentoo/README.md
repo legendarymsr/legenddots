@@ -96,6 +96,142 @@ half. ccache means any subsequent reinstall is significantly faster.
 
 ---
 
+## Step-by-Step Walkthrough
+
+What you'll actually see scroll by, in order.
+
+**Prompts (10s timeout each, defaults shown):**
+
+```
+$ bash install.sh
+Apply WD-40 (mask optional rust USE flag)? [Y/n] (10s, default: Y)
+
+Privilege escalation tool? [doas/sudo] (10s, default: doas)
+
+```
+
+**Disk Management:**
+
+```
+── Disk Management
+Creating new GPT entries.
+The operation has completed successfully.
+The operation has completed successfully.
+The operation has completed successfully.
+mke2fs 1.47.1 (20-May-2024)
+Creating filesystem with 28311552 4k blocks and 7077888 inodes
+```
+
+**Stage3 unpack** (no header — just a progress bar):
+
+```
+######################################################################## 100.0%
+```
+
+**1. Portage sync & hardened profile:**
+
+```
+── Syncing portage tree...
+>>> Syncing repository 'gentoo' into '/var/db/repos/gentoo'...
+>>> Fetching 1 file...
+>>> Syncing completed
+ * Profile not changed.
+```
+
+**2-3. Keywords & make.conf** — written silently, no console output.
+
+**4. Overlays:**
+
+```
+── Setting up overlays...
+ * Repository guru
+ * Location: /var/db/repos/guru
+ * Added repository 'guru'
+
+>>> Syncing repository 'hyproverlay' into '/var/db/repos/hyproverlay'...
+>>> Syncing completed
+```
+
+**5. WD-40** (skipped if you answered `n` to the first prompt):
+
+```
+── Applying WD-40...
+ * Repository local
+ * Location: /var/db/repos/local
+ * Added repository 'local'
+```
+
+or, if declined:
+
+```
+── Skipping WD-40 (ENABLE_WD40=false)...
+```
+
+**6. Kernel:**
+
+```
+── Building kernel...
+>>> Emerging (1 of 4) sys-kernel/gentoo-sources-6.x.x::gentoo
+#
+# configuration written to .config
+#
+  CC      arch/x86/boot/compressed/vmlinux
+  LD      vmlinux
+  GEN     .vmlinux.export.c
+  INSTALL /boot/vmlinuz-6.x.x-gentoo
+>>> Building initramfs...
+```
+
+**7. Base system:**
+
+```
+── Emerging base system...
+>>> Emerging (1 of 24) sys-apps/pciutils-3.x.x::gentoo
+>>> Emerging (2 of 24) sys-apps/usbutils-0.x.x::gentoo
+...
+>>> Emerging (24 of 24) sys-boot/refind-0.x.x::gentoo
+```
+
+**8. Desktop:**
+
+```
+── Emerging desktop...
+>>> Emerging (1 of 16) gui-wm/niri-25.x.x::guru
+>>> Emerging (2 of 16) gui-apps/waybar-0.x.x::guru
+...
+>>> Emerging (16 of 16) www-client/brave-browser-nightly-1.x.x.x::another-brave-overlay
+```
+
+**9. Localization & user:**
+
+```
+── Localizing and creating user...
+ * Generating locales...
+ *   en_US.UTF-8.UTF-8...            [ ok ]
+ *   sv_SE.UTF-8.UTF-8...            [ ok ]
+Cloning into '/home/legend/legenddots'...
+remote: Enumerating objects: ...
+```
+
+**10. Finalize:**
+
+```
+── Finalizing...
+Installing rEFInd on this disk...
+Mounted EFI System Partition at /boot/efi
+Copying rEFInd files...
+Setting EFI boot entry...
+rEFInd has been installed successfully.
+ * rc-update add NetworkManager default ... [ ok ]
+ * rc-update add bluetooth default       ... [ ok ]
+
+── Done. The Hardened Kingdom of Legend is built.
+
+Reboot now: umount -R /mnt/gentoo && reboot
+```
+
+---
+
 ## What It Does
 
 ### Disk layout (hardcoded, `/dev/sda` wiped)
