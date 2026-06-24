@@ -118,7 +118,7 @@ half. ccache means any subsequent reinstall is significantly faster.
 
 ```
 COMMON_FLAGS="-march=haswell -O2 -pipe"
-MAKEOPTS="-j4"
+MAKEOPTS="-j3"
 VIDEO_CARDS="intel iris"
 LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
