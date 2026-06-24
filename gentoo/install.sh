@@ -8,6 +8,10 @@ set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 
+# ── Configuration (override via env before running, e.g. ENABLE_WD40=false bash install.sh) ──
+ENABLE_WD40="${ENABLE_WD40:-true}"   # true: mask optional rust USE flag via the WD-40 profile
+PRIV_ESC="${PRIV_ESC:-doas}"         # doas or sudo
+
 # ── Pre-flight ───────────────────────────────────────────────────────────────
 [[ $EUID -eq 0 ]] || exit 1
 swapoff -a || true
@@ -49,6 +53,8 @@ export DEBUGINFOD_URLS_CERT_PATH=""
 set +u; source /etc/profile; set -u
 export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+ENABLE_WD40="${ENABLE_WD40:-true}"
+PRIV_ESC="${PRIV_ESC:-doas}"
 
 # Allow overcommit so portage fork() calls don't fail with ENOMEM
 # when the live-CD RAM is under pressure during heavy package builds
@@ -160,19 +166,23 @@ emaint sync --repo hyproverlay           || true
 # 5. WD-40 (de-rust the profile): masks the "rust" USE flag wherever a
 #    package can be built without it. Can't eliminate rust entirely --
 #    x11-terms/alacritty below is itself written in Rust and needs
-#    dev-lang/rust regardless of this.
-header "Applying WD-40..."
-eselect repository create local || true
-echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
-mkdir -p /var/db/repos/local/profiles/wd40-hardened
-echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
-{
-  echo "gentoo:default/linux/amd64/23.0/hardened"
-  echo "gentoo:features/wd40"
-} > /var/db/repos/local/profiles/wd40-hardened/parent
-echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
-WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
-eselect profile set "${WD40_NUM}"
+#    dev-lang/rust regardless of this. Skip with ENABLE_WD40=false.
+if [[ "$ENABLE_WD40" == "true" ]]; then
+  header "Applying WD-40..."
+  eselect repository create local || true
+  echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
+  mkdir -p /var/db/repos/local/profiles/wd40-hardened
+  echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
+  {
+    echo "gentoo:default/linux/amd64/23.0/hardened"
+    echo "gentoo:features/wd40"
+  } > /var/db/repos/local/profiles/wd40-hardened/parent
+  echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
+  WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
+  eselect profile set "${WD40_NUM}"
+else
+  header "Skipping WD-40 (ENABLE_WD40=false)..."
+fi
 
 # 6. KERNEL (gentoo-sources + manual hardening; hardened-sources was removed
 #    from the Gentoo tree in 2024/2025)
@@ -229,6 +239,9 @@ EOF
 groupadd -f plugdev
 groupadd -f bluetooth
 
+PRIV_PKG="app-admin/doas"
+[[ "$PRIV_ESC" == "sudo" ]] && PRIV_PKG="app-admin/sudo"
+
 emerge \
   sys-apps/pciutils \
   sys-apps/usbutils \
@@ -240,7 +253,7 @@ emerge \
   net-wireless/wpa_supplicant \
   net-wireless/broadcom-sta \
   net-wireless/bluez \
-  app-admin/doas \
+  "$PRIV_PKG" \
   sys-apps/dbus \
   sys-auth/polkit \
   sys-power/acpid \
@@ -292,8 +305,13 @@ useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend |
 echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
 echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
 
-echo 'permit persist legend as root' > /etc/doas.conf
-chmod 0400 /etc/doas.conf
+if [[ "$PRIV_ESC" == "sudo" ]]; then
+  echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/wheel
+  chmod 0440 /etc/sudoers.d/wheel
+else
+  echo 'permit persist legend as root' > /etc/doas.conf
+  chmod 0400 /etc/doas.conf
+fi
 
 # Dotfiles
 su - legend -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
@@ -369,6 +387,6 @@ mount --make-rslave /mnt/gentoo/sys
 mount --rbind /dev /mnt/gentoo/dev
 mount --make-rslave /mnt/gentoo/dev
 mount --bind /run /mnt/gentoo/run
-chroot /mnt/gentoo /tmp/inside.sh
+chroot /mnt/gentoo /usr/bin/env ENABLE_WD40="$ENABLE_WD40" PRIV_ESC="$PRIV_ESC" /tmp/inside.sh
 sync
 echo -e "${GREEN}Reboot now: umount -R /mnt/gentoo && reboot${NC}"

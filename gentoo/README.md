@@ -59,6 +59,18 @@ tmux new -s install   # so a dropped connection doesn't kill the build
 bash install.sh
 ```
 
+Two choices are configurable via environment variables before running
+(no interactive prompts — set these or take the defaults):
+
+```sh
+ENABLE_WD40=false PRIV_ESC=sudo bash install.sh
+```
+
+| Variable | Default | Options | Effect |
+|----------|---------|---------|--------|
+| `ENABLE_WD40` | `true` | `true` / `false` | Mask the optional `rust` USE flag via the WD-40 profile |
+| `PRIV_ESC` | `doas` | `doas` / `sudo` | Privilege-escalation tool installed and configured |
+
 The script runs fully unattended. A full build takes roughly **4 hours**
 on this hardware:
 
@@ -118,9 +130,11 @@ This only suppresses *optional* Rust dependencies — it can't eliminate
 Rust entirely. `x11-terms/alacritty` (in the base package list) is
 itself written in Rust and needs `dev-lang/rust` regardless.
 
-If you'd rather keep optional Rust-using packages available (or just
-don't want the extra local profile/repo), fork the script and remove
-the "WD-40" step.
+Toggle it with the `ENABLE_WD40` env var (default `true`):
+
+```sh
+ENABLE_WD40=false bash install.sh
+```
 
 ### Overlays
 
@@ -173,9 +187,16 @@ permit persist legend as root
 `persist` mirrors sudo's timestamp caching so you're not re-entering
 your password every command. doas trades sudo's feature depth for a
 much smaller, easier-to-audit codebase — fewer features means fewer
-places for a privilege-escalation bug to hide. If you need sudo's
-extras (lecture messages, fine-grained logging, LDAP-backed rules),
-swap `app-admin/doas` back for `app-admin/sudo` in the package list.
+places for a privilege-escalation bug to hide.
+
+If you need sudo's extras (lecture messages, fine-grained logging,
+LDAP-backed rules), set `PRIV_ESC=sudo` before running the script —
+it installs `app-admin/sudo` instead and grants `wheel` via
+`/etc/sudoers.d/wheel` rather than writing `/etc/doas.conf`:
+
+```sh
+PRIV_ESC=sudo bash install.sh
+```
 
 ### Default credentials
 
