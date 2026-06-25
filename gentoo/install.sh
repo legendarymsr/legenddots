@@ -253,10 +253,14 @@ if ! step_done kernel; then
   # but it also lets the kernel itself float on the bleeding-edge testing
   # series -- which net-wireless/broadcom-sta's unmaintained out-of-tree
   # source reliably fails to compile against (compat patches for it lag
-  # behind by design). Overriding ACCEPT_KEYWORDS to stable-only for just
-  # this emerge call pins the kernel to the latest *stable* release without
-  # touching the testing-wide default the rest of the system relies on.
-  ACCEPT_KEYWORDS="amd64" emerge sys-kernel/gentoo-sources
+  # behind by design). ACCEPT_KEYWORDS is an *incremental* portage variable
+  # (like USE): just setting it to "amd64" here would only add to the
+  # inherited "~amd64" from make.conf, not replace it -- "~amd64" already
+  # implies "accept testing too", so that would be a no-op. The leading
+  # "-~amd64" explicitly drops the inherited testing acceptance first, so
+  # this one emerge call is genuinely restricted to the latest *stable*
+  # release without touching the testing-wide default everything else uses.
+  ACCEPT_KEYWORDS="-~amd64 amd64" emerge sys-kernel/gentoo-sources
   emerge sys-kernel/genkernel sys-kernel/linux-firmware sys-firmware/intel-microcode
   eselect kernel set 1
   cd /usr/src/linux

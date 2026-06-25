@@ -464,17 +464,25 @@ haven't caught up to. The script pins just that one emerge call back to
 stable with an env var override:
 
 ```sh
-ACCEPT_KEYWORDS="amd64" emerge sys-kernel/gentoo-sources
+ACCEPT_KEYWORDS="-~amd64 amd64" emerge sys-kernel/gentoo-sources
 ```
 
-— overlay packages and everything else keep using the global `~amd64`,
-only the kernel is pulled from stable. (An earlier version of this fix
-tried a `package.mask` entry of `~sys-kernel/gentoo-sources`, but that's
-not valid atom syntax — the `~` version operator requires an actual
-version number, it doesn't mean "all testing-keyword ebuilds of this
-package"; portage silently ignored it.) `resume.sh` detects a too-new
-kernel left over from before this fix (major version ≥ 7), unmerges it,
-and forces a rebuild on the stable kernel automatically.
+`ACCEPT_KEYWORDS` is an *incremental* portage variable, same as `USE` —
+plain `ACCEPT_KEYWORDS="amd64"` would only add to the `~amd64` inherited
+from make.conf rather than replace it, and `~amd64` already implies
+"testing is fine", so that would have been a silent no-op (this is
+exactly what happened in an earlier version of this fix: it looked
+right but kept building the testing kernel anyway). The leading
+`-~amd64` explicitly drops the inherited testing acceptance before
+adding `amd64` back, so only *this* emerge call is genuinely
+stable-only — overlay packages and everything else still use the
+global `~amd64`. (A version before *that* tried a `package.mask` entry
+of `~sys-kernel/gentoo-sources`, which isn't valid atom syntax either —
+the `~` version operator requires an actual version number, it doesn't
+mean "all testing-keyword ebuilds of this package"; portage silently
+ignored it.) `resume.sh` detects a too-new kernel left over from before
+this fix (major version ≥ 7), unmerges it, and forces a rebuild on the
+stable kernel automatically.
 
 ## Kernel — hardening options
 
