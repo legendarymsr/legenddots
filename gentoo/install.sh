@@ -272,6 +272,22 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_USB_XHCI_HCD
   ./scripts/config -e CONFIG_USB_EHCI_HCD
 
+  # --- BROADCOM-STA (wl) COMPATIBILITY ---
+  # broadcom-sta refuses to build against CONFIG_PREEMPT_RCU (pulled in by
+  # PREEMPT_DYNAMIC's default of "Preemptible Kernel") and against the
+  # in-tree mac80211 stack it conflicts with -- not just the modprobe.d
+  # blacklist (runtime) but the kernel build itself must drop these.
+  ./scripts/config -d CONFIG_PREEMPT_DYNAMIC
+  ./scripts/config -d CONFIG_PREEMPT
+  ./scripts/config -e CONFIG_PREEMPT_NONE
+  ./scripts/config -d CONFIG_BRCMSMAC
+  ./scripts/config -d CONFIG_BRCMFMAC
+  ./scripts/config -d CONFIG_BRCMUTIL
+  ./scripts/config -d CONFIG_B43
+  ./scripts/config -d CONFIG_B43LEGACY
+  ./scripts/config -d CONFIG_SSB
+  ./scripts/config -d CONFIG_MAC80211
+
   # --- HARDENED SECURITY ---
   ./scripts/config -e CONFIG_RANDOMIZE_BASE
   ./scripts/config -e CONFIG_RANDOMIZE_MEMORY

@@ -432,6 +432,18 @@ refind-install --usedefault /dev/sda1
 | `CONFIG_USB_XHCI_HCD`         | USB 3.0                                 |
 | `CONFIG_USB_EHCI_HCD`         | USB 2.0                                 |
 
+## Kernel — broadcom-sta (`wl`) compatibility
+
+`net-wireless/broadcom-sta` refuses to build (compile failure, not just a
+runtime conflict) unless these are set *before* the kernel build, not just
+the `/etc/modprobe.d/broadcom-sta.conf` blacklist:
+
+| Option                     | Reason                                          |
+|-----------------------------|--------------------------------------------------|
+| `CONFIG_PREEMPT_DYNAMIC=n`  | Defaults to "Preemptible Kernel", which pulls in `CONFIG_PREEMPT_RCU` — broadcom-sta hard-refuses to build against it |
+| `CONFIG_PREEMPT_NONE=y`     | Preemption model broadcom-sta accepts            |
+| `CONFIG_BRCMSMAC=n`, `CONFIG_BRCMFMAC=n`, `CONFIG_B43=n`, `CONFIG_B43LEGACY=n`, `CONFIG_SSB=n`, `CONFIG_MAC80211=n` | In-tree drivers/stack that conflict with `wl`; disabled at the kernel-config level, not just blacklisted at runtime |
+
 ## Kernel — hardening options
 
 | Option                           | Protection              |
