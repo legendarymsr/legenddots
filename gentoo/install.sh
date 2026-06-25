@@ -145,6 +145,14 @@ chown -R portage:portage /var/cache/ccache
 # Must happen before the kernel/LLVM/clang builds to actually save anything.
 if ! step_done ccache; then
   emerge dev-util/ccache
+  # ccache defaults to a 5GiB max-size, which a single LLVM+clang+mesa+kernel
+  # build cycle can blow through on its own -- once full, ccache starts
+  # evicting old entries (LRU), so a resumed/repeated install gets far fewer
+  # cache hits than it should. Compression keeps the larger cache from eating
+  # disproportionate disk on a laptop SSD.
+  CCACHE_DIR=/var/cache/ccache ccache --max-size=12G
+  CCACHE_DIR=/var/cache/ccache ccache --set-config=compression=true
+  chown -R portage:portage /var/cache/ccache
   mark_step ccache
 fi
 

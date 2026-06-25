@@ -92,7 +92,11 @@ on this hardware:
 | Everything else | ~30 min |
 
 LLVM, clang, and mesa build with `-O1` to cut compile time roughly in
-half. ccache means any subsequent reinstall is significantly faster.
+half. ccache means any subsequent reinstall is significantly faster —
+the script bumps ccache's max-size from its 5GiB default to 12GiB and
+turns on compression, since a single LLVM+clang+mesa+kernel build cycle
+can otherwise fill the default cache and start evicting entries before a
+resumed/repeated install ever gets to reuse them.
 LLVM stays at the same system-wide `MAKEOPTS=-j3` as everything else —
 `--jobs=1` only stops *multiple packages* from building in parallel, it
 doesn't cap how much RAM a single package's own parallel compile uses,
