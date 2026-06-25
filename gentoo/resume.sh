@@ -53,6 +53,13 @@ mountpoint -q /mnt/gentoo/sys  || { mount --rbind /sys /mnt/gentoo/sys; mount --
 mountpoint -q /mnt/gentoo/dev  || { mount --rbind /dev /mnt/gentoo/dev; mount --make-rslave /mnt/gentoo/dev; }
 mountpoint -q /mnt/gentoo/run  || mount --bind /run /mnt/gentoo/run
 
+# An earlier version of this fix wrote an invalid package.mask atom
+# (`~sys-kernel/gentoo-sources` -- the `~` version operator requires an
+# actual version, it doesn't mean "all testing-keyword ebuilds"). Portage
+# silently ignored it and kept building the testing kernel. Clean up that
+# stray file if a prior resume left it behind.
+rm -f /mnt/gentoo/etc/portage/package.mask/gentoo-sources-stable
+
 # A kernel built before the broadcom-sta fixes will fail the base_system
 # emerge the same way every time it's resumed, even with a freshly
 # regenerated inside.sh, since "kernel" is already marked done. Detect
@@ -65,11 +72,9 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx kernel /mnt/gentoo/
 
   if [[ "$KMAJOR" =~ ^[0-9]+$ ]] && (( KMAJOR >= 7 )); then
     # Too new: broadcom-sta's out-of-tree source isn't patched for testing-
-    # branch kernels this far ahead. Mask the testing kernel, unmerge it,
-    # and force a clean rebuild on the latest stable kernel instead.
-    echo -e "${CYAN}Kernel ${KVER} is from the testing branch and too new for broadcom-sta — masking it and forcing a rebuild on the latest stable kernel...${NC}"
-    mkdir -p /mnt/gentoo/etc/portage/package.mask
-    echo "~sys-kernel/gentoo-sources" > /mnt/gentoo/etc/portage/package.mask/gentoo-sources-stable
+    # branch kernels this far ahead. Unmerge it and force a rebuild, which
+    # will now pull the stable kernel via ACCEPT_KEYWORDS=amd64 in install.sh.
+    echo -e "${CYAN}Kernel ${KVER} is from the testing branch and too new for broadcom-sta — unmerging it and forcing a rebuild on the latest stable kernel...${NC}"
     chroot /mnt/gentoo emerge --unmerge "=sys-kernel/gentoo-sources-${KVER}*" 2>/dev/null || true
     rm -rf "/mnt/gentoo/usr/src/linux-${KVER}-gentoo"
     rm -f /mnt/gentoo/usr/src/linux

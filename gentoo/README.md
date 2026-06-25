@@ -460,13 +460,21 @@ against a kernel that's simply too new: it's an unmaintained,
 out-of-tree driver, and `ACCEPT_KEYWORDS="~amd64"` (needed for the
 overlay packages) also lets `sys-kernel/gentoo-sources` float on the
 bleeding-edge testing series, which broadcom-sta's compat patches
-haven't caught up to. The script masks the testing-keyword kernel
-ebuilds specifically (`/etc/portage/package.mask/gentoo-sources-stable`
-containing `~sys-kernel/gentoo-sources`), forcing the latest *stable*
-kernel instead — overlay packages keep using `~amd64`, only the kernel
-is pinned back. `resume.sh` detects a too-new kernel left over from
-before this fix (major version ≥ 7), unmerges it, and forces a rebuild
-on the stable kernel automatically.
+haven't caught up to. The script pins just that one emerge call back to
+stable with an env var override:
+
+```sh
+ACCEPT_KEYWORDS="amd64" emerge sys-kernel/gentoo-sources
+```
+
+— overlay packages and everything else keep using the global `~amd64`,
+only the kernel is pulled from stable. (An earlier version of this fix
+tried a `package.mask` entry of `~sys-kernel/gentoo-sources`, but that's
+not valid atom syntax — the `~` version operator requires an actual
+version number, it doesn't mean "all testing-keyword ebuilds of this
+package"; portage silently ignored it.) `resume.sh` detects a too-new
+kernel left over from before this fix (major version ≥ 7), unmerges it,
+and forces a rebuild on the stable kernel automatically.
 
 ## Kernel — hardening options
 
