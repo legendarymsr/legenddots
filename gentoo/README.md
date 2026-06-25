@@ -94,6 +94,14 @@ on this hardware:
 LLVM, clang, and mesa build with `-O1` to cut compile time roughly in
 half. ccache means any subsequent reinstall is significantly faster.
 
+`EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
+a time, `MAKEOPTS=-j3` inside that package) rather than building
+several heavy packages in parallel. This machine doesn't have the RAM
+to run multiple LLVM/clang/mesa/brave-browser-nightly compiles at
+once — `--jobs=4` would spawn up to 12 concurrent compiler threads on
+a 4-thread CPU, which thrashes swap hard enough to look like a frozen
+machine.
+
 ---
 
 ## Step-by-Step Walkthrough
