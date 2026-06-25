@@ -455,6 +455,19 @@ the `/etc/modprobe.d/broadcom-sta.conf` blacklist:
 | `CONFIG_PREEMPT_NONE=y`     | Preemption model broadcom-sta accepts            |
 | `CONFIG_BRCMSMAC=n`, `CONFIG_BRCMFMAC=n`, `CONFIG_B43=n`, `CONFIG_B43LEGACY=n`, `CONFIG_SSB=n`, `CONFIG_MAC80211=n` | In-tree drivers/stack that conflict with `wl`; disabled at the kernel-config level, not just blacklisted at runtime |
 
+Even with the config above, `broadcom-sta` can still fail to compile
+against a kernel that's simply too new: it's an unmaintained,
+out-of-tree driver, and `ACCEPT_KEYWORDS="~amd64"` (needed for the
+overlay packages) also lets `sys-kernel/gentoo-sources` float on the
+bleeding-edge testing series, which broadcom-sta's compat patches
+haven't caught up to. The script masks the testing-keyword kernel
+ebuilds specifically (`/etc/portage/package.mask/gentoo-sources-stable`
+containing `~sys-kernel/gentoo-sources`), forcing the latest *stable*
+kernel instead — overlay packages keep using `~amd64`, only the kernel
+is pinned back. `resume.sh` detects a too-new kernel left over from
+before this fix (major version ≥ 7), unmerges it, and forces a rebuild
+on the stable kernel automatically.
+
 ## Kernel — hardening options
 
 | Option                           | Protection              |

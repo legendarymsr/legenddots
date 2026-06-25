@@ -48,16 +48,37 @@ else
   echo -e "${CYAN}install.sh not found next to resume.sh — reusing the existing /tmp/inside.sh as-is.${NC}"
 fi
 
-# A kernel built before the broadcom-sta PREEMPT_RCU/in-tree-driver fix will
-# fail the base_system emerge the same way every time it's resumed, even
-# with a freshly regenerated inside.sh, since "kernel" is already marked
-# done. Detect that stale config and force both steps to rerun.
-if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] \
-  && grep -qx kernel /mnt/gentoo/etc/gentoo-install.state \
-  && [[ -f /mnt/gentoo/usr/src/linux/.config ]] \
-  && grep -qE '^CONFIG_(PREEMPT_RCU|BRCMFMAC|BRCMSMAC|BRCMUTIL|B43|B43LEGACY|SSB|MAC80211)=y' /mnt/gentoo/usr/src/linux/.config; then
-  echo -e "${CYAN}Stale kernel config detected (broadcom-sta incompatible) — forcing kernel + base_system rebuild...${NC}"
-  sed -i '/^kernel$/d; /^base_system$/d' /mnt/gentoo/etc/gentoo-install.state
+mountpoint -q /mnt/gentoo/proc || mount --types proc proc /mnt/gentoo/proc
+mountpoint -q /mnt/gentoo/sys  || { mount --rbind /sys /mnt/gentoo/sys; mount --make-rslave /mnt/gentoo/sys; }
+mountpoint -q /mnt/gentoo/dev  || { mount --rbind /dev /mnt/gentoo/dev; mount --make-rslave /mnt/gentoo/dev; }
+mountpoint -q /mnt/gentoo/run  || mount --bind /run /mnt/gentoo/run
+
+# A kernel built before the broadcom-sta fixes will fail the base_system
+# emerge the same way every time it's resumed, even with a freshly
+# regenerated inside.sh, since "kernel" is already marked done. Detect
+# either stale failure mode and force kernel + base_system to rerun.
+if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx kernel /mnt/gentoo/etc/gentoo-install.state; then
+  KVER=""
+  [[ -e /mnt/gentoo/usr/src/linux ]] && \
+    KVER=$(basename "$(readlink -f /mnt/gentoo/usr/src/linux)" | sed -E 's/^linux-//; s/-gentoo$//')
+  KMAJOR="${KVER%%.*}"
+
+  if [[ "$KMAJOR" =~ ^[0-9]+$ ]] && (( KMAJOR >= 7 )); then
+    # Too new: broadcom-sta's out-of-tree source isn't patched for testing-
+    # branch kernels this far ahead. Mask the testing kernel, unmerge it,
+    # and force a clean rebuild on the latest stable kernel instead.
+    echo -e "${CYAN}Kernel ${KVER} is from the testing branch and too new for broadcom-sta — masking it and forcing a rebuild on the latest stable kernel...${NC}"
+    mkdir -p /mnt/gentoo/etc/portage/package.mask
+    echo "~sys-kernel/gentoo-sources" > /mnt/gentoo/etc/portage/package.mask/gentoo-sources-stable
+    chroot /mnt/gentoo emerge --unmerge "=sys-kernel/gentoo-sources-${KVER}*" 2>/dev/null || true
+    rm -rf "/mnt/gentoo/usr/src/linux-${KVER}-gentoo"
+    rm -f /mnt/gentoo/usr/src/linux
+    sed -i '/^kernel$/d; /^base_system$/d' /mnt/gentoo/etc/gentoo-install.state
+  elif [[ -f /mnt/gentoo/usr/src/linux/.config ]] \
+    && grep -qE '^CONFIG_(PREEMPT_RCU|BRCMFMAC|BRCMSMAC|BRCMUTIL|B43|B43LEGACY|SSB|MAC80211)=y' /mnt/gentoo/usr/src/linux/.config; then
+    echo -e "${CYAN}Stale kernel config detected (broadcom-sta incompatible) — forcing kernel + base_system rebuild...${NC}"
+    sed -i '/^kernel$/d; /^base_system$/d' /mnt/gentoo/etc/gentoo-install.state
+  fi
 fi
 
 if [[ -f /mnt/gentoo/etc/gentoo-install.state ]]; then
@@ -67,11 +88,6 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]]; then
 else
   echo -e "${CYAN}No completed steps recorded yet — resuming from the start.${NC}"
 fi
-
-mountpoint -q /mnt/gentoo/proc || mount --types proc proc /mnt/gentoo/proc
-mountpoint -q /mnt/gentoo/sys  || { mount --rbind /sys /mnt/gentoo/sys; mount --make-rslave /mnt/gentoo/sys; }
-mountpoint -q /mnt/gentoo/dev  || { mount --rbind /dev /mnt/gentoo/dev; mount --make-rslave /mnt/gentoo/dev; }
-mountpoint -q /mnt/gentoo/run  || mount --bind /run /mnt/gentoo/run
 
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 header "Resuming install..."

@@ -248,6 +248,17 @@ fi
 #    from the Gentoo tree in 2024/2025)
 if ! step_done kernel; then
   header "Building kernel..."
+
+  # ACCEPT_KEYWORDS="~amd64" in make.conf is needed for the overlay packages,
+  # but it also lets the kernel itself float on the bleeding-edge testing
+  # series -- which net-wireless/broadcom-sta's unmaintained out-of-tree
+  # source reliably fails to compile against (compat patches for it lag
+  # behind by design). Masking just the ~amd64 (testing) gentoo-sources
+  # ebuilds forces portage to fall back to the latest *stable* kernel,
+  # which broadcom-sta has actually been patched to support.
+  mkdir -p /etc/portage/package.mask
+  echo "~sys-kernel/gentoo-sources" > /etc/portage/package.mask/gentoo-sources-stable
+
   emerge sys-kernel/gentoo-sources sys-kernel/genkernel \
          sys-kernel/linux-firmware sys-firmware/intel-microcode
   eselect kernel set 1
