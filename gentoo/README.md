@@ -93,6 +93,11 @@ on this hardware:
 
 LLVM, clang, and mesa build with `-O1` to cut compile time roughly in
 half. ccache means any subsequent reinstall is significantly faster.
+`llvm-core/llvm` also gets a `package.env` override bumping `MAKEOPTS`
+to `-j5` (vs. the system-wide `-j3`) since it's the single biggest build
+on this box — mild oversubscription on a 4-thread CPU still speeds it
+up, and `--jobs=1` means it's never competing with another heavy build
+in parallel.
 
 `EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
 a time, `MAKEOPTS=-j3` inside that package) rather than building

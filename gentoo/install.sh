@@ -153,8 +153,15 @@ fi
 mkdir -p /etc/portage/env /etc/portage/package.env
 echo 'CFLAGS="-march=haswell -O1 -pipe"
 CXXFLAGS="-march=haswell -O1 -pipe"' > /etc/portage/env/O1.conf
+
+# llvm-core/llvm specifically gets a slightly higher MAKEOPTS than the
+# system-wide -j3 -- it's the single biggest build on this box, and a small
+# amount of oversubscription on a 4-thread CPU still speeds it up despite
+# the extra RAM pressure (unlike running several heavy packages in
+# parallel via --jobs, this is still only one package building at a time).
+echo 'MAKEOPTS="-j5"' > /etc/portage/env/llvm-j5.conf
 {
-  echo "llvm-core/llvm O1.conf"
+  echo "llvm-core/llvm O1.conf llvm-j5.conf"
   echo "llvm-core/clang O1.conf"
   echo "media-libs/mesa O1.conf"
 } > /etc/portage/package.env/O1
