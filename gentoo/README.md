@@ -115,13 +115,24 @@ bash resume.sh
 `/etc/gentoo-install.state` inside the new root filesystem as it
 completes them. `resume.sh` re-mounts the partitions `install.sh`
 already created (it does **not** repartition or re-unpack stage3),
-re-enters the chroot, and re-runs the same install logic — steps
-already marked done are skipped, so it picks up at whichever step was
-running when it crashed. The `ENABLE_WD40`/`PRIV_ESC` choices from the
-original run are reused automatically.
+re-enters the chroot, and re-runs the install logic — steps already
+marked done are skipped, so it picks up at whichever step was running
+when it crashed. The `ENABLE_WD40`/`PRIV_ESC` choices from the original
+run are reused automatically.
 
-If `/mnt/gentoo/tmp/inside.sh` doesn't exist (e.g. the crash happened
-before stage3 even finished unpacking), there's nothing to resume —
+`resume.sh` regenerates `/tmp/inside.sh` fresh from the `install.sh`
+sitting next to it before re-entering the chroot, rather than reusing
+the stale copy from the original run — so if you `git pull` an updated
+`install.sh` after a crash, the resumed run picks up that fix instead
+of repeating the same failure. It also detects a kernel built before
+the broadcom-sta `PREEMPT_RCU`/in-tree-driver fix (see below) and
+automatically forces both the kernel and base_system steps to rerun in
+that case, so you don't have to manually edit
+`/etc/gentoo-install.state` yourself.
+
+If neither `install.sh` is present next to `resume.sh` nor
+`/mnt/gentoo/tmp/inside.sh` exists (e.g. the crash happened before
+stage3 even finished unpacking), there's nothing to resume —
 `resume.sh` will tell you to run `install.sh` again from scratch.
 
 ---
