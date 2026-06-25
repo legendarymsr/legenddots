@@ -102,6 +102,28 @@ once — `--jobs=4` would spawn up to 12 concurrent compiler threads on
 a 4-thread CPU, which thrashes swap hard enough to look like a frozen
 machine.
 
+### Resuming after a crash
+
+If the machine freezes or loses power mid-install, reboot the live ISO,
+tether internet again, and run:
+
+```sh
+bash resume.sh
+```
+
+`install.sh` checkpoints each of the 10 numbered steps to
+`/etc/gentoo-install.state` inside the new root filesystem as it
+completes them. `resume.sh` re-mounts the partitions `install.sh`
+already created (it does **not** repartition or re-unpack stage3),
+re-enters the chroot, and re-runs the same install logic — steps
+already marked done are skipped, so it picks up at whichever step was
+running when it crashed. The `ENABLE_WD40`/`PRIV_ESC` choices from the
+original run are reused automatically.
+
+If `/mnt/gentoo/tmp/inside.sh` doesn't exist (e.g. the crash happened
+before stage3 even finished unpacking), there's nothing to resume —
+`resume.sh` will tell you to run `install.sh` again from scratch.
+
 ---
 
 ## Step-by-Step Walkthrough

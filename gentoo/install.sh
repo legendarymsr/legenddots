@@ -59,6 +59,14 @@ curl -# -O "${MIRROR}/releases/amd64/autobuilds/${STAGE3_PATH}"
 tar xpf "$(basename "$STAGE3_PATH")" --xattrs-include='*.*' --numeric-owner
 cp -L /etc/resolv.conf /mnt/gentoo/etc/
 
+# Persist the chosen options so resume.sh can re-enter the chroot after a
+# crash without re-prompting (the chroot env wrapper below only reaches
+# this first run).
+{
+  echo "ENABLE_WD40=${ENABLE_WD40}"
+  echo "PRIV_ESC=${PRIV_ESC}"
+} > /mnt/gentoo/etc/gentoo-install.env
+
 # ── CHROOT LOGIC ──────────────────────────────────────────────────────────────
 cat << 'CHROOT_EOF' > /mnt/gentoo/tmp/inside.sh
 #!/bin/bash
@@ -68,8 +76,20 @@ export DEBUGINFOD_URLS_CERT_PATH=""
 set +u; source /etc/profile; set -u
 export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+
+# resume.sh re-enters this same script after a crash; pick up the options
+# chosen on the original run if they weren't passed in via the environment.
+if [[ ( -z "${ENABLE_WD40:-}" || -z "${PRIV_ESC:-}" ) && -f /etc/gentoo-install.env ]]; then
+  source /etc/gentoo-install.env
+fi
 ENABLE_WD40="${ENABLE_WD40:-true}"
 PRIV_ESC="${PRIV_ESC:-doas}"
+
+# ── Step checkpointing — lets resume.sh skip steps already completed ────────
+STATE_FILE=/etc/gentoo-install.state
+touch "$STATE_FILE"
+step_done() { grep -qx "$1" "$STATE_FILE"; }
+mark_step() { echo "$1" >> "$STATE_FILE"; }
 
 # Allow overcommit so portage fork() calls don't fail with ENOMEM
 # when the live-CD RAM is under pressure during heavy package builds
@@ -77,9 +97,12 @@ echo 1 > /proc/sys/vm/overcommit_memory
 echo 262144 > /proc/sys/vm/max_map_count
 
 # 1. PORTAGE SYNC & HARDENED PROFILE
-header "Syncing portage tree..."
-emerge-webrsync
-eselect profile set default/linux/amd64/23.0/hardened
+if ! step_done portage_sync; then
+  header "Syncing portage tree..."
+  emerge-webrsync
+  eselect profile set default/linux/amd64/23.0/hardened
+  mark_step portage_sync
+fi
 
 # 2. KEYWORDS
 # ACCEPT_KEYWORDS="~amd64" in make.conf already accepts all testing packages.
@@ -167,205 +190,224 @@ echo "dev-cpp/cairomm X" >> /etc/portage/package.use/xlibs
 echo "dev-cpp/atkmm X" >> /etc/portage/package.use/xlibs
 
 # 4. OVERLAYS
-header "Setting up overlays..."
-emerge --oneshot app-eselect/eselect-repository dev-vcs/git
-eselect repository enable guru
-eselect repository add another-brave-overlay git \
-    https://github.com/falbrechtskirchinger/another-brave-overlay.git || true
-eselect repository add hyproverlay git \
-    https://codeberg.org/hyproverlay/hyproverlay.git || true
-emaint sync --repo guru                  || true
-emaint sync --repo another-brave-overlay || true
-emaint sync --repo hyproverlay           || true
+if ! step_done overlays; then
+  header "Setting up overlays..."
+  emerge --oneshot app-eselect/eselect-repository dev-vcs/git
+  eselect repository enable guru
+  eselect repository add another-brave-overlay git \
+      https://github.com/falbrechtskirchinger/another-brave-overlay.git || true
+  eselect repository add hyproverlay git \
+      https://codeberg.org/hyproverlay/hyproverlay.git || true
+  emaint sync --repo guru                  || true
+  emaint sync --repo another-brave-overlay || true
+  emaint sync --repo hyproverlay           || true
+  mark_step overlays
+fi
 
 # 5. WD-40 (de-rust the profile): masks the "rust" USE flag wherever a
 #    package can be built without it. Can't eliminate rust entirely --
 #    x11-terms/alacritty below is itself written in Rust and needs
 #    dev-lang/rust regardless of this. Skip with ENABLE_WD40=false.
-if [[ "$ENABLE_WD40" == "true" ]]; then
-  header "Applying WD-40..."
-  eselect repository create local || true
-  echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
-  mkdir -p /var/db/repos/local/profiles/wd40-hardened
-  echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
-  {
-    echo "gentoo:default/linux/amd64/23.0/hardened"
-    echo "gentoo:features/wd40"
-  } > /var/db/repos/local/profiles/wd40-hardened/parent
-  echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
-  WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
-  eselect profile set "${WD40_NUM}"
+if ! step_done wd40; then
+  if [[ "$ENABLE_WD40" == "true" ]]; then
+    header "Applying WD-40..."
+    eselect repository create local || true
+    echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
+    mkdir -p /var/db/repos/local/profiles/wd40-hardened
+    echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
+    {
+      echo "gentoo:default/linux/amd64/23.0/hardened"
+      echo "gentoo:features/wd40"
+    } > /var/db/repos/local/profiles/wd40-hardened/parent
+    echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
+    WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
+    eselect profile set "${WD40_NUM}"
 
-  # features/wd40/package.mask blanket-masks packages that hard-require rust
-  # (no optional USE flag to strip) instead of leaving them buildable --
-  # alacritty is one of them, but it's in the base package list regardless,
-  # so unmask it specifically rather than disabling WD-40 wholesale.
-  mkdir -p /etc/portage/package.unmask
-  echo "x11-terms/alacritty" > /etc/portage/package.unmask/alacritty
-else
-  header "Skipping WD-40 (ENABLE_WD40=false)..."
+    # features/wd40/package.mask blanket-masks packages that hard-require rust
+    # (no optional USE flag to strip) instead of leaving them buildable --
+    # alacritty is one of them, but it's in the base package list regardless,
+    # so unmask it specifically rather than disabling WD-40 wholesale.
+    mkdir -p /etc/portage/package.unmask
+    echo "x11-terms/alacritty" > /etc/portage/package.unmask/alacritty
+  else
+    header "Skipping WD-40 (ENABLE_WD40=false)..."
+  fi
+  mark_step wd40
 fi
 
 # 6. KERNEL (gentoo-sources + manual hardening; hardened-sources was removed
 #    from the Gentoo tree in 2024/2025)
-header "Building kernel..."
-emerge sys-kernel/gentoo-sources sys-kernel/genkernel \
-       sys-kernel/linux-firmware sys-firmware/intel-microcode
-eselect kernel set 1
-cd /usr/src/linux
-make defconfig
+if ! step_done kernel; then
+  header "Building kernel..."
+  emerge sys-kernel/gentoo-sources sys-kernel/genkernel \
+         sys-kernel/linux-firmware sys-firmware/intel-microcode
+  eselect kernel set 1
+  cd /usr/src/linux
+  make defconfig
 
-# --- INTEL ME REMOVAL ---
-./scripts/config -d CONFIG_INTEL_MEI
-./scripts/config -d CONFIG_INTEL_MEI_ME
-./scripts/config -d CONFIG_INTEL_MEI_TXE
-./scripts/config -d CONFIG_INTEL_MEI_HDCP
-./scripts/config -d CONFIG_INTEL_MEI_PXP
+  # --- INTEL ME REMOVAL ---
+  ./scripts/config -d CONFIG_INTEL_MEI
+  ./scripts/config -d CONFIG_INTEL_MEI_ME
+  ./scripts/config -d CONFIG_INTEL_MEI_TXE
+  ./scripts/config -d CONFIG_INTEL_MEI_HDCP
+  ./scripts/config -d CONFIG_INTEL_MEI_PXP
 
-# --- MBA 6,2 HARDWARE ---
-./scripts/config -e CONFIG_DRM_I915
-./scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS
-./scripts/config -e CONFIG_HID_APPLE
-./scripts/config -e CONFIG_BT_HCIBTUSB
-./scripts/config -e CONFIG_SATA_AHCI
-./scripts/config -e CONFIG_X86_INTEL_PSTATE
-./scripts/config -e CONFIG_THUNDERBOLT
-./scripts/config -e CONFIG_USB_XHCI_HCD
-./scripts/config -e CONFIG_USB_EHCI_HCD
+  # --- MBA 6,2 HARDWARE ---
+  ./scripts/config -e CONFIG_DRM_I915
+  ./scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS
+  ./scripts/config -e CONFIG_HID_APPLE
+  ./scripts/config -e CONFIG_BT_HCIBTUSB
+  ./scripts/config -e CONFIG_SATA_AHCI
+  ./scripts/config -e CONFIG_X86_INTEL_PSTATE
+  ./scripts/config -e CONFIG_THUNDERBOLT
+  ./scripts/config -e CONFIG_USB_XHCI_HCD
+  ./scripts/config -e CONFIG_USB_EHCI_HCD
 
-# --- HARDENED SECURITY ---
-./scripts/config -e CONFIG_RANDOMIZE_BASE
-./scripts/config -e CONFIG_RANDOMIZE_MEMORY
-./scripts/config -e CONFIG_PAGE_TABLE_ISOLATION
-./scripts/config -e CONFIG_MITIGATION_RETPOLINE
-./scripts/config -e CONFIG_RETPOLINE
-./scripts/config -e CONFIG_STRICT_KERNEL_RWX
-./scripts/config -e CONFIG_STRICT_MODULE_RWX
-./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM
-./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY
-./scripts/config -d CONFIG_MODULE_SIG_FORCE
+  # --- HARDENED SECURITY ---
+  ./scripts/config -e CONFIG_RANDOMIZE_BASE
+  ./scripts/config -e CONFIG_RANDOMIZE_MEMORY
+  ./scripts/config -e CONFIG_PAGE_TABLE_ISOLATION
+  ./scripts/config -e CONFIG_MITIGATION_RETPOLINE
+  ./scripts/config -e CONFIG_RETPOLINE
+  ./scripts/config -e CONFIG_STRICT_KERNEL_RWX
+  ./scripts/config -e CONFIG_STRICT_MODULE_RWX
+  ./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM
+  ./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY
+  ./scripts/config -d CONFIG_MODULE_SIG_FORCE
 
-make olddefconfig
-make -j3 && make modules_install && make install
-genkernel --no-clean --no-mrproper initramfs
+  make olddefconfig
+  make -j3 && make modules_install && make install
+  genkernel --no-clean --no-mrproper initramfs
+  mark_step kernel
+fi
 
 # 7. BASE SYSTEM
-header "Emerging base system..."
-echo "mba" > /etc/hostname
-cat > /etc/hosts << 'EOF'
+if ! step_done base_system; then
+  header "Emerging base system..."
+  echo "mba" > /etc/hostname
+  cat > /etc/hosts << 'EOF'
 127.0.0.1   localhost
 ::1         localhost
 127.0.1.1   mba.localdomain mba
 EOF
 
-groupadd -f plugdev
-groupadd -f bluetooth
+  groupadd -f plugdev
+  groupadd -f bluetooth
 
-PRIV_PKG="app-admin/doas"
-[[ "$PRIV_ESC" == "sudo" ]] && PRIV_PKG="app-admin/sudo"
+  PRIV_PKG="app-admin/doas"
+  [[ "$PRIV_ESC" == "sudo" ]] && PRIV_PKG="app-admin/sudo"
 
-emerge \
-  sys-apps/pciutils \
-  sys-apps/usbutils \
-  sys-process/procps \
-  app-misc/figlet \
-  x11-apps/igt-gpu-tools \
-  sys-auth/elogind \
-  net-misc/networkmanager \
-  net-wireless/wpa_supplicant \
-  net-wireless/broadcom-sta \
-  net-wireless/bluez \
-  "$PRIV_PKG" \
-  sys-apps/dbus \
-  sys-auth/polkit \
-  sys-power/acpid \
-  sys-power/tlp \
-  sys-apps/lm-sensors \
-  net-misc/wget \
-  app-shells/zsh \
-  dev-vcs/git \
-  app-editors/neovim \
-  media-video/pipewire \
-  media-video/wireplumber \
-  x11-terms/alacritty \
-  llvm-core/llvm \
-  llvm-core/clang \
-  sys-boot/refind
-
-# 8. DESKTOP (niri + full Wayland stack)
-header "Emerging desktop..."
-emerge \
-  gui-wm/niri \
-  gui-apps/waybar \
-  gui-apps/fuzzel \
-  gui-apps/swaylock \
-  gui-apps/swaybg \
-  gui-apps/grim \
-  gui-apps/slurp \
-  gui-apps/wl-clipboard \
-  x11-misc/dunst \
-  gui-libs/xdg-desktop-portal-wlr \
-  gnome-extra/polkit-gnome \
-  media-sound/pavucontrol \
-  x11-misc/xdg-utils \
-  x11-misc/xdg-user-dirs \
-  media-fonts/nerdfonts \
-  www-client/brave-browser-nightly
-
-# 9. LOCALIZATION & USER
-header "Localizing and creating user..."
-echo "Europe/Stockholm" > /etc/timezone
-emerge --config sys-libs/timezone-data
-sed -i 's/keymap="us"/keymap="se"/' /etc/conf.d/keymaps
-echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-echo "sv_SE.UTF-8 UTF-8" >> /etc/locale.gen
-locale-gen
-eselect locale set en_US.utf8
-env-update && set +u && source /etc/profile && set -u
-
-useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend || true
-echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
-echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
-
-if [[ "$PRIV_ESC" == "sudo" ]]; then
-  echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/wheel
-  chmod 0440 /etc/sudoers.d/wheel
-else
-  echo 'permit persist legend as root' > /etc/doas.conf
-  chmod 0400 /etc/doas.conf
+  emerge \
+    sys-apps/pciutils \
+    sys-apps/usbutils \
+    sys-process/procps \
+    app-misc/figlet \
+    x11-apps/igt-gpu-tools \
+    sys-auth/elogind \
+    net-misc/networkmanager \
+    net-wireless/wpa_supplicant \
+    net-wireless/broadcom-sta \
+    net-wireless/bluez \
+    "$PRIV_PKG" \
+    sys-apps/dbus \
+    sys-auth/polkit \
+    sys-power/acpid \
+    sys-power/tlp \
+    sys-apps/lm-sensors \
+    net-misc/wget \
+    app-shells/zsh \
+    dev-vcs/git \
+    app-editors/neovim \
+    media-video/pipewire \
+    media-video/wireplumber \
+    x11-terms/alacritty \
+    llvm-core/llvm \
+    llvm-core/clang \
+    sys-boot/refind
+  mark_step base_system
 fi
 
-# Dotfiles
-su - legend -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
-su - legend -c "mkdir -p ~/Pictures/Screenshots"
-su - legend -c "
-    mkdir -p ~/.config/alacritty ~/.config/niri
-    ln -sfn ~/legenddots/alacritty.toml       ~/.config/alacritty/alacritty.toml
-    ln -sfn ~/legenddots/.zshrc               ~/.zshrc
-    ln -sfn ~/legenddots/niri/config.kdl      ~/.config/niri/config.kdl
-    ln -sfn ~/legenddots/niri/waybar          ~/.config/waybar
-    ln -sfn ~/legenddots/niri/fuzzel          ~/.config/fuzzel
-    ln -sfn ~/legenddots/niri/dunst           ~/.config/dunst
-    ln -sfn ~/legenddots/niri/swaylock        ~/.config/swaylock
-"
+# 8. DESKTOP (niri + full Wayland stack)
+if ! step_done desktop; then
+  header "Emerging desktop..."
+  emerge \
+    gui-wm/niri \
+    gui-apps/waybar \
+    gui-apps/fuzzel \
+    gui-apps/swaylock \
+    gui-apps/swaybg \
+    gui-apps/grim \
+    gui-apps/slurp \
+    gui-apps/wl-clipboard \
+    x11-misc/dunst \
+    gui-libs/xdg-desktop-portal-wlr \
+    gnome-extra/polkit-gnome \
+    media-sound/pavucontrol \
+    x11-misc/xdg-utils \
+    x11-misc/xdg-user-dirs \
+    media-fonts/nerdfonts \
+    www-client/brave-browser-nightly
+  mark_step desktop
+fi
 
-xdg-user-dirs-update || true
+# 9. LOCALIZATION & USER
+if ! step_done localization_user; then
+  header "Localizing and creating user..."
+  echo "Europe/Stockholm" > /etc/timezone
+  emerge --config sys-libs/timezone-data
+  sed -i 's/keymap="us"/keymap="se"/' /etc/conf.d/keymaps
+  echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  echo "sv_SE.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen
+  eselect locale set en_US.utf8
+  env-update && set +u && source /etc/profile && set -u
+
+  useradd -m -G wheel,audio,video,input,usb,plugdev,bluetooth -s /bin/zsh legend || true
+  echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
+  echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
+
+  if [[ "$PRIV_ESC" == "sudo" ]]; then
+    echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/wheel
+    chmod 0440 /etc/sudoers.d/wheel
+  else
+    echo 'permit persist legend as root' > /etc/doas.conf
+    chmod 0400 /etc/doas.conf
+  fi
+
+  # Dotfiles
+  su - legend -c "git clone https://github.com/legendarymsr/legenddots ~/legenddots"
+  su - legend -c "mkdir -p ~/Pictures/Screenshots"
+  su - legend -c "
+      mkdir -p ~/.config/alacritty ~/.config/niri
+      ln -sfn ~/legenddots/alacritty.toml       ~/.config/alacritty/alacritty.toml
+      ln -sfn ~/legenddots/.zshrc               ~/.zshrc
+      ln -sfn ~/legenddots/niri/config.kdl      ~/.config/niri/config.kdl
+      ln -sfn ~/legenddots/niri/waybar          ~/.config/waybar
+      ln -sfn ~/legenddots/niri/fuzzel          ~/.config/fuzzel
+      ln -sfn ~/legenddots/niri/dunst           ~/.config/dunst
+      ln -sfn ~/legenddots/niri/swaylock        ~/.config/swaylock
+  "
+
+  xdg-user-dirs-update || true
+  mark_step localization_user
+fi
 
 # 10. FINALIZE
-header "Finalizing..."
+if ! step_done finalize; then
+  header "Finalizing..."
 
-# fstab
-ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
-EFI_UUID=$(blkid  -s UUID -o value /dev/sda1)
-SWAP_UUID=$(blkid -s UUID -o value /dev/sda2)
-{
-    echo "UUID=${ROOT_UUID}  /          ext4  defaults,noatime  0 1"
-    echo "UUID=${EFI_UUID}   /boot/efi  vfat  defaults,noatime  0 2"
-    echo "UUID=${SWAP_UUID}  none       swap  sw                0 0"
-} > /etc/fstab
+  # fstab
+  ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
+  EFI_UUID=$(blkid  -s UUID -o value /dev/sda1)
+  SWAP_UUID=$(blkid -s UUID -o value /dev/sda2)
+  {
+      echo "UUID=${ROOT_UUID}  /          ext4  defaults,noatime  0 1"
+      echo "UUID=${EFI_UUID}   /boot/efi  vfat  defaults,noatime  0 2"
+      echo "UUID=${SWAP_UUID}  none       swap  sw                0 0"
+  } > /etc/fstab
 
-# Broadcom wl
-cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
+  # Broadcom wl
+  cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
 blacklist brcmfmac
 blacklist brcmsmac
 blacklist b43
@@ -373,30 +415,32 @@ blacklist b43legacy
 blacklist ssb
 blacklist bcma
 EOF
-echo 'modules="wl"' >> /etc/conf.d/modules
+  echo 'modules="wl"' >> /etc/conf.d/modules
 
-# Apple keyboard fn-mode
-echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
+  # Apple keyboard fn-mode
+  echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
 
-# Backlight permissions
-mkdir -p /etc/udev/rules.d
-cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
+  # Backlight permissions
+  mkdir -p /etc/udev/rules.d
+  cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
 EOF
 
-depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
+  depmod -a "$(ls /lib/modules/ | grep gentoo | sort -V | tail -1)"
 
-# rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
-refind-install --usedefault /dev/sda1
+  # rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
+  refind-install --usedefault /dev/sda1
 
-# Services
-rc-update add NetworkManager default
-rc-update add bluetooth       default
-rc-update add dbus            default
-rc-update add elogind         default
-rc-update add acpid           default
-rc-update add tlp             default
+  # Services
+  rc-update add NetworkManager default
+  rc-update add bluetooth       default
+  rc-update add dbus            default
+  rc-update add elogind         default
+  rc-update add acpid           default
+  rc-update add tlp             default
+  mark_step finalize
+fi
 
 header "Done. The Hardened Kingdom of Legend is built."
 CHROOT_EOF
