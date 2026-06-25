@@ -139,6 +139,15 @@ EOF
 mkdir -p /var/cache/ccache
 chown -R portage:portage /var/cache/ccache
 
+# FEATURES="ccache" above is a no-op until the ccache package itself is
+# installed -- without it portage warns "no masquerade dir can be found
+# in /usr/lib*/ccache/bin" and silently skips caching for every build.
+# Must happen before the kernel/LLVM/clang builds to actually save anything.
+if ! step_done ccache; then
+  emerge dev-util/ccache
+  mark_step ccache
+fi
+
 # O1 env override for slow packages — halves compile time with no practical
 # runtime impact since these are build tools / shader compilers, not hot paths
 mkdir -p /etc/portage/env /etc/portage/package.env
