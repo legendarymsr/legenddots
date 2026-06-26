@@ -322,7 +322,16 @@ LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
 FEATURES="ccache"
 ACCEPT_KEYWORDS="~amd64"
+GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
 ```
+
+`MAKEOPTS="-j3"` on 4 threads (one held back so the system stays usable
+mid-compile) plus `EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3"` (one
+package at a time, back off if load climbs) is the safe ceiling for 8GB
+RAM — this combo replaced an earlier, more aggressive setting after it
+caused an actual OOM freeze on this machine. `GENTOO_MIRRORS` points
+distfile downloads at Lysator (Linköping, Sweden) first, falling back to
+dotsrc.org (Denmark) — portage tries mirrors left-to-right per file.
 
 ### WD-40 (de-rust the profile)
 

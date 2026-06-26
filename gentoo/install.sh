@@ -134,6 +134,9 @@ FEATURES="ccache"
 CCACHE_DIR="/var/cache/ccache"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
+# Nearest mirrors to Sweden -- Lysator (Linköping, SE) first, dotsrc.org
+# (Denmark) as fallback. Portage tries them left-to-right per file.
+GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
 EOF
 
 mkdir -p /var/cache/ccache
