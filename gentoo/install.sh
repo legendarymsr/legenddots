@@ -182,6 +182,18 @@ CXXFLAGS="-march=haswell -O1 -pipe"' > /etc/portage/env/O1.conf
 # package.use — set before any emerge so deps pick up the right flags
 mkdir -p /etc/portage/package.use
 
+# llvm-core/llvm and llvm-core/clang both default to USE="debug" upstream,
+# which builds in assertions and extra debug codepaths -- this isn't a
+# debug *build type*, it's always-on overhead in every compile this LLVM/
+# clang ever does afterwards (e.g. mesa's shader compiler at runtime), on
+# top of slowing down building LLVM/clang itself. clang also defaults to
+# USE="extra" (clangd, clang-tidy, ...) and "static-analyzer" (scan-build),
+# neither of which this system uses since gcc is the system compiler.
+{
+  echo "llvm-core/llvm -debug -binutils-plugin"
+  echo "llvm-core/clang -debug -extra -static-analyzer"
+} > /etc/portage/package.use/llvm
+
 # PipeWire must expose a sound-server so wireplumber can act as its session manager
 echo "media-video/pipewire sound-server" > /etc/portage/package.use/pipewire
 

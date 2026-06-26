@@ -104,6 +104,16 @@ and LLVM/clang are memory-hungry enough per compile unit that pushing
 just that package past `-j3` risks the same kind of OOM/freeze a higher
 `--jobs` caused earlier.
 
+`llvm-core/llvm` and `llvm-core/clang` both default to `USE="debug"`
+upstream, which compiles in assertions and extra debug codepaths — not a
+debug build *type*, just always-on overhead in every compile that LLVM/
+clang itself ever does afterwards (mesa's runtime shader compiler, for
+one), on top of slowing down building LLVM/clang itself. clang also
+defaults to `USE="extra"` (clangd, clang-tidy, ...) and
+`"static-analyzer"` (scan-build), neither used since gcc is the system
+compiler. `/etc/portage/package.use/llvm` turns all of these off — pure
+time savings, no parallelism added, so no OOM risk reopened.
+
 `EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
 a time, `MAKEOPTS=-j3` inside that package) rather than building
 several heavy packages in parallel. This machine doesn't have the RAM
