@@ -319,8 +319,9 @@ COMMON_FLAGS="-march=haswell -O2 -pipe"
 MAKEOPTS="-j3"
 VIDEO_CARDS="intel iris"
 LLVM_TARGETS="X86"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
-FEATURES="ccache"
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls"
+PYTHON_TARGETS="python3_13"
+FEATURES="ccache parallel-fetch"
 ACCEPT_KEYWORDS="~amd64"
 GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
 ```
@@ -332,6 +333,19 @@ RAM — this combo replaced an earlier, more aggressive setting after it
 caused an actual OOM freeze on this machine. `GENTOO_MIRRORS` points
 distfile downloads at Lysator (Linköping, Sweden) first, falling back to
 dotsrc.org (Denmark) — portage tries mirrors left-to-right per file.
+
+Other emerge-time speedups, all safe for 8GB RAM / 4 threads since they
+don't add compile parallelism:
+
+- `PYTHON_TARGETS="python3_13"` (was three versions) — anything using the
+  `python-r1`/`distutils-r1` eclasses builds its bindings once per target,
+  so three targets tripled the python-related share of the build for
+  interpreter versions this system never uses.
+- `FEATURES="parallel-fetch"` — downloads the next package's sources while
+  the current one compiles instead of fetching serially between builds.
+- `-nls` in `USE` — skips building/installing translation catalogs on an
+  English-only system; small per-package, but it adds up across a full
+  `@world` build.
 
 ### WD-40 (de-rust the profile)
 

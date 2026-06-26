@@ -127,10 +127,18 @@ VIDEO_CARDS="intel iris"
 ABI_X86="64"
 LLVM_TARGETS="X86"
 # -cuda/-rocm/-vdpau: Intel-only hardware, no Nvidia/AMD GPU stack needed
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau"
-PYTHON_TARGETS="python3_12 python3_13 python3_14"
+# -nls: skip building/installing translation catalogs (English-only system),
+# shaves a little off nearly every package that has the flag
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls"
+# Single python target instead of three -- packages using python-r1/
+# distutils-r1 (a lot of them) build their python bindings once per
+# PYTHON_TARGETS entry, so three targets means triple the python-related
+# build work for versions this system never actually uses.
+PYTHON_TARGETS="python3_13"
 PYTHON_SINGLE_TARGET="python3_13"
-FEATURES="ccache"
+# parallel-fetch: download the next package's sources while the current
+# one compiles, instead of fetch-then-build-then-fetch serially
+FEATURES="ccache parallel-fetch"
 CCACHE_DIR="/var/cache/ccache"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
