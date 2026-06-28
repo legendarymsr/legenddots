@@ -75,7 +75,25 @@ export DEBUGINFOD_URLS=""
 export DEBUGINFOD_URLS_CERT_PATH=""
 set +u; source /etc/profile; set -u
 export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
-header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+TIMING_LOG=/var/log/gentoo-install-timing.log
+mkdir -p "$(dirname "$TIMING_LOG")"
+# Each header() call marks a new phase; logging the elapsed time since the
+# previous call gives real per-phase durations for free, no per-step
+# bookkeeping needed. Skipped (already-done) steps never call header(), so
+# a resumed run's deltas only cover phases that actually ran this time.
+header() {
+  local now ts
+  now=$(date +%s)
+  ts=$(date '+%T')
+  if [[ -n "${_PHASE_NAME:-}" ]]; then
+    printf '[%s] %s -- finished after %dm%02ds\n' "$ts" "$_PHASE_NAME" \
+      $(( (now - _PHASE_START) / 60 )) $(( (now - _PHASE_START) % 60 )) >> "$TIMING_LOG"
+  fi
+  _PHASE_NAME="$*"
+  _PHASE_START="$now"
+  printf '[%s] %s -- starting\n' "$ts" "$*" >> "$TIMING_LOG"
+  echo -e "\n\033[1m\033[36m── $* \033[0m"
+}
 
 # resume.sh re-enters this same script after a crash; pick up the options
 # chosen on the original run if they weren't passed in via the environment.
@@ -512,6 +530,8 @@ EOF
 fi
 
 header "Done. The Hardened Kingdom of Legend is built."
+echo -e "\nPer-phase timings: $TIMING_LOG"
+cat "$TIMING_LOG"
 CHROOT_EOF
 
 # ── Execution ─────────────────────────────────────────────────────────────────

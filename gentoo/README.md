@@ -81,7 +81,15 @@ ENABLE_WD40=false PRIV_ESC=sudo bash install.sh
 
 After those two questions, the rest of the script runs fully
 unattended. A full build takes roughly **4 hours**
-on this hardware:
+on this hardware (estimate — see below for real numbers):
+
+Every phase header is timestamped to `/var/log/gentoo-install-timing.log`
+inside the new root, with the elapsed time for the *previous* phase
+logged right before the next one starts. It's printed in full at the end
+of the run. Skipped (already-completed) steps on a resume don't get a
+fresh entry, so a resumed run's log only covers what actually ran that
+time — check the file's timestamps if you're stitching together timing
+across multiple resumes.
 
 | Phase | Time |
 |-------|------|
