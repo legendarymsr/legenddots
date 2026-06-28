@@ -1,14 +1,28 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Resume an interrupted gentoo/install.sh run after a crash/freeze.
+# Chroot back into an in-progress gentoo/install.sh run -- after a crash,
+# a freeze, or just a deliberate reboot. The script doesn't know or care
+# which one happened; either way the disk is in the same state and this
+# script's only job is to get you back into a working chroot on it.
 #
-# install.sh checkpoints each major step to /etc/gentoo-install.state inside
-# the new root filesystem. This script re-mounts the partitions install.sh
-# already created, re-extracts the chroot logic fresh from the adjacent
-# install.sh (so fixes made to install.sh since the original run are picked
-# up rather than re-running the stale copy baked into /tmp/inside.sh), then
-# re-enters the chroot. Steps already marked done are skipped, continuing
-# from the one that didn't finish.
+# What it does, in order:
+#   1. Re-mounts the partitions install.sh already created (/dev/sda1
+#      EFI, /dev/sda2 swap, /dev/sda3 root) plus proc/sys/dev/run --
+#      it never repartitions or re-unpacks stage3, only resumes.
+#   2. Re-extracts the chroot logic fresh from the adjacent install.sh
+#      into /mnt/gentoo/tmp/inside.sh, so a `git pull`-ed fix since the
+#      original run gets picked up instead of re-running the stale copy
+#      baked in from before.
+#   3. Detects a couple of known-stale states (invalid package.mask left
+#      by an old bug, a too-new/incompatible kernel already built) and
+#      auto-corrects them by forcing the affected steps to rerun.
+#   4. chroots in and re-runs inside.sh. install.sh checkpoints each
+#      major step to /etc/gentoo-install.state inside the new root as it
+#      completes them, so steps already marked done are skipped --
+#      picking up exactly where the previous run stopped. Any package
+#      that finished building before now gets reused from the local
+#      binpkg cache (FEATURES="buildpkg", PKGDIR=/var/cache/binpkgs)
+#      instead of recompiled, even if its step gets forced to rerun.
 #
 # Boot the same live ISO, tether internet again, then:
 #   bash resume.sh
@@ -95,7 +109,7 @@ else
 fi
 
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
-header "Resuming install..."
+header "Chrooting back in to resume install..."
 chroot /mnt/gentoo /tmp/inside.sh
 sync
 echo -e "${GREEN}Reboot now: umount -R /mnt/gentoo && reboot${NC}"
