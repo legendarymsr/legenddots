@@ -160,10 +160,17 @@ automatically forces both the kernel and base_system steps to rerun in
 that case, so you don't have to manually edit
 `/etc/gentoo-install.state` yourself.
 
-If neither `install.sh` is present next to `resume.sh` nor
-`/mnt/gentoo/tmp/inside.sh` exists (e.g. the crash happened before
-stage3 even finished unpacking), there's nothing to resume —
-`resume.sh` will tell you to run `install.sh` again from scratch.
+If `/dev/sda3` doesn't exist at all — stage3 was never unpacked, so
+there's no chroot to get back into — `resume.sh` just hands off and runs
+the adjacent `install.sh` for you instead of erroring out; there's
+nothing to "resume" from a disk that was never partitioned.
+
+If `/dev/sda3` *does* exist but neither `install.sh` is present next to
+`resume.sh` nor `/mnt/gentoo/tmp/inside.sh` exists (e.g. the crash
+happened mid-unpack, after partitioning but before the chroot logic was
+ever generated), there's still nothing to resume — `resume.sh` will tell
+you to run `install.sh` again from scratch (it repartitions `/dev/sda`,
+so make sure that's actually what you want).
 
 `FEATURES="buildpkg"` + `PKGDIR="/var/cache/binpkgs"` and
 `EMERGE_DEFAULT_OPTS="... --usepkg=y"` mean every package that finishes

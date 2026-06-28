@@ -24,6 +24,11 @@
 #      binpkg cache (FEATURES="buildpkg", PKGDIR=/var/cache/binpkgs)
 #      instead of recompiled, even if its step gets forced to rerun.
 #
+# There's nothing to "resume" if /dev/sda3 doesn't even exist yet -- stage3
+# was never unpacked, so there's no chroot to get back into. In that case
+# this script just hands off to the adjacent install.sh instead, which
+# does the actual from-scratch partitioning/unpacking.
+#
 # Boot the same live ISO, tether internet again, then:
 #   bash resume.sh
 # =============================================================================
@@ -33,13 +38,17 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 [[ $EUID -eq 0 ]] || exit 1
 
-if [[ ! -e /dev/sda3 ]]; then
-  echo -e "${RED}No existing install found on /dev/sda3 — run install.sh instead.${NC}" >&2
-  exit 1
-fi
-
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 INSTALL_SH="${SCRIPT_DIR}/install.sh"
+
+if [[ ! -e /dev/sda3 ]]; then
+  if [[ -f "$INSTALL_SH" ]]; then
+    echo -e "${CYAN}No existing install found on /dev/sda3 — stage3 was never unpacked, nothing to resume. Running install.sh instead...${NC}"
+    exec bash "$INSTALL_SH"
+  fi
+  echo -e "${RED}No existing install found on /dev/sda3, and install.sh isn't next to resume.sh — can't proceed.${NC}" >&2
+  exit 1
+fi
 
 echo -e "${CYAN}Re-mounting existing install...${NC}"
 mkdir -p /mnt/gentoo
