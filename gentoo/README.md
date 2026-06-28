@@ -130,10 +130,12 @@ once — `--jobs=4` would spawn up to 12 concurrent compiler threads on
 a 4-thread CPU, which thrashes swap hard enough to look like a frozen
 machine.
 
-### Resuming after a crash
+### Resuming after a crash or reboot
 
-If the machine freezes or loses power mid-install, reboot the live ISO,
-tether internet again, and run:
+Works the same whether the machine froze/lost power, or you deliberately
+rebooted (e.g. to clear a hung build) — `resume.sh` doesn't know or care
+which happened, it just re-mounts whatever `install.sh` already created
+and continues. Boot the live ISO, tether internet again, and run:
 
 ```sh
 bash resume.sh
@@ -162,6 +164,15 @@ If neither `install.sh` is present next to `resume.sh` nor
 `/mnt/gentoo/tmp/inside.sh` exists (e.g. the crash happened before
 stage3 even finished unpacking), there's nothing to resume —
 `resume.sh` will tell you to run `install.sh` again from scratch.
+
+`FEATURES="buildpkg"` + `PKGDIR="/var/cache/binpkgs"` and
+`EMERGE_DEFAULT_OPTS="... --usepkg=y"` mean every package that finishes
+building gets cached as a binary on disk. On a resume, if any step has
+to fully re-run (e.g. the forced kernel/base_system re-run below), any
+package whose USE/version hasn't changed gets reused from that cache
+instead of recompiled — `--getbinpkg` stays off since Gentoo's official
+remote binhost only covers stock (non-hardened) profiles, so it wouldn't
+help with anything actually slow here (kernel, LLVM, clang, mesa).
 
 ---
 
@@ -339,7 +350,8 @@ VIDEO_CARDS="intel iris"
 LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls"
 PYTHON_TARGETS="python3_13"
-FEATURES="ccache parallel-fetch"
+FEATURES="ccache parallel-fetch buildpkg"
+EMERGE_DEFAULT_OPTS="... --usepkg=y --getbinpkg=n"
 ACCEPT_KEYWORDS="~amd64"
 GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
 ```

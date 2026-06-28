@@ -139,7 +139,13 @@ COMMON_FLAGS="-march=haswell -O2 -pipe"
 CFLAGS="${COMMON_FLAGS}"
 CXXFLAGS="${COMMON_FLAGS}"
 MAKEOPTS="-j3"
-EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=n --getbinpkg=n --backtrack=100"
+# usepkg=y: reuse an already-built local binary package instead of
+# recompiling if one matches (huge win on a resumed/repeated run).
+# getbinpkg stays off -- Gentoo's official remote binhost only covers
+# stock amd64/17.1 desktop profiles; for hardened it only ships the
+# packages already in stage3, so it wouldn't help with anything we
+# actually spend time compiling here (kernel, LLVM, clang, mesa, ...).
+EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
@@ -155,9 +161,14 @@ USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio 
 PYTHON_TARGETS="python3_13"
 PYTHON_SINGLE_TARGET="python3_13"
 # parallel-fetch: download the next package's sources while the current
-# one compiles, instead of fetch-then-build-then-fetch serially
-FEATURES="ccache parallel-fetch"
+# one compiles, instead of fetch-then-build-then-fetch serially.
+# buildpkg: cache every built package as a binary in PKGDIR so a
+# resumed/repeated emerge of the same package (e.g. after a crash, or the
+# forced kernel/base_system re-runs resume.sh does for the broadcom-sta
+# fix) can reuse it via usepkg instead of recompiling from source.
+FEATURES="ccache parallel-fetch buildpkg"
 CCACHE_DIR="/var/cache/ccache"
+PKGDIR="/var/cache/binpkgs"
 ACCEPT_KEYWORDS="~amd64"
 ACCEPT_LICENSE="*"
 # Nearest mirrors to Sweden -- Lysator (Linköping, SE) first, dotsrc.org
@@ -165,8 +176,8 @@ ACCEPT_LICENSE="*"
 GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
 EOF
 
-mkdir -p /var/cache/ccache
-chown -R portage:portage /var/cache/ccache
+mkdir -p /var/cache/ccache /var/cache/binpkgs
+chown -R portage:portage /var/cache/ccache /var/cache/binpkgs
 
 # FEATURES="ccache" above is a no-op until the ccache package itself is
 # installed -- without it portage warns "no masquerade dir can be found
