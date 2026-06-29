@@ -153,7 +153,14 @@ LLVM_TARGETS="X86"
 # -cuda/-rocm/-vdpau: Intel-only hardware, no Nvidia/AMD GPU stack needed
 # -nls: skip building/installing translation catalogs (English-only system),
 # shaves a little off nearly every package that has the flag
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls"
+# -introspection: skips generating GObject introspection (.gir/.typelib) data
+# for the glib/gtk-adjacent stack -- only needed by GIR consumers like
+# gnome-shell extensions or python-gi scripting, neither of which this niri
+# setup uses
+# -gtk-doc/-doc: skip building each package's own HTML/API documentation
+# -static-libs: skip building the .a alongside the .so most packages offer
+# -- this is a CLI/desktop system, nothing here links anything statically
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
 # Single python target instead of three -- packages using python-r1/
 # distutils-r1 (a lot of them) build their python bindings once per
 # PYTHON_TARGETS entry, so three targets means triple the python-related
@@ -250,6 +257,12 @@ echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 
 # libglvnd X flag is off by default; mesa requires libglvnd[X] for GLX/XWayland
 echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
+
+# mesa defaults USE="llvm" on (gallium llvmpipe software rasterizer, AMD
+# radeonsi, rusticl). VIDEO_CARDS is "intel iris" only -- the native Intel
+# driver doesn't touch the LLVM gallium backend, so this is pure waste here,
+# and it's one of the bigger individual mesa build-time costs.
+echo "media-libs/mesa -llvm" > /etc/portage/package.use/mesa
 
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland

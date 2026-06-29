@@ -360,7 +360,7 @@ COMMON_FLAGS="-march=haswell -O2 -pipe"
 MAKEOPTS="-j3"
 VIDEO_CARDS="intel iris"
 LLVM_TARGETS="X86"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls"
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
 PYTHON_TARGETS="python3_13"
 FEATURES="ccache parallel-fetch buildpkg"
 EMERGE_DEFAULT_OPTS="... --usepkg=y --getbinpkg=n"
@@ -388,6 +388,18 @@ don't add compile parallelism:
 - `-nls` in `USE` — skips building/installing translation catalogs on an
   English-only system; small per-package, but it adds up across a full
   `@world` build.
+- `-introspection` in `USE` — skips generating GObject introspection
+  (`.gir`/`.typelib`) data across the glib/gtk-adjacent stack; only needed by
+  GIR consumers like GNOME Shell extensions or `python-gi` scripting, neither
+  of which this niri/Wayland setup uses.
+- `-gtk-doc -doc` in `USE` — skips each package building its own HTML/API
+  documentation.
+- `-static-libs` in `USE` — skips building the `.a` alongside the `.so` most
+  packages offer; nothing here links anything statically.
+- `media-libs/mesa -llvm` — mesa defaults this on for its gallium llvmpipe
+  software rasterizer / AMD radeonsi / rusticl backends, none of which apply
+  with `VIDEO_CARDS="intel iris"` — the native Intel driver never touches
+  LLVM. One of the larger individual per-package savings here.
 
 ### WD-40 (de-rust the profile)
 
