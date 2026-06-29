@@ -578,6 +578,20 @@ stable kernel automatically.
 
 ---
 
+## Kernel — zswap
+
+`CONFIG_ZSWAP_DEFAULT_ON=y` with an `lz4` compressor. Compresses pages in
+RAM before they hit the disk swap partition, so *if* the box swaps under
+the LLVM/mesa/kernel build's memory pressure, it's cheaper than otherwise.
+It doesn't add RAM and doesn't change how many parallel emerge jobs are
+safe — `MAKEOPTS`/`--jobs` stay at `-j3`/`1` regardless. lz4 was picked
+over the upstream zstd default for lower CPU cost per page on this
+4-thread box, where CPU is already the scarce resource mid-build; zstd's
+better compression ratio isn't worth spending cycles on that could go to
+compiling instead.
+
+---
+
 ## WiFi — first boot
 
 The `wl` module is loaded via `/etc/conf.d/modules` and conflicting

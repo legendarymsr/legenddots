@@ -376,6 +376,22 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY
   ./scripts/config -d CONFIG_MODULE_SIG_FORCE
 
+  # --- ZSWAP ---
+  # Compressed RAM cache in front of the swap partition. Doesn't add RAM or
+  # change how many parallel emerge jobs are safe -- it only makes it cheaper
+  # when the box *does* swap under the LLVM/mesa/kernel build's memory
+  # pressure, by compressing pages in RAM instead of writing them straight to
+  # the (much slower) disk swap partition. lz4 over the zstd default: lower
+  # CPU cost per page on this 4-thread box, where CPU is already the scarce
+  # resource during builds -- zstd's better ratio isn't worth taking cycles
+  # away from compiling.
+  ./scripts/config -e CONFIG_ZSWAP
+  ./scripts/config -e CONFIG_ZSMALLOC
+  ./scripts/config -e CONFIG_CRYPTO_LZ4
+  ./scripts/config -d CONFIG_ZSWAP_COMPRESSOR_DEFAULT_DEFLATE
+  ./scripts/config -e CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4
+  ./scripts/config -e CONFIG_ZSWAP_DEFAULT_ON
+
   make olddefconfig
   make -j3 && make modules_install && make install
   genkernel --no-clean --no-mrproper initramfs
