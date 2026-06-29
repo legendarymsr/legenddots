@@ -119,8 +119,13 @@ clang itself ever does afterwards (mesa's runtime shader compiler, for
 one), on top of slowing down building LLVM/clang itself. clang also
 defaults to `USE="extra"` (clangd, clang-tidy, ...) and
 `"static-analyzer"` (scan-build), neither used since gcc is the system
-compiler. `/etc/portage/package.use/llvm` turns all of these off — pure
-time savings, no parallelism added, so no OOM risk reopened.
+compiler. `/etc/portage/package.use/llvm` turns all of these off, plus
+llvm's default-on `libffi` interpreter-call binding (unused here) — pure
+time savings, no parallelism added, so no OOM risk reopened. LLVM also
+already builds as a shared `libLLVM.so` rather than statically linking
+each tool, per the upstream ebuild default — that's the single biggest
+lever against LLVM's notorious link-time/RAM blowup, and it's not
+something this script needs to set.
 
 `EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
 a time, `MAKEOPTS=-j3` inside that package) rather than building

@@ -218,8 +218,10 @@ mkdir -p /etc/portage/package.use
 # top of slowing down building LLVM/clang itself. clang also defaults to
 # USE="extra" (clangd, clang-tidy, ...) and "static-analyzer" (scan-build),
 # neither of which this system uses since gcc is the system compiler.
+# -libffi drops llvm's (default-on) libffi interpreter-call binding --
+# marginal build-time saving, but it's dead weight nothing here exercises.
 {
-  echo "llvm-core/llvm -debug -binutils-plugin"
+  echo "llvm-core/llvm -debug -binutils-plugin -libffi"
   echo "llvm-core/clang -debug -extra -static-analyzer"
 } > /etc/portage/package.use/llvm
 
