@@ -276,8 +276,9 @@ fi
 
 # 5. WD-40 (de-rust the profile): masks the "rust" USE flag wherever a
 #    package can be built without it. Can't eliminate rust entirely --
-#    x11-terms/alacritty below is itself written in Rust and needs
-#    dev-lang/rust regardless of this. Skip with ENABLE_WD40=false.
+#    x11-terms/alacritty AND gui-wm/niri below are themselves written in
+#    Rust and need dev-lang/rust regardless of this. Skip with
+#    ENABLE_WD40=false.
 if ! step_done wd40; then
   if [[ "$ENABLE_WD40" == "true" ]]; then
     header "Applying WD-40..."

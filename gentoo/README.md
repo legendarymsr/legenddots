@@ -394,15 +394,18 @@ creates a local profile (`local:wd40-hardened`) that inherits from both
 and activates it via `eselect profile set`.
 
 This only suppresses *optional* Rust dependencies — it can't eliminate
-Rust entirely. `x11-terms/alacritty` (in the base package list) is
-itself written in Rust and needs `dev-lang/rust` regardless.
+Rust entirely. Both `x11-terms/alacritty` and `gui-wm/niri` (the
+compositor this whole setup is built around) are themselves written in
+Rust and need `dev-lang/rust` regardless of WD-40.
 
 `features/wd40/package.mask` goes further than just the USE flag: it
 blanket-masks packages that hard-require rust with no way to build
-around it, alacritty included. The script unmasks alacritty
+around it. `alacritty` is on that list, so the script unmasks it
 specifically via `/etc/portage/package.unmask/alacritty` right after
 activating the profile, so the base-system emerge doesn't fail on a
-masked package.
+masked package. `niri` is *not* on that list (it ships from an overlay,
+not Gentoo's main tree, so the hand-curated mask doesn't cover it) —
+nothing to unmask there, it just builds.
 
 Toggle it with the `ENABLE_WD40` env var (default `true`):
 
