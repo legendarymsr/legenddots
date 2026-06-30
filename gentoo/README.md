@@ -224,6 +224,13 @@ checks whether `/etc/portage/package.unmask/wd40-exceptions` is missing
 the `librsvg` line, or `/etc/portage/package.use/librsvg` is missing the
 `-vala` flag, and forces `wd40` to rerun if either is stale.
 
+Likewise for `finalize`: if it ran before `refind_linux.conf` generation
+was added, rEFInd can see the kernel but boots it without an initramfs
+(genkernel's `initramfs-genkernel-x86_64-*` naming breaks rEFInd's
+auto-detection heuristics) — the kernel then panics silently at root
+mount because UUID lookup requires the initramfs. `resume.sh` forces
+`finalize` to rerun if `/boot/refind_linux.conf` is absent.
+
 If `/dev/sda3` doesn't exist at all — stage3 was never unpacked, so
 there's no chroot to get back into — `resume.sh` just hands off and runs
 the adjacent `install.sh` for you instead of erroring out; there's
@@ -612,6 +619,19 @@ Mac-native, auto-detects kernels, and requires no configuration.
 
 ```sh
 refind-install --usedefault /dev/sda1
+```
+
+`--usedefault` writes rEFInd to the EFI fallback path (`\EFI\BOOT\BOOTX64.EFI`)
+without touching NVRAM. rEFInd then auto-detects the kernel on the ext4 root
+partition, but its heuristics don't match genkernel's
+`initramfs-genkernel-x86_64-*` naming — so without a `refind_linux.conf` it
+boots the kernel without an initramfs, which causes a silent kernel panic at
+root mount (UUID lookup fails).
+
+The finalize step generates `/boot/refind_linux.conf` to make it explicit:
+
+```
+"Boot Gentoo"  "ro root=UUID=<sda3-uuid> initrd=/boot/initramfs-genkernel-x86_64-<kver>-gentoo"
 ```
 
 ---

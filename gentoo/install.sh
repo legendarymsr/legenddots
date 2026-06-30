@@ -643,6 +643,17 @@ EOF
   # rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
   refind-install --usedefault /dev/sda1
 
+  # rEFInd auto-detection finds vmlinuz but misses genkernel's
+  # initramfs-genkernel-x86_64-* naming (the infix breaks its heuristics),
+  # so without this file it boots the kernel bare and panics at root mount.
+  KVER=$(basename "$(readlink -f /usr/src/linux)" | sed 's/^linux-//')
+  INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
+  ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
+  if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
+    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s"\n' \
+      "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
+  fi
+
   # Services
   rc-update add NetworkManager default
   rc-update add bluetooth       default

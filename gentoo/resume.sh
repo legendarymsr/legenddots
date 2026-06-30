@@ -130,6 +130,17 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx wd40 /mnt/gentoo/et
   fi
 fi
 
+# Finalize ran without generating refind_linux.conf, so rEFInd booted the
+# kernel bare (no initramfs) → kernel panic at root mount. Force finalize to
+# rerun if the file is missing so it gets created with the correct UUID and
+# initramfs path.
+if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx finalize /mnt/gentoo/etc/gentoo-install.state; then
+  if [[ ! -f /mnt/gentoo/boot/refind_linux.conf ]]; then
+    echo -e "${CYAN}Stale finalize state detected (missing refind_linux.conf) — forcing finalize to rerun...${NC}"
+    sed -i '/^finalize$/d' /mnt/gentoo/etc/gentoo-install.state
+  fi
+fi
+
 if [[ -f /mnt/gentoo/etc/gentoo-install.state ]]; then
   echo -e "${CYAN}Steps already completed:${NC}"
   cat /mnt/gentoo/etc/gentoo-install.state
