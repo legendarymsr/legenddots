@@ -529,6 +529,17 @@ if ! step_done desktop; then
 S="${WORKDIR}"' "$NERDFONTS_EBUILD"
   fi
 
+  # dev-cpp/glibmm-2.88.1 (pulled in by dev-cpp/gtkmm, for pavucontrol's
+  # GTK4 dependency) hardcodes -Dmaintainer-mode=true unconditionally (a
+  # temporary upstream workaround, see the ebuild's own XXX comment) --
+  # that runs gmmproc's binding codegen on every build, not just when the
+  # gtk-doc USE flag is on, and gmmproc's DocsParser.pm unconditionally
+  # `use`s Perl's XML::Parser module. The ebuild's BDEPEND only pulls
+  # dev-lang/perl itself behind gtk-doc, missing this module entirely, so
+  # the compile dies with "Can't locate XML/Parser.pm in @INC" regardless
+  # of USE flags. Pre-emerge it so it's already present when glibmm builds.
+  emerge --oneshot dev-perl/XML-Parser
+
   header "Emerging desktop..."
   emerge \
     gui-wm/niri \

@@ -726,6 +726,30 @@ manifest-verification failure. The patch is idempotent (skipped if
 already applied) and persists across `resume.sh` runs since the
 `overlays` step (which syncs guru) doesn't re-run once completed.
 
+## Desktop — glibmm missing XML::Parser BDEPEND
+
+`dev-cpp/glibmm-2.88.1` (pulled in by `dev-cpp/gtkmm`, needed for
+`pavucontrol`'s GTK4 dependency) hardcodes `-Dmaintainer-mode=true`
+unconditionally in its `meson_src_configure` — a temporary upstream
+workaround per the ebuild's own `XXX` comment. That setting runs
+`gmmproc`'s C++ binding codegen on every build, not just when the
+`gtk-doc` USE flag is on, and `gmmproc`'s `DocsParser.pm` unconditionally
+`use`s Perl's `XML::Parser` module. The ebuild's `BDEPEND` only pulls in
+`dev-lang/perl` itself, gated behind `gtk-doc`, missing the `XML::Parser`
+module entirely — so the compile dies regardless of USE flags:
+
+```
+Can't locate XML/Parser.pm in @INC (you may need to install the XML::Parser module)
+... at .../tools/pm/DocsParser.pm line 23.
+```
+
+This is a missing `BDEPEND` in the upstream ebuild, not a `USE`-flag
+gap. Since `glibmm` lives in the main `::gentoo` tree (not a
+thin-manifest overlay like guru), patching the ebuild in place would
+trip Manifest verification, so the script pre-emerges
+`dev-perl/XML-Parser` once at the top of the desktop step instead —
+by the time `glibmm` builds, the module is already present on `@INC`.
+
 ---
 
 ## WiFi — first boot
