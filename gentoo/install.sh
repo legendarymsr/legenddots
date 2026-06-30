@@ -203,11 +203,24 @@ if ! step_done ccache; then
   mark_step ccache
 fi
 
+# mold -- a standalone C++ linker (no LLVM dependency, builds fine with gcc,
+# so no chicken-and-egg problem using it to link LLVM/clang/mesa themselves).
+# Dramatically faster and lighter on RAM than the default ld.bfd for linking
+# huge binaries like clang and libLLVM.so -- linking is a serial, memory-
+# heavy step MAKEOPTS/--jobs can't parallelize away, so this cuts real time
+# without touching the parallelism/OOM tradeoff already settled at -j3.
+if ! step_done mold; then
+  emerge sys-devel/mold
+  mark_step mold
+fi
+
 # O1 env override for slow packages — halves compile time with no practical
-# runtime impact since these are build tools / shader compilers, not hot paths
+# runtime impact since these are build tools / shader compilers, not hot paths.
+# LDFLAGS routes their link step through mold instead of the default ld.bfd.
 mkdir -p /etc/portage/env /etc/portage/package.env
 echo 'CFLAGS="-march=haswell -O1 -pipe"
-CXXFLAGS="-march=haswell -O1 -pipe"' > /etc/portage/env/O1.conf
+CXXFLAGS="-march=haswell -O1 -pipe"
+LDFLAGS="-fuse-ld=mold"' > /etc/portage/env/O1.conf
 
 {
   echo "llvm-core/llvm O1.conf"

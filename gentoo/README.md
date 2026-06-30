@@ -100,7 +100,15 @@ across multiple resumes.
 | Everything else | ~30 min |
 
 LLVM, clang, and mesa build with `-O1` to cut compile time roughly in
-half. ccache means any subsequent reinstall is significantly faster —
+half, and link via `sys-devel/mold` instead of the default `ld.bfd`
+(`LDFLAGS="-fuse-ld=mold"` in the same env override). Linking huge
+binaries like `clang` and `libLLVM.so` is a serial, memory-heavy step
+that `MAKEOPTS`/`--jobs` can't parallelize away, so a faster/lighter
+linker cuts real wall-clock time without touching the parallelism/OOM
+tradeoff `-j3` already represents. mold is a standalone C++ project with
+no LLVM dependency — it builds fine with gcc before LLVM/clang exist, so
+there's no bootstrap problem using it to link them. ccache means any
+subsequent reinstall is significantly faster —
 the script bumps ccache's max-size from its 5GiB default to 12GiB and
 turns on compression, since a single LLVM+clang+mesa+kernel build cycle
 can otherwise fill the default cache and start evicting entries before a
