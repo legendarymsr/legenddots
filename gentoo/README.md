@@ -174,6 +174,17 @@ once — `--jobs=4` would spawn up to 12 concurrent compiler threads on
 a 4-thread CPU, which thrashes swap hard enough to look like a frozen
 machine.
 
+It also sets `--autounmask-write=y --autounmask-continue=y`. The
+portage tree shifts between syncs, and transitive dependencies
+occasionally need a USE flag this script didn't set explicitly (e.g.
+`freetype[harfbuzz]` for `pango`, `xmlto[text]` for
+`brave-browser-nightly`'s `xdg-utils`). Normally portage halts and
+waits for a manual `emerge --autounmask-write` rerun; since this script
+runs unattended, these two flags make it write the needed change and
+keep going in the same invocation instead. This only covers USE-flag
+and keyword gaps — a hard `package.mask` entry (like the `librsvg` case
+above) still needs an explicit `package.unmask`.
+
 ### Resuming after a crash or reboot
 
 Works the same whether the machine froze/lost power, or you deliberately
@@ -203,6 +214,14 @@ the broadcom-sta `PREEMPT_RCU`/in-tree-driver fix (see below) and
 automatically forces both the kernel and base_system steps to rerun in
 that case, so you don't have to manually edit
 `/etc/gentoo-install.state` yourself.
+
+The same stale-state problem applies to `wd40`: if it was already
+marked done by an `install.sh` from before the `librsvg` unmask was
+added, regenerating `inside.sh` alone wouldn't help, since `wd40` would
+just get skipped as already-completed and the desktop step would hit
+the exact same masked-package failure again. `resume.sh` checks whether
+`/etc/portage/package.unmask/wd40-exceptions` is missing the `librsvg`
+line and, if so, forces `wd40` to rerun too.
 
 If `/dev/sda3` doesn't exist at all — stage3 was never unpacked, so
 there's no chroot to get back into — `resume.sh` just hands off and runs
@@ -292,8 +311,8 @@ Creating filesystem with 28311552 4k blocks and 7077888 inodes
  * Added repository 'local'
 ```
 
-Right after activating the profile, alacritty is unmasked again —
-without this, step 7's emerge fails with:
+Right after activating the profile, alacritty and librsvg are unmasked
+again — without this, step 7's emerge fails with:
 
 ```
 !!! All ebuilds that could satisfy "x11-terms/alacritty" have been masked.
@@ -301,6 +320,17 @@ without this, step 7's emerge fails with:
 - x11-terms/alacritty-9999::gentoo (masked by: package.mask, missing keyword)
 /var/db/repos/gentoo/profiles/features/wd40/package.mask:
 # alacritty requires rust unconditionally
+```
+
+or, for librsvg (pulled in transitively by pavucontrol's GTK4 dependency):
+
+```
+!!! All ebuilds that could satisfy "gnome-base/librsvg" have been masked.
+!!! One of the following masked packages is required to complete your request:
+- gnome-base/librsvg-2.62.2-r1::gentoo (masked by: package.mask)
+- gnome-base/librsvg-2.40.21-r1::gentoo (masked by: ~amd64 keyword)
+/var/db/repos/gentoo/profiles/features/wd40/package.mask:
+# Various packages requiring Rust
 ```
 
 or, if declined:
@@ -456,12 +486,18 @@ Rust and need `dev-lang/rust` regardless of WD-40.
 
 `features/wd40/package.mask` goes further than just the USE flag: it
 blanket-masks packages that hard-require rust with no way to build
-around it. `alacritty` is on that list, so the script unmasks it
-specifically via `/etc/portage/package.unmask/alacritty` right after
-activating the profile, so the base-system emerge doesn't fail on a
-masked package. `niri` is *not* on that list (it ships from an overlay,
-not Gentoo's main tree, so the hand-curated mask doesn't cover it) —
-nothing to unmask there, it just builds.
+around it. `alacritty` and `gnome-base/librsvg` are both on that list,
+so the script unmasks them via a single
+`/etc/portage/package.unmask/wd40-exceptions` file right after
+activating the profile, so the base-system/desktop emerges don't fail
+on a masked package. `librsvg` is dragged in transitively —
+`media-sound/pavucontrol` needs GTK4 (`gtkmm`), and GTK4 hard-requires
+librsvg for SVG icon rendering. Every librsvg release newer than 2.40
+has been Rust-only for years, and 2.40 itself was never keyworded for
+`amd64`, so there's no rust-free fallback to use instead — unmasking is
+the only option. `niri` is *not* on the package.mask list (it ships
+from an overlay, not Gentoo's main tree, so the hand-curated mask
+doesn't cover it) — nothing to unmask there, it just builds.
 
 Toggle it with the `ENABLE_WD40` env var (default `true`):
 

@@ -145,7 +145,12 @@ MAKEOPTS="-j3"
 # stock amd64/17.1 desktop profiles; for hardened it only ships the
 # packages already in stage3, so it wouldn't help with anything we
 # actually spend time compiling here (kernel, LLVM, clang, mesa, ...).
-EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100"
+# autounmask-write/continue: when a dependency needs a USE flag this script
+# didn't set explicitly (transitive deps shift between portage tree syncs),
+# write the needed package.use change and keep going in the same invocation
+# instead of halting and waiting on a manual `emerge --autounmask-write`
+# rerun -- this script runs unattended, nothing's there to do that.
+EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100 --autounmask-write=y --autounmask-continue=y"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
@@ -346,8 +351,17 @@ if ! step_done wd40; then
     # (no optional USE flag to strip) instead of leaving them buildable --
     # alacritty is one of them, but it's in the base package list regardless,
     # so unmask it specifically rather than disabling WD-40 wholesale.
+    # gnome-base/librsvg is the same situation, one step removed: pavucontrol
+    # pulls in GTK4 (gtkmm), and GTK4 hard-requires librsvg for SVG icon
+    # rendering -- every librsvg version newer than 2.40 has been Rust-only
+    # for years, and 2.40 itself was never keyworded for amd64, so there's no
+    # rust-free version to fall back to here either.
     mkdir -p /etc/portage/package.unmask
-    echo "x11-terms/alacritty" > /etc/portage/package.unmask/alacritty
+    {
+      echo "x11-terms/alacritty"
+      echo "gnome-base/librsvg"
+    } > /etc/portage/package.unmask/wd40-exceptions
+    rm -f /etc/portage/package.unmask/alacritty
   else
     header "Skipping WD-40 (ENABLE_WD40=false)..."
   fi

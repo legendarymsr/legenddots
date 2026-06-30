@@ -109,6 +109,20 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx kernel /mnt/gentoo/
   fi
 fi
 
+# An earlier version of WD-40 only unmasked x11-terms/alacritty, but
+# gnome-base/librsvg hits the same wall (every Rust-based version is masked,
+# and the one pre-Rust version was never keyworded for amd64) -- it's pulled
+# in transitively by media-sound/pavucontrol's GTK4 dependency. If wd40 is
+# already marked done from a run before that fix existed, the unmask file
+# either doesn't exist yet or is missing the librsvg line; force a rerun so
+# the new unmask actually lands before the desktop step retries.
+if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx wd40 /mnt/gentoo/etc/gentoo-install.state; then
+  if ! grep -qx gnome-base/librsvg /mnt/gentoo/etc/portage/package.unmask/wd40-exceptions 2>/dev/null; then
+    echo -e "${CYAN}Stale wd40 state detected (missing librsvg unmask) — forcing wd40 to rerun...${NC}"
+    sed -i '/^wd40$/d' /mnt/gentoo/etc/gentoo-install.state
+  fi
+fi
+
 if [[ -f /mnt/gentoo/etc/gentoo-install.state ]]; then
   echo -e "${CYAN}Steps already completed:${NC}"
   cat /mnt/gentoo/etc/gentoo-install.state
