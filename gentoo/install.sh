@@ -241,7 +241,11 @@ mkdir -p /etc/portage/package.use
 # not something this system ever does. Nothing else depends on "sanitize"
 # being on (REQUIRED_USE only goes the other way: sanitize needs
 # compiler-rt, not vice versa), so this is a clean skip.
-echo "llvm-runtimes/clang-runtime -sanitize" > /etc/portage/package.use/llvm-runtimes
+# The hardened profile also defaults USE="openmp" on globally, which here
+# pulls in llvm-runtimes/openmp (clang's own OpenMP runtime, libomp) --
+# unused, since gcc is the system compiler and has its own independent
+# OpenMP support; nothing here ever invokes clang with -fopenmp.
+echo "llvm-runtimes/clang-runtime -sanitize -openmp" > /etc/portage/package.use/llvm-runtimes
 
 # PipeWire must expose a sound-server so wireplumber can act as its session manager
 echo "media-video/pipewire sound-server" > /etc/portage/package.use/pipewire

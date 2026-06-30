@@ -139,6 +139,22 @@ else depends on it (`REQUIRED_USE` only goes the other way: `sanitize`
 needs `compiler-rt`, not vice versa), so it's a clean skip, and it's the
 single biggest individual time sink in the whole LLVM/clang/mesa group.
 
+The hardened profile also defaults `USE="openmp"` on globally, which on
+`llvm-runtimes/clang-runtime` pulls in `llvm-runtimes/openmp` (clang's
+own OpenMP runtime, `libomp`) — unused here, since gcc is the system
+compiler and has its own independent OpenMP support, and nothing in this
+setup ever invokes clang with `-fopenmp`. Turned off in the same
+`package.use/llvm-runtimes` file.
+
+A full pass over every LLVM-family package's USE defaults (`llvm-core/llvm`,
+`llvm-core/clang`, `llvm-runtimes/compiler-rt`, `llvm-runtimes/clang-runtime`,
+`llvm-runtimes/libclc`, `dev-util/spirv-llvm-translator`, `dev-util/mesa_clc`)
+turned up nothing else worth trimming — what's left default-on is either
+already disabled (`binutils-plugin`, `libffi`, `extra`, `static-analyzer`,
+`sanitize`, `openmp`), required by something else in this stack
+(`compiler-rt` base, `atomic-builtins`), or a hardening feature this whole
+setup is built around (`clang`'s `+pie`) rather than a time sink.
+
 `EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
 a time, `MAKEOPTS=-j3` inside that package) rather than building
 several heavy packages in parallel. This machine doesn't have the RAM
