@@ -127,6 +127,18 @@ each tool, per the upstream ebuild default — that's the single biggest
 lever against LLVM's notorious link-time/RAM blowup, and it's not
 something this script needs to set.
 
+`llvm-runtimes/clang-runtime` defaults `USE="+sanitize"` on, which pulls
+in `llvm-runtimes/compiler-rt-sanitizers` — a separate package building
+15 distinct instrumented runtime libraries (asan, tsan, msan, ubsan,
+lsan, dfsan, hwasan, libfuzzer, memprof, cfi, scudo, safestack, xray,
+ctx-profile, gwp-asan), one full compile pass each. Those exist for
+instrumenting C/C++ programs being actively developed with
+`-fsanitize=...` flags, which this system never does.
+`/etc/portage/package.use/llvm-runtimes` turns `sanitize` off — nothing
+else depends on it (`REQUIRED_USE` only goes the other way: `sanitize`
+needs `compiler-rt`, not vice versa), so it's a clean skip, and it's the
+single biggest individual time sink in the whole LLVM/clang/mesa group.
+
 `EMERGE_DEFAULT_OPTS` caps emerge at `--jobs=1` (one package built at
 a time, `MAKEOPTS=-j3` inside that package) rather than building
 several heavy packages in parallel. This machine doesn't have the RAM

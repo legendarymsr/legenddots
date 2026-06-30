@@ -232,6 +232,17 @@ mkdir -p /etc/portage/package.use
   echo "llvm-core/clang -debug -extra -static-analyzer"
 } > /etc/portage/package.use/llvm
 
+# llvm-runtimes/clang-runtime defaults USE="+sanitize" on, which pulls in
+# llvm-runtimes/compiler-rt-sanitizers -- a separate package that builds 15
+# distinct instrumented runtime libraries (asan, tsan, msan, ubsan, lsan,
+# dfsan, hwasan, libfuzzer, memprof, cfi, scudo, safestack, xray,
+# ctx-profile, gwp-asan), one full compile pass each. Those are for
+# instrumenting C/C++ programs being developed with -fsanitize=... flags,
+# not something this system ever does. Nothing else depends on "sanitize"
+# being on (REQUIRED_USE only goes the other way: sanitize needs
+# compiler-rt, not vice versa), so this is a clean skip.
+echo "llvm-runtimes/clang-runtime -sanitize" > /etc/portage/package.use/llvm-runtimes
+
 # PipeWire must expose a sound-server so wireplumber can act as its session manager
 echo "media-video/pipewire sound-server" > /etc/portage/package.use/pipewire
 
