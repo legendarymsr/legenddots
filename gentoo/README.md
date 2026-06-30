@@ -701,6 +701,33 @@ compiling instead.
 
 ---
 
+## Desktop — guru nerdfonts ebuild bug
+
+`media-fonts/nerdfonts-3.4.0::guru` was refactored upstream on
+2026-06-26 ("DRY up ebuild by generating SRC_URI and IUSE") and the
+refactor accidentally dropped `S="${WORKDIR}"`. The nerd-fonts release
+tarballs extract flat (no wrapping directory matching `${P}`), so
+without that override the default `S="${WORKDIR}/${P}"` never exists on
+disk and the build dies in the prepare phase:
+
+```
+* ERROR: media-fonts/nerdfonts-3.4.0::guru failed (prepare phase):
+*   The source directory '${S}' doesn't exist
+```
+
+This is a bug in the overlay itself, not something fixable with
+`USE`/`package.*` config. The script works around it by patching the
+synced ebuild file directly (`/var/db/repos/guru/media-fonts/nerdfonts/nerdfonts-3.4.0.ebuild`)
+to restore the missing `S=` line, right before the desktop step's
+`emerge` call. This is safe because guru sets `thin-manifests = true`
+— only the `DIST` (source tarball) checksums are tracked in `Manifest`,
+not the ebuild text itself, so editing it in place doesn't trip a
+manifest-verification failure. The patch is idempotent (skipped if
+already applied) and persists across `resume.sh` runs since the
+`overlays` step (which syncs guru) doesn't re-run once completed.
+
+---
+
 ## WiFi — first boot
 
 The `wl` module is loaded via `/etc/conf.d/modules` and conflicting

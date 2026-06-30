@@ -514,6 +514,21 @@ fi
 
 # 8. DESKTOP (niri + full Wayland stack)
 if ! step_done desktop; then
+  # guru's media-fonts/nerdfonts-3.4.0 ebuild was refactored upstream
+  # (2026-06-26, "DRY up ebuild by generating SRC_URI and IUSE") and the
+  # refactor accidentally dropped S="${WORKDIR}". nerd-fonts release
+  # tarballs extract flat (no wrapping directory matching ${P}), so
+  # without that override the default S="${WORKDIR}/${P}" never exists
+  # on disk and the build dies in the prepare phase before src_prepare
+  # even runs. guru has thin-manifests=true (only DIST/tarball checksums
+  # are tracked, not the ebuild text itself), so patching the synced copy
+  # in place needs no Manifest regen.
+  NERDFONTS_EBUILD="/var/db/repos/guru/media-fonts/nerdfonts/nerdfonts-3.4.0.ebuild"
+  if [[ -f "$NERDFONTS_EBUILD" ]] && ! grep -q '^S="${WORKDIR}"' "$NERDFONTS_EBUILD"; then
+    sed -i '/^FONT_SUFFIX=""$/a\
+S="${WORKDIR}"' "$NERDFONTS_EBUILD"
+  fi
+
   header "Emerging desktop..."
   emerge \
     gui-wm/niri \
