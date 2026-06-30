@@ -107,7 +107,10 @@ that `MAKEOPTS`/`--jobs` can't parallelize away, so a faster/lighter
 linker cuts real wall-clock time without touching the parallelism/OOM
 tradeoff `-j3` already represents. mold is a standalone C++ project with
 no LLVM dependency — it builds fine with gcc before LLVM/clang exist, so
-there's no bootstrap problem using it to link them. ccache means any
+there's no bootstrap problem using it to link them. mold's own USE flags
+(`debug`, `mimalloc`, `test`) are already default-off upstream and pinned
+explicitly in `package.use/mold` anyway, so it stays minimal regardless
+of future profile changes. ccache means any
 subsequent reinstall is significantly faster —
 the script bumps ccache's max-size from its 5GiB default to 12GiB and
 turns on compression, since a single LLVM+clang+mesa+kernel build cycle

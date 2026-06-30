@@ -210,6 +210,11 @@ fi
 # heavy step MAKEOPTS/--jobs can't parallelize away, so this cuts real time
 # without touching the parallelism/OOM tradeoff already settled at -j3.
 if ! step_done mold; then
+  # All of mold's own USE flags (debug, mimalloc, test) are already
+  # default-off upstream and untouched by this profile -- pinned explicitly
+  # anyway so it stays minimal even if a future profile update changes that.
+  mkdir -p /etc/portage/package.use
+  echo "sys-devel/mold -debug -mimalloc -test" > /etc/portage/package.use/mold
   emerge sys-devel/mold
   mark_step mold
 fi
