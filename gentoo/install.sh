@@ -362,6 +362,14 @@ if ! step_done wd40; then
       echo "gnome-base/librsvg"
     } > /etc/portage/package.unmask/wd40-exceptions
     rm -f /etc/portage/package.unmask/alacritty
+
+    # librsvg also defaults IUSE="+introspection +vala" on, and its own
+    # REQUIRED_USE is "vala? ( introspection )" -- since the global USE trim
+    # above already turns introspection off (unused without GNOME Shell/
+    # python-gi), leaving vala on by itself violates that constraint. Nothing
+    # here needs librsvg's Vala bindings either, so turn both off explicitly
+    # to satisfy REQUIRED_USE instead of relying on the global flag alone.
+    echo "gnome-base/librsvg -introspection -vala" > /etc/portage/package.use/librsvg
   else
     header "Skipping WD-40 (ENABLE_WD40=false)..."
   fi

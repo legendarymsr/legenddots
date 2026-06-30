@@ -216,12 +216,13 @@ that case, so you don't have to manually edit
 `/etc/gentoo-install.state` yourself.
 
 The same stale-state problem applies to `wd40`: if it was already
-marked done by an `install.sh` from before the `librsvg` unmask was
-added, regenerating `inside.sh` alone wouldn't help, since `wd40` would
-just get skipped as already-completed and the desktop step would hit
-the exact same masked-package failure again. `resume.sh` checks whether
-`/etc/portage/package.unmask/wd40-exceptions` is missing the `librsvg`
-line and, if so, forces `wd40` to rerun too.
+marked done by an `install.sh` from before the `librsvg` unmask (or the
+follow-up `vala` USE fix) was added, regenerating `inside.sh` alone
+wouldn't help, since `wd40` would just get skipped as already-completed
+and the desktop step would hit the exact same failure again. `resume.sh`
+checks whether `/etc/portage/package.unmask/wd40-exceptions` is missing
+the `librsvg` line, or `/etc/portage/package.use/librsvg` is missing the
+`-vala` flag, and forces `wd40` to rerun if either is stale.
 
 If `/dev/sda3` doesn't exist at all — stage3 was never unpacked, so
 there's no chroot to get back into — `resume.sh` just hands off and runs
@@ -332,6 +333,21 @@ or, for librsvg (pulled in transitively by pavucontrol's GTK4 dependency):
 /var/db/repos/gentoo/profiles/features/wd40/package.mask:
 # Various packages requiring Rust
 ```
+
+Unmasking librsvg surfaces one more wrinkle: its own `IUSE` defaults
+`+introspection +vala` on, with `REQUIRED_USE="vala? ( introspection )"`.
+Since the global USE trim already turns `introspection` off, `vala`
+staying on by itself violates that constraint:
+
+```
+!!! The ebuild selected to satisfy "gnome-base/librsvg:2" has unmet requirements.
+- gnome-base/librsvg-2.62.2-r1::gentoo USE="vala -debug -gtk-doc -introspection -test"
+  The following REQUIRED_USE flag constraints are unsatisfied:
+    vala? ( introspection )
+```
+
+Fixed by explicitly disabling `vala` for librsvg too (nothing here
+needs its Vala bindings) via `/etc/portage/package.use/librsvg`.
 
 or, if declined:
 
@@ -498,6 +514,12 @@ has been Rust-only for years, and 2.40 itself was never keyworded for
 the only option. `niri` is *not* on the package.mask list (it ships
 from an overlay, not Gentoo's main tree, so the hand-curated mask
 doesn't cover it) — nothing to unmask there, it just builds.
+
+librsvg's own `IUSE` also defaults `+introspection +vala` on, with
+`REQUIRED_USE="vala? ( introspection )"`. The global `-introspection`
+trim (see above) turns introspection off, so `vala` left on by itself
+trips that constraint — fixed with an explicit
+`/etc/portage/package.use/librsvg` entry disabling both.
 
 Toggle it with the `ENABLE_WD40` env var (default `true`):
 

@@ -116,9 +116,16 @@ fi
 # already marked done from a run before that fix existed, the unmask file
 # either doesn't exist yet or is missing the librsvg line; force a rerun so
 # the new unmask actually lands before the desktop step retries.
+#
+# A later fix found that librsvg's own IUSE defaults "+introspection +vala"
+# on, and REQUIRED_USE="vala? ( introspection )" -- since this profile's
+# global USE already turns introspection off, leaving vala on by itself
+# fails that constraint. If wd40 ran after the unmask fix but before this
+# USE fix, package.use/librsvg won't exist yet either; force another rerun.
 if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx wd40 /mnt/gentoo/etc/gentoo-install.state; then
-  if ! grep -qx gnome-base/librsvg /mnt/gentoo/etc/portage/package.unmask/wd40-exceptions 2>/dev/null; then
-    echo -e "${CYAN}Stale wd40 state detected (missing librsvg unmask) — forcing wd40 to rerun...${NC}"
+  if ! grep -qx gnome-base/librsvg /mnt/gentoo/etc/portage/package.unmask/wd40-exceptions 2>/dev/null \
+    || ! grep -q '^gnome-base/librsvg .*-vala' /mnt/gentoo/etc/portage/package.use/librsvg 2>/dev/null; then
+    echo -e "${CYAN}Stale wd40 state detected (missing librsvg unmask/USE fix) — forcing wd40 to rerun...${NC}"
     sed -i '/^wd40$/d' /mnt/gentoo/etc/gentoo-install.state
   fi
 fi
