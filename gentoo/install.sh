@@ -650,7 +650,11 @@ EOF
   INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
   ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
   if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
-    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s"\n' \
+    # acpi_osi= : prevents Apple firmware from taking Mac-specific ACPI
+    # paths that conflict with Linux on this hardware.
+    # i915.enable_psr=0 : panel self-refresh causes display refresh hangs
+    # on MacBook Air 6,2 (Intel HD 5000 / Haswell).
+    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s acpi_osi= i915.enable_psr=0"\n' \
       "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
   fi
 
