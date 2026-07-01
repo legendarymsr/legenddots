@@ -407,6 +407,7 @@ if ! step_done kernel; then
 
   # --- MBA 6,2 HARDWARE ---
   ./scripts/config -e CONFIG_DRM_I915
+  ./scripts/config -e CONFIG_DRM_SIMPLEDRM   # EFI framebuffer via DRM (nomodeset fallback)
   ./scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS
   ./scripts/config -e CONFIG_HID_APPLE
   ./scripts/config -e CONFIG_BT_HCIBTUSB
@@ -415,6 +416,12 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_THUNDERBOLT
   ./scripts/config -e CONFIG_USB_XHCI_HCD
   ./scripts/config -e CONFIG_USB_EHCI_HCD
+  # ext4 and SCSI disk must be built-in (=y) so the initramfs can mount
+  # root without needing any modules -- genkernel copies 0 modules when
+  # these are built-in, which is correct, but if they were =m and missing
+  # from the initramfs the root mount would silently fail.
+  ./scripts/config -e CONFIG_EXT4_FS
+  ./scripts/config -e CONFIG_BLK_DEV_SD
 
   # --- BROADCOM-STA (wl) COMPATIBILITY ---
   # broadcom-sta refuses to build against CONFIG_PREEMPT_RCU (pulled in by
@@ -462,7 +469,7 @@ if ! step_done kernel; then
 
   make olddefconfig
   make -j3 && make modules_install && make install
-  genkernel --no-clean --no-mrproper initramfs
+  genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs
   mark_step kernel
 fi
 
@@ -643,18 +650,29 @@ EOF
   # rEFInd — works natively with Apple EFI, auto-detects kernels, no config needed
   refind-install --usedefault /dev/sda1
 
+  # Rebuild initramfs with the actual kernel .config so genkernel knows
+  # which drivers are built-in vs modules; the kernel-step build uses
+  # --no-clean/--no-mrproper and ran before the config was finalized with
+  # olddefconfig, so regenerating here is the authoritative copy.
+  genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs
+
   # rEFInd auto-detection finds vmlinuz but misses genkernel's
   # initramfs-genkernel-x86_64-* naming (the infix breaks its heuristics),
   # so without this file it boots the kernel bare and panics at root mount.
+  #
+  # acpi_osi=     : stops Apple firmware activating Mac-specific ACPI paths
+  #                 that conflict with Linux power management.
+  # i915.enable_psr=0  : panel self-refresh causes display refresh hangs on
+  #                 Intel HD 5000 (Haswell) in MacBook Air 6,2.
+  # i915.enable_dc=0   : display power control, same family of Haswell quirks.
+  # pcie_aspm=off : PCIE active-state power management causes spurious hangs
+  #                 on Apple EFI hardware.
+  # rootfstype=ext4    : explicit filesystem hint; avoids initramfs guessing.
   KVER=$(basename "$(readlink -f /usr/src/linux)" | sed 's/^linux-//')
   INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
   ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
   if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
-    # acpi_osi= : prevents Apple firmware from taking Mac-specific ACPI
-    # paths that conflict with Linux on this hardware.
-    # i915.enable_psr=0 : panel self-refresh causes display refresh hangs
-    # on MacBook Air 6,2 (Intel HD 5000 / Haswell).
-    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s acpi_osi= i915.enable_psr=0"\n' \
+    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= i915.enable_psr=0 i915.enable_dc=0 pcie_aspm=off"\n' \
       "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
   fi
 
