@@ -139,7 +139,7 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx finalize /mnt/gento
     || ! grep -q 'acpi_osi=' /mnt/gentoo/boot/refind_linux.conf \
     || ! grep -q 'i915.enable_psr=0' /mnt/gentoo/boot/refind_linux.conf \
     || ! grep -q 'pcie_aspm=off' /mnt/gentoo/boot/refind_linux.conf \
-    || ! grep -q 'video=eDP-1' /mnt/gentoo/boot/refind_linux.conf; then
+    || ! grep -q 'nomodeset' /mnt/gentoo/boot/refind_linux.conf; then
     echo -e "${CYAN}Stale finalize state detected (refind_linux.conf missing or lacks required boot params) — forcing finalize to rerun...${NC}"
     sed -i '/^finalize$/d' /mnt/gentoo/etc/gentoo-install.state
   fi

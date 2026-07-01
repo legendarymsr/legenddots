@@ -672,7 +672,11 @@ EOF
   INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
   ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
   if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
-    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= i915.enable_psr=0 i915.enable_dc=0 pcie_aspm=off video=eDP-1:1366x768e"\n' \
+    # nomodeset disables i915 KMS and falls back to simpledrm, which reads
+    # the EFI GOP framebuffer parameters (including stride) directly from the
+    # firmware rather than guessing -- giving a clean text console on Apple
+    # hardware where i915 stalls during display init due to missing VBT/DDC.
+    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= pcie_aspm=off nomodeset"\n' \
       "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
   fi
 
