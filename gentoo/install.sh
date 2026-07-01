@@ -672,7 +672,7 @@ EOF
   INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
   ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
   if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
-    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= i915.enable_psr=0 i915.enable_dc=0 pcie_aspm=off"\n' \
+    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= i915.enable_psr=0 i915.enable_dc=0 pcie_aspm=off video=eDP-1:1366x768e"\n' \
       "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
   fi
 
