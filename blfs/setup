@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LFS 12.2 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
+# LFS 12.4 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
 #
 # Phase 1 (from Gentoo host, as root):
 #   LFS_DISK=/dev/sdX bash ~/legenddots/blfs/setup
-#   Partitions disk, builds LFS 12.2 base system, then exits with reboot prompt.
+#   Partitions disk, builds LFS 12.4 base system, then exits with reboot prompt.
 #
 # Phase 2 (booted into LFS or chrooted, as root):
 #   bash ~/legenddots/blfs/setup
