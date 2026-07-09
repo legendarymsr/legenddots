@@ -403,10 +403,8 @@ p2 coreutils_tmp "$SRC/coreutils-9.5.tar.xz" bash -c "
 for pkg_args in \
   "diffutils_tmp $SRC/diffutils-3.10.tar.xz" \
   "findutils_tmp $SRC/findutils-4.10.0.tar.xz" \
-  "gawk_tmp      $SRC/gawk-5.3.0.tar.xz" \
   "grep_tmp      $SRC/grep-3.11.tar.xz" \
   "gzip_tmp      $SRC/gzip-1.13.tar.xz" \
-  "make_tmp      $SRC/make-4.4.1.tar.gz" \
   "patch_tmp     $SRC/patch-2.7.6.tar.xz" \
   "sed_tmp       $SRC/sed-4.9.tar.xz" \
   "tar_tmp       $SRC/tar-1.35.tar.xz"; do
@@ -416,6 +414,17 @@ for pkg_args in \
     make \$MAKEFLAGS && make DESTDIR=\$LFS install
   "
 done
+
+p2 gawk_tmp "$SRC/gawk-5.3.0.tar.xz" bash -c "
+  sed -i 's/extras//' Makefile.in
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess)
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 make_tmp "$SRC/make-4.4.1.tar.gz" bash -c "
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess) --without-guile
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
 
 p2 xz_tmp "$SRC/xz-5.6.2.tar.xz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
@@ -521,6 +530,15 @@ if ! step_done vfs_mount; then
   mount -vt tmpfs tmpfs      "$LFS/run"
   [[ -h "$LFS/dev/shm" ]] && install -v -d -m 1777 "$LFS/$(readlink "$LFS/dev/shm")"
   mark_step vfs_mount
+elif ! mountpoint -q "$LFS/proc"; then
+  # Host was rebooted — mounts are gone but step is marked done; remount
+  header "Remounting virtual filesystems after host reboot"
+  mount -v --bind /dev       "$LFS/dev"
+  mount -vt devpts devpts    "$LFS/dev/pts" -o gid=5,mode=0620
+  mount -vt proc  proc       "$LFS/proc"
+  mount -vt sysfs sysfs      "$LFS/sys"
+  mount -vt tmpfs tmpfs      "$LFS/run"
+  [[ -h "$LFS/dev/shm" ]] && install -v -d -m 1777 "$LFS/$(readlink "$LFS/dev/shm")"
 fi
 
 # =============================================================================
@@ -794,7 +812,7 @@ pkg elfutils_f  "$SRC/elfutils-0.191.tar.bz2" bash -c "./configure --prefix=/usr
 pkg libffi_f    "$SRC/libffi-3.4.6.tar.gz"    bash -c "./configure --prefix=/usr --disable-static --with-gcc-arch=native; make \$MAKEFLAGS; make install"
 
 pkg python3_f "$SRC/Python-3.12.5.tar.xz" bash -c "
-  ./configure --prefix=/usr --enable-shared --with-system-expat --enable-optimizations
+  ./configure --prefix=/usr --enable-shared --with-system-expat --with-ensurepip=yes --enable-optimizations
   make \$MAKEFLAGS && make install
   cat > /etc/pip.conf << 'EOF2'
 [global]
@@ -1760,7 +1778,7 @@ fi
 # =============================================================================
 if ! step_done user_setup; then
   header "User setup — legend"
-  groupadd -f seat; groupadd -f render; groupadd -f video
+  groupadd -f wheel; groupadd -f seat; groupadd -f render; groupadd -f video
   groupadd -f audio; groupadd -f input
   useradd -m -G wheel,audio,video,render,input,seat \
           -s /bin/zsh legend 2>/dev/null || true
