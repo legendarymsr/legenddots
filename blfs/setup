@@ -60,10 +60,55 @@ mark_step()  { echo "$1" >> "$HOST_STATE"; }
 
 # ── Host validation ──────────────────────────────────────────────────────────
 header "Validating host"
-for cmd in gcc g++ make bison flex gawk grep gzip m4 perl python3 tar xz parted; do
-  command -v "$cmd" &>/dev/null || die "Missing host tool: $cmd"
+
+declare -A HOST_PKGS=(
+  [gcc]="sys-devel/gcc"
+  [g++]="sys-devel/gcc"
+  [make]="sys-devel/make"
+  [bison]="sys-devel/bison"
+  [flex]="sys-devel/flex"
+  [gawk]="sys-apps/gawk"
+  [grep]="sys-apps/grep"
+  [gzip]="app-arch/gzip"
+  [m4]="sys-devel/m4"
+  [perl]="dev-lang/perl"
+  [python3]="dev-lang/python"
+  [tar]="app-arch/tar"
+  [xz]="app-arch/xz-utils"
+  [parted]="sys-block/parted"
+  [mkswap]="sys-apps/util-linux"
+  [mke2fs]="sys-fs/e2fsprogs"
+  [blkid]="sys-apps/util-linux"
+)
+missing=()
+for cmd in "${!HOST_PKGS[@]}"; do
+  command -v "$cmd" &>/dev/null || missing+=("${HOST_PKGS[$cmd]} (provides $cmd)")
 done
+if (( ${#missing[@]} )); then
+  echo "Missing host tools. Run: emerge -av ${missing[*]%% *}" >&2
+  for m in "${missing[@]}"; do echo "  $m" >&2; done
+  exit 1
+fi
+
+# Check for mkfs.fat (dosfstools) — may be mkdosfs on older systems
+if ! command -v mkfs.fat &>/dev/null && ! command -v mkdosfs &>/dev/null; then
+  die "Missing mkfs.fat — emerge sys-fs/dosfstools"
+fi
+MKFSFAT=$(command -v mkfs.fat || command -v mkdosfs)
+
+# Require wget or curl
+if command -v wget &>/dev/null; then
+  dl() { wget -q --show-progress -c -O "$1" "$2"; }
+elif command -v curl &>/dev/null; then
+  dl() { curl -fL --progress-bar -C - -o "$1" "$2"; }
+else
+  die "Neither wget nor curl found — emerge net-misc/wget"
+fi
+
 [[ $(gcc -dumpmachine) == x86_64* ]] || die "Host must be x86_64"
+python3 -c 'import sys; assert sys.version_info >= (3,4)' 2>/dev/null \
+  || die "python3 >= 3.4 required"
+awk --version 2>&1 | grep -q "GNU Awk" || die "gawk (GNU Awk) required — not mawk/nawk"
 info "Host OK"
 
 # ── Disk ─────────────────────────────────────────────────────────────────────
@@ -84,7 +129,7 @@ if ! step_done disk; then
     EFI="${LFS_DISK}1";  SWAP="${LFS_DISK}2";  ROOT="${LFS_DISK}3"
   fi
 
-  mkfs.fat -F32 "$EFI"
+  "$MKFSFAT" -F32 "$EFI"
   mkswap        "$SWAP"
   mkfs.ext4 -L LFS "$ROOT"
 
@@ -206,7 +251,7 @@ if ! step_done sources; then
     out="$LFS/sources/$f"
     [[ -f "$out" ]] && continue
     info "Downloading $f..."
-    wget -q --show-progress -c -O "$out" "${PKGS[$f]}" || warn "Failed: $f"
+    dl "$out" "${PKGS[$f]}" || warn "Failed: $f"
   done
 
   for url in \
@@ -214,7 +259,7 @@ if ! step_done sources; then
     "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch" \
     "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch"; do
     out="$LFS/sources/$(basename "$url")"
-    [[ -f "$out" ]] || wget -q -O "$out" "$url" || warn "Failed patch: $(basename "$url")"
+    [[ -f "$out" ]] || dl "$out" "$url" || warn "Failed patch: $(basename "$url")"
   done
 
   mark_step sources
@@ -358,17 +403,6 @@ if ! done libstdcxx_p1; then
   mark libstdcxx_p1
 fi
 
-p2 file_tmp "$SRC/file-5.46.tar.gz" bash -c "
-  mkdir build && pushd build
-    ../configure --disable-bzlib --disable-libseccomp --disable-xzlib --disable-zlib
-    make \$MAKEFLAGS
-  popd
-  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./config.guess)
-  make FILE_COMPILE=\$(pwd)/build/src/file \$MAKEFLAGS
-  make DESTDIR=\$LFS install
-  rm -v \$LFS/usr/lib/libmagic.la
-"
-
 # ── Phase 2: Temporary tools ──────────────────────────────────────────────────
 
 p2() {
@@ -413,6 +447,17 @@ p2 coreutils_tmp "$SRC/coreutils-9.7.tar.xz" bash -c "
   mkdir -pv \$LFS/usr/share/man/man8
   mv -v \$LFS/usr/share/man/man1/chroot.1 \$LFS/usr/share/man/man8/chroot.8
   sed -i 's/\"1\"/\"8\"/' \$LFS/usr/share/man/man8/chroot.8
+"
+
+p2 file_tmp "$SRC/file-5.46.tar.gz" bash -c "
+  mkdir build && pushd build
+    ../configure --disable-bzlib --disable-libseccomp --disable-xzlib --disable-zlib
+    make \$MAKEFLAGS
+  popd
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./config.guess)
+  make FILE_COMPILE=\$(pwd)/build/src/file \$MAKEFLAGS
+  make DESTDIR=\$LFS install
+  rm -v \$LFS/usr/lib/libmagic.la
 "
 
 for pkg_args in \
