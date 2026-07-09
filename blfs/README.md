@@ -1,7 +1,7 @@
-# LFS 12.2 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
+# LFS 12.4 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
 
 One script, two phases. Phase 1 runs from a Gentoo host and builds a complete
-Linux From Scratch 12.2 base system on a target disk. Phase 2 runs inside that
+Linux From Scratch 12.4 base system on a target disk. Phase 2 runs inside that
 LFS system and builds the full Niri + Wayland desktop stack from source.
 
 The script detects which phase to run automatically — the first invocation
@@ -108,7 +108,7 @@ LLVM is the overwhelming bottleneck in Phase 2.
 | Phase 1a | Cross-toolchain (binutils, gcc p1, glibc, libstdc++) | ~45 min |
 | Phase 1b | Temporary tools (bash, coreutils, gcc p2, etc.) | ~60 min |
 | Phase 1c | Base system in chroot (~75 packages) | ~4–6 h |
-| Kernel | Linux 6.10.5 with MacBook hardware config | ~30 min |
+| Kernel | Linux 6.16.1 with MacBook hardware config | ~30 min |
 | rEFInd | Bootloader | ~2 min |
 
 ### Phase 2 — BLFS desktop (~20–30 hours)
@@ -146,8 +146,8 @@ LLVM is the overwhelming bottleneck in Phase 2.
 
 ### Phase 1 — LFS base
 
-A standard LFS 12.2 system: cross-toolchain targeting `x86_64-lfs-linux-gnu`,
-~75 final packages (glibc, gcc, shadow, eudev, sysvinit, etc.), Linux 6.10.5
+A standard LFS 12.4 system: cross-toolchain targeting `x86_64-lfs-linux-gnu`,
+~75 final packages (glibc, gcc, shadow, eudev, sysvinit, etc.), Linux 6.16.1
 kernel tuned for MacBook Air 6,2 hardware. Extras added beyond the standard
 LFS book: wget, curl, git, zsh, cmake, doas.
 
@@ -160,12 +160,12 @@ pure Wayland. LLVM is required for shader compilation and cannot be avoided.
 **Compositor:** niri built via `cargo build --release`. Configured with Swedish
 keyboard layout, JetBrains Nerd Font, Tokyo Night colours.
 
-**Audio:** PipeWire + WirePlumber. Built without systemd. Session managed by
-elogind / seatd.
+**Audio:** PipeWire + WirePlumber. Built without systemd or elogind. Session
+tracking disabled at build time; seatd handles device access directly.
 
-**Seat management:** seatd runs as an OpenRC service, managing `/dev/input/*`
-and `/dev/drm/*` for unprivileged Wayland sessions. `legend` is added to the
-`seat` group.
+**Seat management:** seatd runs as a SysVinit init script, managing
+`/dev/input/*` and `/dev/drm/*` for unprivileged Wayland sessions. `legend`
+is added to the `seat` group.
 
 **Rust toolchain:** Installed via rustup to `/usr/share/rustup` and
 `/usr/share/cargo`. Both niri and alacritty compile against this toolchain.
@@ -246,7 +246,7 @@ permit persist legend as root
 | LLVM build time | ~1.5 h (ccache, O1) | ~6–10 h (cold, O2) |
 | Kernel | Managed by portage | Built by this script |
 | Updates | `emerge --update @world` | Rebuild from source manually |
-| Phase 1 base | Gentoo install medium | LFS 12.2 cross-toolchain |
+| Phase 1 base | Gentoo install medium | LFS 12.4 cross-toolchain |
 
 The Gentoo script is the faster, more practical path for daily use. This script
 is for learning exactly what the Gentoo script does under the hood, or for
