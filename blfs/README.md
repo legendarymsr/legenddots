@@ -14,16 +14,35 @@ the second invocation (booted into LFS) builds the desktop.
 
 ### Phase 1 — Gentoo host requirements
 
-| Tool | Used for |
-|------|----------|
-| gcc, g++ | cross-toolchain |
-| make, bison, flex, gawk | build tools |
-| grep, gzip, gperf, m4 | build tools |
-| perl, python3 | build scripts |
-| tar, xz, patch, diffutils | archive/patch |
-| parted, mkfs.fat, mkswap, mkfs.ext4 | disk partitioning |
-| wget | downloading sources |
-| sys-boot/refind | bootloader (optional, can run later) |
+Install all required tools before running the script:
+
+```sh
+# Core build tools (most already installed on Gentoo)
+emerge -av sys-devel/gcc sys-devel/make sys-devel/bison \
+           sys-devel/flex sys-apps/gawk sys-devel/m4
+
+# Disk tools
+emerge -av sys-block/parted sys-fs/dosfstools sys-fs/e2fsprogs \
+           sys-apps/util-linux
+
+# Downloader (wget or curl — either is fine, the script detects both)
+emerge -av net-misc/wget
+
+# Bootloader (optional — can be installed and run later after booting LFS)
+emerge -av sys-boot/refind
+```
+
+| Tool | Package | Used for |
+|------|---------|----------|
+| gcc, g++ | `sys-devel/gcc` | cross-toolchain |
+| make, bison, flex, gawk, m4 | `sys-devel/*`, `sys-apps/gawk` | build tools |
+| perl, python3 | `dev-lang/perl`, `dev-lang/python` | build scripts |
+| tar, xz | `app-arch/tar`, `app-arch/xz-utils` | archives |
+| parted | `sys-block/parted` | disk partitioning |
+| mkfs.fat / mkdosfs | `sys-fs/dosfstools` | EFI partition |
+| mkfs.ext4, mkswap, blkid | `sys-fs/e2fsprogs`, `sys-apps/util-linux` | root/swap |
+| wget or curl | `net-misc/wget` | downloading sources |
+| refind-install | `sys-boot/refind` | bootloader (optional) |
 
 ### Phase 2 — LFS environment requirements
 
