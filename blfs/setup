@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 # =============================================================================
-# BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
-# Builds the full desktop stack from source following BLFS procedures.
+# LFS 12.2 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
 #
-# Prerequisites: LFS 12.x base system with gcc, make, cmake, meson, ninja,
-#   pkg-config, python3, perl, bison, flex, gperf, diffutils, patch, which.
+# Phase 1 (from Gentoo host, as root):
+#   LFS_DISK=/dev/sdX bash ~/legenddots/blfs/setup
+#   Partitions disk, builds LFS 12.2 base system, then exits with reboot prompt.
 #
-# Run as root inside the LFS environment (chroot or booted LFS partition).
-# Re-runnable: completed steps are skipped via /etc/blfs-setup.state.
+# Phase 2 (booted into LFS or chrooted, as root):
+#   bash ~/legenddots/blfs/setup
+#   Builds the full Niri + Wayland desktop stack from source.
+#
+# Checkpoint files:
+#   /var/log/lfs-host.state   — Phase 1 host steps (on Gentoo)
+#   /etc/blfs-setup.state     — Phase 2 BLFS steps (in LFS)
+#   (lfs_complete marker in /etc/blfs-setup.state separates the two phases)
 # =============================================================================
 set -euo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "Run as root"; exit 1; }
 
-# ── Colors & helpers ──────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[0;33m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* ──\033[0m"; }
 info()   { echo -e "${CYAN}  → $*${NC}"; }
@@ -21,13 +26,1070 @@ ok()     { echo -e "${GREEN}  ✓ $*${NC}"; }
 warn()   { echo -e "${YELLOW}  ! $*${NC}"; }
 die()    { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
 
-# ── Checkpointing ─────────────────────────────────────────────────────────────
+# =============================================================================
+# PHASE DETECTION
+# =============================================================================
+LFS=/mnt/lfs
+
+if grep -qx "lfs_complete" /etc/blfs-setup.state 2>/dev/null; then
+    LFS_DONE=true
+else
+    LFS_DONE=false
+fi
+
+# =============================================================================
+# PHASE 1 — LFS BASE SYSTEM (run from Gentoo host)
+# =============================================================================
+if [[ "$LFS_DONE" == false ]]; then
+
+LFS_DISK="${LFS_DISK:-}"
+LFS_TGT="x86_64-lfs-linux-gnu"
+MAKEFLAGS="${MAKEFLAGS:--j3}"
+
+if [[ -z "$LFS_DISK" ]]; then
+  echo "Available block devices:"
+  lsblk -d -o NAME,SIZE,TYPE | grep disk
+  read -rp "Target disk for LFS (e.g. /dev/sdb): " LFS_DISK
+fi
+[[ -b "$LFS_DISK" ]] || die "$LFS_DISK is not a block device"
+
+HOST_STATE=/var/log/lfs-host.state
+touch "$HOST_STATE"
+step_done() { grep -qx "$1" "$HOST_STATE"; }
+mark_step()  { echo "$1" >> "$HOST_STATE"; }
+
+# ── Host validation ──────────────────────────────────────────────────────────
+header "Validating host"
+for cmd in gcc g++ make bison flex gawk grep gzip m4 perl python3 tar xz parted; do
+  command -v "$cmd" &>/dev/null || die "Missing host tool: $cmd"
+done
+[[ $(gcc -dumpmachine) == x86_64* ]] || die "Host must be x86_64"
+info "Host OK"
+
+# ── Disk ─────────────────────────────────────────────────────────────────────
+if ! step_done disk; then
+  header "Partitioning $LFS_DISK"
+  warn "This will WIPE $LFS_DISK. Ctrl-C to abort. Sleeping 5s..."
+  sleep 5
+
+  parted -s "$LFS_DISK" mklabel gpt
+  parted -s "$LFS_DISK" mkpart ESP      fat32    1MiB   513MiB
+  parted -s "$LFS_DISK" mkpart swap linux-swap 513MiB  4609MiB
+  parted -s "$LFS_DISK" mkpart root    ext4    4609MiB  100%
+  parted -s "$LFS_DISK" set 1 esp on
+
+  if [[ "$LFS_DISK" == *nvme* || "$LFS_DISK" == *mmcblk* ]]; then
+    EFI="${LFS_DISK}p1"; SWAP="${LFS_DISK}p2"; ROOT="${LFS_DISK}p3"
+  else
+    EFI="${LFS_DISK}1";  SWAP="${LFS_DISK}2";  ROOT="${LFS_DISK}3"
+  fi
+
+  mkfs.fat -F32 "$EFI"
+  mkswap        "$SWAP"
+  mkfs.ext4 -L LFS "$ROOT"
+
+  swapon "$SWAP"
+  mkdir -p "$LFS"
+  mount "$ROOT" "$LFS"
+  mkdir -p "$LFS/boot/efi"
+  mount "$EFI" "$LFS/boot/efi"
+
+  cat > /var/log/lfs-parts.env << EOF
+LFS_DISK=$LFS_DISK
+EFI=$EFI
+SWAP=$SWAP
+ROOT=$ROOT
+EOF
+  mark_step disk
+fi
+
+source /var/log/lfs-parts.env 2>/dev/null || true
+mountpoint -q "$LFS" || { mount "${ROOT}" "$LFS"; mount "${EFI}" "$LFS/boot/efi"; }
+
+# ── Sources ──────────────────────────────────────────────────────────────────
+if ! step_done sources; then
+  header "Downloading LFS 12.2 sources"
+  mkdir -p "$LFS/sources"
+  chmod a+wt "$LFS/sources"
+
+  declare -A PKGS=(
+    ["binutils-2.43.1.tar.xz"]="https://sourceware.org/pub/binutils/releases/binutils-2.43.1.tar.xz"
+    ["gcc-14.2.0.tar.xz"]="https://ftp.gnu.org/gnu/gcc/gcc-14.2.0/gcc-14.2.0.tar.xz"
+    ["linux-6.10.5.tar.xz"]="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.10.5.tar.xz"
+    ["glibc-2.40.tar.xz"]="https://ftp.gnu.org/gnu/glibc/glibc-2.40.tar.xz"
+    ["mpfr-4.2.1.tar.xz"]="https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz"
+    ["gmp-6.3.0.tar.xz"]="https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz"
+    ["mpc-1.3.1.tar.gz"]="https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz"
+    ["m4-1.4.19.tar.xz"]="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
+    ["ncurses-6.5.tar.gz"]="https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz"
+    ["bash-5.2.32.tar.gz"]="https://ftp.gnu.org/gnu/bash/bash-5.2.32.tar.gz"
+    ["coreutils-9.5.tar.xz"]="https://ftp.gnu.org/gnu/coreutils/coreutils-9.5.tar.xz"
+    ["diffutils-3.10.tar.xz"]="https://ftp.gnu.org/gnu/diffutils/diffutils-3.10.tar.xz"
+    ["file-5.45.tar.gz"]="https://astron.com/pub/file/file-5.45.tar.gz"
+    ["findutils-4.10.0.tar.xz"]="https://ftp.gnu.org/gnu/findutils/findutils-4.10.0.tar.xz"
+    ["gawk-5.3.0.tar.xz"]="https://ftp.gnu.org/gnu/gawk/gawk-5.3.0.tar.xz"
+    ["grep-3.11.tar.xz"]="https://ftp.gnu.org/gnu/grep/grep-3.11.tar.xz"
+    ["gzip-1.13.tar.xz"]="https://ftp.gnu.org/gnu/gzip/gzip-1.13.tar.xz"
+    ["make-4.4.1.tar.gz"]="https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
+    ["patch-2.7.6.tar.xz"]="https://ftp.gnu.org/gnu/patch/patch-2.7.6.tar.xz"
+    ["sed-4.9.tar.xz"]="https://ftp.gnu.org/gnu/sed/sed-4.9.tar.xz"
+    ["tar-1.35.tar.xz"]="https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz"
+    ["xz-5.6.2.tar.xz"]="https://github.com/tukaani-project/xz/releases/download/v5.6.2/xz-5.6.2.tar.xz"
+    ["gettext-0.22.5.tar.xz"]="https://ftp.gnu.org/gnu/gettext/gettext-0.22.5.tar.xz"
+    ["bison-3.8.2.tar.xz"]="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz"
+    ["perl-5.40.0.tar.xz"]="https://www.cpan.org/src/5.0/perl-5.40.0.tar.xz"
+    ["Python-3.12.5.tar.xz"]="https://www.python.org/ftp/python/3.12.5/Python-3.12.5.tar.xz"
+    ["texinfo-7.1.tar.xz"]="https://ftp.gnu.org/gnu/texinfo/texinfo-7.1.tar.xz"
+    ["util-linux-2.40.2.tar.xz"]="https://www.kernel.org/pub/linux/utils/util-linux/v2.40/util-linux-2.40.2.tar.xz"
+    ["zlib-1.3.1.tar.gz"]="https://zlib.net/zlib-1.3.1.tar.gz"
+    ["bzip2-1.0.8.tar.gz"]="https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+    ["lz4-1.10.0.tar.gz"]="https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
+    ["zstd-1.5.6.tar.gz"]="https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz"
+    ["readline-8.2.13.tar.gz"]="https://ftp.gnu.org/gnu/readline/readline-8.2.13.tar.gz"
+    ["bc-6.7.6.tar.xz"]="https://github.com/gavinhoward/bc/releases/download/6.7.6/bc-6.7.6.tar.xz"
+    ["flex-2.6.4.tar.gz"]="https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz"
+    ["tcl8.6.14-src.tar.gz"]="https://downloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz"
+    ["expect5.45.4.tar.gz"]="https://downloads.sourceforge.net/expect/expect5.45.4.tar.gz"
+    ["dejagnu-1.6.3.tar.gz"]="https://ftp.gnu.org/gnu/dejagnu/dejagnu-1.6.3.tar.gz"
+    ["pkgconf-2.3.0.tar.xz"]="https://distfiles.ariadne.space/pkgconf/pkgconf-2.3.0.tar.xz"
+    ["attr-2.5.2.tar.gz"]="https://download.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz"
+    ["acl-2.3.2.tar.xz"]="https://download.savannah.gnu.org/releases/acl/acl-2.3.2.tar.xz"
+    ["libcap-2.70.tar.xz"]="https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.70.tar.xz"
+    ["libxcrypt-4.4.36.tar.xz"]="https://github.com/besser82/libxcrypt/releases/download/v4.4.36/libxcrypt-4.4.36.tar.xz"
+    ["shadow-4.16.0.tar.xz"]="https://github.com/shadow-maint/shadow/releases/download/4.16.0/shadow-4.16.0.tar.xz"
+    ["psmisc-23.7.tar.xz"]="https://downloads.sourceforge.net/psmisc/psmisc-23.7.tar.xz"
+    ["libtool-2.4.7.tar.xz"]="https://ftp.gnu.org/gnu/libtool/libtool-2.4.7.tar.xz"
+    ["gdbm-1.24.tar.gz"]="https://ftp.gnu.org/gnu/gdbm/gdbm-1.24.tar.gz"
+    ["gperf-3.1.tar.gz"]="https://ftp.gnu.org/gnu/gperf/gperf-3.1.tar.gz"
+    ["expat-2.6.2.tar.xz"]="https://github.com/libexpat/libexpat/releases/download/R_2_6_2/expat-2.6.2.tar.xz"
+    ["inetutils-2.5.tar.xz"]="https://ftp.gnu.org/gnu/inetutils/inetutils-2.5.tar.xz"
+    ["less-661.tar.gz"]="https://www.greenwoodsoftware.com/less/less-661.tar.gz"
+    ["XML-Parser-2.47.tar.gz"]="https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
+    ["intltool-0.51.0.tar.gz"]="https://launchpad.net/intltool/trunk/0.51.0/+download/intltool-0.51.0.tar.gz"
+    ["autoconf-2.72.tar.xz"]="https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
+    ["automake-1.17.tar.xz"]="https://ftp.gnu.org/gnu/automake/automake-1.17.tar.xz"
+    ["openssl-3.3.1.tar.gz"]="https://www.openssl.org/source/openssl-3.3.1.tar.gz"
+    ["kmod-33.tar.xz"]="https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-33.tar.xz"
+    ["elfutils-0.191.tar.bz2"]="https://sourceware.org/ftp/elfutils/0.191/elfutils-0.191.tar.bz2"
+    ["libffi-3.4.6.tar.gz"]="https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz"
+    ["wheel-0.44.0.tar.gz"]="https://pypi.org/packages/source/w/wheel/wheel-0.44.0.tar.gz"
+    ["flit_core-3.9.0.tar.gz"]="https://pypi.org/packages/source/f/flit_core/flit_core-3.9.0.tar.gz"
+    ["ninja-1.12.1.tar.gz"]="https://github.com/ninja-build/ninja/archive/refs/tags/v1.12.1.tar.gz"
+    ["meson-1.5.1.tar.gz"]="https://github.com/mesonbuild/meson/releases/download/1.5.1/meson-1.5.1.tar.gz"
+    ["check-0.15.2.tar.gz"]="https://github.com/libcheck/check/releases/download/0.15.2/check-0.15.2.tar.gz"
+    ["groff-1.23.0.tar.gz"]="https://ftp.gnu.org/gnu/groff/groff-1.23.0.tar.gz"
+    ["iproute2-6.10.0.tar.xz"]="https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-6.10.0.tar.xz"
+    ["kbd-2.6.4.tar.xz"]="https://www.kernel.org/pub/linux/utils/kbd/kbd-2.6.4.tar.xz"
+    ["libpipeline-1.5.7.tar.gz"]="https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.7.tar.gz"
+    ["vim-9.1.0660.tar.gz"]="https://github.com/vim/vim/archive/refs/tags/v9.1.0660.tar.gz"
+    ["eudev-3.2.14.tar.gz"]="https://github.com/eudev-project/eudev/releases/download/v3.2.14/eudev-3.2.14.tar.gz"
+    ["man-db-2.12.1.tar.xz"]="https://download.savannah.gnu.org/releases/man-db/man-db-2.12.1.tar.xz"
+    ["man-pages-6.9.1.tar.xz"]="https://www.kernel.org/pub/linux/docs/man-pages/man-pages-6.9.1.tar.xz"
+    ["procps-ng-4.0.4.tar.xz"]="https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.4.tar.xz"
+    ["e2fsprogs-1.47.1.tar.gz"]="https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.1/e2fsprogs-1.47.1.tar.gz"
+    ["sysklogd-2.6.1.tar.gz"]="https://github.com/troglobit/sysklogd/releases/download/v2.6.1/sysklogd-2.6.1.tar.gz"
+    ["sysvinit-3.10.tar.xz"]="https://github.com/slicer69/sysvinit/releases/download/3.10/sysvinit-3.10.tar.xz"
+    ["iana-etc-20240806.tar.gz"]="https://github.com/Mic92/iana-etc/releases/download/20240806/iana-etc-20240806.tar.gz"
+    ["cmake-3.30.2.tar.gz"]="https://cmake.org/files/v3.30/cmake-3.30.2.tar.gz"
+    ["git-2.46.0.tar.xz"]="https://www.kernel.org/pub/software/scm/git/git-2.46.0.tar.xz"
+    ["wget-1.24.5.tar.gz"]="https://ftp.gnu.org/gnu/wget/wget-1.24.5.tar.gz"
+    ["zsh-5.9.tar.xz"]="https://www.zsh.org/pub/zsh-5.9.tar.xz"
+    ["opendoas-6.8.2.tar.gz"]="https://github.com/Duncaen/OpenDoas/releases/download/v6.8.2/opendoas-6.8.2.tar.gz"
+    ["curl-8.9.1.tar.xz"]="https://curl.se/download/curl-8.9.1.tar.xz"
+  )
+
+  for f in "${!PKGS[@]}"; do
+    out="$LFS/sources/$f"
+    [[ -f "$out" ]] && continue
+    info "Downloading $f..."
+    wget -q --show-progress -c -O "$out" "${PKGS[$f]}" || warn "Failed: $f"
+  done
+
+  for url in \
+    "https://www.linuxfromscratch.org/patches/lfs/12.2/bzip2-1.0.8-install_docs-1.patch" \
+    "https://www.linuxfromscratch.org/patches/lfs/12.2/glibc-2.40-fhs-1.patch" \
+    "https://www.linuxfromscratch.org/patches/lfs/12.2/kbd-2.6.4-backspace-1.patch"; do
+    out="$LFS/sources/$(basename "$url")"
+    [[ -f "$out" ]] || wget -q -O "$out" "$url" || warn "Failed patch: $(basename "$url")"
+  done
+
+  mark_step sources
+fi
+
+# ── LFS directory layout + lfs user ─────────────────────────────────────────
+if ! step_done lfs_env; then
+  header "Setting up LFS build environment"
+  mkdir -pv "$LFS"/{etc,var} "$LFS/usr"/{bin,lib,sbin}
+  for d in bin lib sbin; do ln -sfv "usr/$d" "$LFS/$d" 2>/dev/null || true; done
+  mkdir -pv "$LFS/lib64" "$LFS/tools"
+
+  groupadd -f lfs
+  useradd -s /bin/bash -g lfs -m -k /dev/null lfs 2>/dev/null || true
+  chown -v lfs "$LFS/"{usr{,/*},lib,lib64,var,etc,bin,sbin,tools,sources}
+
+  cat > /home/lfs/.bash_profile << 'EOF'
+exec env -i HOME=$HOME TERM=$TERM PS1='\u:\w\$ ' /bin/bash
+EOF
+  cat > /home/lfs/.bashrc << EOF
+set +h
+umask 022
+LFS=$LFS
+LC_ALL=POSIX
+LFS_TGT=$LFS_TGT
+PATH=/usr/bin
+if [ ! -L /bin ]; then PATH=/bin:\$PATH; fi
+PATH=\$LFS/tools/bin:\$PATH
+CONFIG_SITE=\$LFS/usr/share/config.site
+export LFS LC_ALL LFS_TGT PATH CONFIG_SITE
+MAKEFLAGS="$MAKEFLAGS"
+export MAKEFLAGS
+EOF
+  chown lfs /home/lfs/.bash_profile /home/lfs/.bashrc
+  mark_step lfs_env
+fi
+
+# =============================================================================
+# PHASE 1a — Cross-toolchain + Temporary Tools (runs as lfs user)
+# =============================================================================
+cat > /tmp/lfs-phase12.sh << 'PHASE12'
+#!/bin/bash
+set -euo pipefail
+source ~/.bashrc
+
+LFS="${LFS:-/mnt/lfs}"
+LFS_TGT="${LFS_TGT:-x86_64-lfs-linux-gnu}"
+SRC="$LFS/sources"
+MAKEFLAGS="${MAKEFLAGS:--j3}"
+
+STATE="$HOME/.lfs-phase12.state"
+touch "$STATE"
+done() { grep -qx "$1" "$STATE"; }
+mark() { echo "$1" >> "$STATE"; }
+
+bpkg() {
+  local arc="$1"; shift
+  local d; d=$(mktemp -d "$SRC/build.XXXXXX")
+  tar -xf "$arc" -C "$d" --strip-components=1
+  pushd "$d" >/dev/null
+  "$@"
+  popd >/dev/null
+  rm -rf "$d"
+}
+
+# ── Phase 1: Cross-toolchain ──────────────────────────────────────────────────
+
+if ! done binutils_p1; then
+  echo "==> Binutils (pass 1)"
+  bpkg "$SRC/binutils-2.43.1.tar.xz" bash -c "
+    mkdir build && cd build
+    ../configure --prefix=\$LFS/tools --with-sysroot=\$LFS --target=\$LFS_TGT \
+      --disable-nls --enable-gprofng=no --disable-werror \
+      --enable-new-dtags --enable-default-hash-style=gnu
+    make \$MAKEFLAGS && make install
+  "
+  mark binutils_p1
+fi
+
+if ! done gcc_p1; then
+  echo "==> GCC (pass 1)"
+  bpkg "$SRC/gcc-14.2.0.tar.xz" bash -c "
+    tar -xf \$SRC/mpfr-4.2.1.tar.xz && mv mpfr-4.2.1 mpfr
+    tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
+    tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
+    sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+    mkdir build && cd build
+    ../configure --target=\$LFS_TGT --prefix=\$LFS/tools \
+      --with-glibc-version=2.40 --with-sysroot=\$LFS --with-newlib \
+      --without-headers --enable-default-pie --enable-default-ssp \
+      --disable-nls --disable-shared --disable-multilib --disable-threads \
+      --disable-libatomic --disable-libgomp --disable-libquadmath \
+      --disable-libssp --disable-libvtv --disable-libstdcxx \
+      --enable-languages=c,c++
+    make \$MAKEFLAGS && make install
+    cd ..
+    cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
+      \$(\$LFS_TGT-gcc -print-libgcc-file-name | sed 's/libgcc/limits/')
+  "
+  mark gcc_p1
+fi
+
+if ! done linux_headers; then
+  echo "==> Linux API headers"
+  bpkg "$SRC/linux-6.10.5.tar.xz" bash -c "
+    make mrproper && make headers
+    find usr/include -type f ! -name '*.h' -delete
+    cp -rv usr/include \$LFS/usr
+  "
+  mark linux_headers
+fi
+
+if ! done glibc; then
+  echo "==> Glibc"
+  bpkg "$SRC/glibc-2.40.tar.xz" bash -c "
+    ln -sfnv ../lib/ld-linux-x86-64.so.2 \$LFS/lib64
+    ln -sfnv ../lib/ld-linux-x86-64.so.2 \$LFS/lib64/ld-lsb-x86-64.so.3
+    patch -Np1 -i \$SRC/glibc-2.40-fhs-1.patch
+    mkdir build && cd build
+    echo rootsbindir=/usr/sbin > configparms
+    ../configure --prefix=/usr --host=\$LFS_TGT \
+      --build=\$(../scripts/config.guess) --enable-kernel=4.19 \
+      --with-headers=\$LFS/usr/include --disable-nscd libc_cv_slibdir=/usr/lib
+    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+    sed '/RTLDLIST=/s@/usr@@g' -i \$LFS/usr/bin/ldd
+  "
+  mark glibc
+fi
+
+if ! done libstdcxx_p1; then
+  echo "==> Libstdc++ (pass 1)"
+  bpkg "$SRC/gcc-14.2.0.tar.xz" bash -c "
+    mkdir build && cd build
+    ../libstdc++-v3/configure --host=\$LFS_TGT \
+      --build=\$(../config.guess) --prefix=/usr \
+      --disable-multilib --disable-nls --disable-libstdcxx-pch \
+      --with-gxx-include-dir=/tools/\$LFS_TGT/include/c++/14.2.0
+    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+    rm -v \$LFS/usr/lib/lib{stdc++{,exp},supc++}.la
+  "
+  mark libstdcxx_p1
+fi
+
+# ── Phase 2: Temporary tools ──────────────────────────────────────────────────
+
+p2() {
+  local name="$1" arc="$2"; shift 2
+  done "$name" && return 0
+  echo "==> $name (temp)"
+  bpkg "$arc" "$@"
+  mark "$name"
+}
+
+p2 m4_tmp "$SRC/m4-1.4.19.tar.xz" bash -c "
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess)
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 ncurses_tmp "$SRC/ncurses-6.5.tar.gz" bash -c "
+  sed -i s/mawk// configure
+  mkdir build && pushd build
+    ../configure && make -C include && make -C progs tic
+  popd
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./config.guess) \
+    --mandir=/usr/share/man --with-manpage-format=normal \
+    --with-shared --without-normal --with-cxx-shared --without-debug \
+    --without-ada --disable-stripping
+  make \$MAKEFLAGS && make DESTDIR=\$LFS TIC_PATH=\$(pwd)/build/progs/tic install
+  ln -sv libncursesw.so \$LFS/usr/lib/libncurses.so
+  sed -e 's/^#if.*XOPEN.*$/\n#if 1/' -i \$LFS/usr/include/curses.h
+"
+
+p2 bash_tmp "$SRC/bash-5.2.32.tar.gz" bash -c "
+  ./configure --prefix=/usr --build=\$(sh support/config.guess) --host=\$LFS_TGT \
+    --without-bash-malloc
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  ln -sv bash \$LFS/bin/sh
+"
+
+p2 coreutils_tmp "$SRC/coreutils-9.5.tar.xz" bash -c "
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
+    --enable-install-program=hostname --enable-no-install-program=kill,uptime
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  mv -v \$LFS/usr/bin/chroot \$LFS/usr/sbin
+  mkdir -pv \$LFS/usr/share/man/man8
+  mv -v \$LFS/usr/share/man/man1/chroot.1 \$LFS/usr/share/man/man8/chroot.8
+  sed -i 's/\"1\"/\"8\"/' \$LFS/usr/share/man/man8/chroot.8
+"
+
+for pkg_args in \
+  "diffutils_tmp $SRC/diffutils-3.10.tar.xz" \
+  "findutils_tmp $SRC/findutils-4.10.0.tar.xz" \
+  "gawk_tmp      $SRC/gawk-5.3.0.tar.xz" \
+  "grep_tmp      $SRC/grep-3.11.tar.xz" \
+  "gzip_tmp      $SRC/gzip-1.13.tar.xz" \
+  "make_tmp      $SRC/make-4.4.1.tar.gz" \
+  "patch_tmp     $SRC/patch-2.7.6.tar.xz" \
+  "sed_tmp       $SRC/sed-4.9.tar.xz" \
+  "tar_tmp       $SRC/tar-1.35.tar.xz"; do
+  read -r name arc <<< "$pkg_args"
+  p2 "$name" "$arc" bash -c "
+    ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess 2>/dev/null || ./config.guess)
+    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  "
+done
+
+p2 xz_tmp "$SRC/xz-5.6.2.tar.xz" bash -c "
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
+    --disable-static --docdir=/usr/share/doc/xz-5.6.2
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  rm -v \$LFS/usr/lib/liblzma.la
+"
+
+p2 binutils_p2 "$SRC/binutils-2.43.1.tar.xz" bash -c "
+  sed '6009s/\$add_dir//' -i ltmain.sh
+  mkdir build && cd build
+  ../configure --prefix=/usr --build=\$(../config.guess) --host=\$LFS_TGT \
+    --disable-nls --enable-shared --enable-gprofng=no --disable-werror \
+    --enable-64-bit-bfd --enable-new-dtags --enable-default-hash-style=gnu
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  rm -v \$LFS/usr/lib/lib{bfd,ctf,ctf-nobfd,opcodes,sframe}.{a,la}
+"
+
+p2 gcc_p2 "$SRC/gcc-14.2.0.tar.xz" bash -c "
+  tar -xf \$SRC/mpfr-4.2.1.tar.xz && mv mpfr-4.2.1 mpfr
+  tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
+  tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
+  sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+  sed '/thread_header =/s/@.*@/gthr-posix.h/' \
+    -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
+  mkdir build && cd build
+  ../configure --build=\$(../config.guess) --host=\$LFS_TGT --target=\$LFS_TGT \
+    LDFLAGS_FOR_TARGET=-L\$PWD/\$LFS_TGT/libgcc \
+    --prefix=/usr --with-build-sysroot=\$LFS --enable-default-pie \
+    --enable-default-ssp --disable-nls --disable-multilib \
+    --disable-libatomic --disable-libgomp --disable-libquadmath \
+    --disable-libssp --disable-libvtv --enable-languages=c,c++
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  ln -sv gcc \$LFS/usr/bin/cc
+"
+
+p2 gettext_tmp "$SRC/gettext-0.22.5.tar.xz" bash -c "
+  ./configure --disable-shared
+  make \$MAKEFLAGS
+  cp -v gettext-tools/src/{msgfmt,msgmerge,xgettext} \$LFS/usr/bin
+"
+
+p2 bison_tmp "$SRC/bison-3.8.2.tar.xz" bash -c "
+  ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2 \
+    --host=\$LFS_TGT --build=\$(build-aux/config.guess)
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 perl_tmp "$SRC/perl-5.40.0.tar.xz" bash -c "
+  sh Configure -des -Dprefix=/usr -Dvendorprefix=/usr \
+    -Dprivlib=/usr/lib/perl5/5.40/core_perl \
+    -Darchlib=/usr/lib/perl5/5.40/core_perl \
+    -Dsitelib=/usr/lib/perl5/5.40/site_perl \
+    -Dsitearch=/usr/lib/perl5/5.40/site_perl \
+    -Dvendorlib=/usr/lib/perl5/5.40/vendor_perl \
+    -Dvendorarch=/usr/lib/perl5/5.40/vendor_perl
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 python_tmp "$SRC/Python-3.12.5.tar.xz" bash -c "
+  ./configure --prefix=/usr --enable-shared --without-ensurepip
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 texinfo_tmp "$SRC/texinfo-7.1.tar.xz" bash -c "
+  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess)
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+p2 util_linux_tmp "$SRC/util-linux-2.40.2.tar.xz" bash -c "
+  mkdir -p \$LFS/var/lib/hwclock
+  ./configure --libdir=/usr/lib --runstatedir=/run \
+    --disable-chfn-chsh --disable-login --disable-nologin --disable-su \
+    --disable-setpriv --disable-runuser --disable-pylibmount \
+    --disable-static --disable-liblastlog2 --without-python \
+    ADJTIME_PATH=/var/lib/hwclock/adjtime \
+    --docdir=/usr/share/doc/util-linux-2.40.2
+  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+"
+
+find "$LFS/usr/lib" "$LFS/usr/lib64" -name '*.la' -delete 2>/dev/null || true
+echo "Phase 1 & 2 complete."
+PHASE12
+
+chmod +x /tmp/lfs-phase12.sh
+
+if ! step_done phase12; then
+  header "Phase 1 & 2 — cross-toolchain + temp tools (as lfs user)"
+  su - lfs -c "bash /tmp/lfs-phase12.sh"
+  mark_step phase12
+fi
+
+# =============================================================================
+# PHASE 1b — Virtual filesystems
+# =============================================================================
+if ! step_done vfs_mount; then
+  header "Mounting virtual filesystems"
+  mkdir -pv "$LFS"/{dev,proc,sys,run}
+  mount -v --bind /dev       "$LFS/dev"
+  mount -vt devpts devpts    "$LFS/dev/pts" -o gid=5,mode=0620
+  mount -vt proc  proc       "$LFS/proc"
+  mount -vt sysfs sysfs      "$LFS/sys"
+  mount -vt tmpfs tmpfs      "$LFS/run"
+  [[ -h "$LFS/dev/shm" ]] && install -v -d -m 1777 "$LFS/$(readlink "$LFS/dev/shm")"
+  mark_step vfs_mount
+fi
+
+# =============================================================================
+# PHASE 1c — Base system in chroot
+# =============================================================================
+mkdir -p "$LFS/tmp"
+cat > "$LFS/tmp/lfs-chroot.sh" << 'CHROOT'
+#!/bin/bash
+set -euo pipefail
+export HOME=/root TERM=$TERM PS1='(lfs chroot) \u:\w\$ '
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export MAKEFLAGS="${MAKEFLAGS:--j3}"
+SRC=/sources
+
+STATE=/tmp/lfs-chroot.state
+touch "$STATE"
+done() { grep -qx "$1" "$STATE"; }
+mark() { echo "$1" >> "$STATE"; }
+
+bpkg() {
+  local arc="$1"; shift
+  local d; d=$(mktemp -d "$SRC/build.XXXXXX")
+  tar -xf "$arc" -C "$d" --strip-components=1
+  pushd "$d" >/dev/null
+  "$@"
+  popd >/dev/null
+  rm -rf "$d"
+}
+
+pkg() { local n="$1" a="$2"; shift 2; done "$n" && return 0; echo "==> $n"; bpkg "$a" "$@"; mark "$n"; }
+
+# ── Initial directory structure ───────────────────────────────────────────────
+if ! done chroot_init; then
+  mkdir -pv /{boot,home,mnt,opt,srv} /etc/{opt,sysconfig} /lib/firmware
+  mkdir -pv /media/{floppy,cdrom} /usr/{,local/}{include,src} /usr/lib/locale
+  mkdir -pv /usr/local/{bin,lib,sbin}
+  mkdir -pv /usr/{,local/}share/{color,dict,doc,info,locale,man,misc,terminfo,zoneinfo}
+  mkdir -pv /usr/{,local/}share/man/man{1..8}
+  mkdir -pv /var/{cache,local,log,mail,opt,spool} /var/lib/{color,misc,locate}
+  ln -sfv /run /var/run; ln -sfv /run/lock /var/lock
+  install -dv -m 0750 /root; install -dv -m 1777 /tmp /var/tmp
+  ln -sv /proc/self/mounts /etc/mtab
+
+  cat > /etc/hosts << 'EOF'
+127.0.0.1 localhost
+127.0.1.1 lfs
+::1       localhost ip6-localhost ip6-loopback
+EOF
+
+  cat > /etc/passwd << 'EOF'
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/dev/null:/usr/bin/false
+daemon:x:6:6:Daemon User:/dev/null:/usr/bin/false
+messagebus:x:18:18:D-Bus Message Daemon User:/run/dbus:/usr/bin/false
+uuidd:x:80:80:UUID Generation Daemon User:/dev/null:/usr/bin/false
+nobody:x:65534:65534:Unprivileged User:/dev/null:/usr/bin/false
+EOF
+
+  cat > /etc/group << 'EOF'
+root:x:0:
+bin:x:1:root,bin,daemon
+daemon:x:6:root,bin,daemon
+sys:x:8:
+audio:x:11:
+video:x:12:
+cdrom:x:15:
+usb:x:85:
+users:x:999:
+nogroup:x:65533:
+nobody:x:65534:
+EOF
+
+  for f in /var/log/{btmp,lastlog,faillog,wtmp}; do touch "$f"; done
+  chgrp -v utmp /var/log/lastlog; chmod -v 664 /var/log/lastlog; chmod -v 600 /var/log/btmp
+  mark chroot_init
+fi
+
+# ── Final system packages ─────────────────────────────────────────────────────
+
+pkg man_pages "$SRC/man-pages-6.9.1.tar.xz" bash -c "
+  rm -v man3/crypt*.3 2>/dev/null || true
+  make prefix=/usr install
+"
+
+pkg iana_etc "$SRC/iana-etc-20240806.tar.gz" bash -c "
+  cp services protocols /etc/
+" 2>/dev/null || true
+
+pkg glibc_final "$SRC/glibc-2.40.tar.xz" bash -c "
+  patch -Np1 -i \$SRC/glibc-2.40-fhs-1.patch
+  mkdir build && cd build
+  echo rootsbindir=/usr/sbin > configparms
+  ../configure --prefix=/usr --disable-werror --enable-kernel=4.19 \
+    --enable-stack-protector=strong --disable-nscd libc_cv_slibdir=/usr/lib
+  make \$MAKEFLAGS
+  touch /etc/ld.so.conf
+  sed '/test-installation/s@\$(PERL)@echo not running@' -i ../Makefile
+  make install
+  sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
+  mkdir -pv /usr/lib/locale
+  localedef -i C -f UTF-8 C.UTF-8
+  localedef -i en_US -f UTF-8 en_US.UTF-8
+  localedef -i sv_SE -f UTF-8 sv_SE.UTF-8
+  cat > /etc/nsswitch.conf << 'EOF2'
+passwd: files
+group:  files
+shadow: files
+hosts:  files dns
+networks: files
+protocols: files
+services: files
+EOF2
+  echo 'Europe/Stockholm' > /etc/timezone
+  ln -sfv /usr/share/zoneinfo/Europe/Stockholm /etc/localtime
+  cat > /etc/ld.so.conf << 'EOF2'
+/usr/local/lib
+/opt/lib
+include /etc/ld.so.conf.d/*.conf
+EOF2
+  mkdir -pv /etc/ld.so.conf.d
+"
+
+pkg zlib_f   "$SRC/zlib-1.3.1.tar.gz"     bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libz.a"
+pkg bzip2_f  "$SRC/bzip2-1.0.8.tar.gz"    bash -c "
+  patch -Np1 -i \$SRC/bzip2-1.0.8-install_docs-1.patch
+  sed -i 's@\(ln -s -f \)\$(PREFIX)/bin/@\1@' Makefile
+  sed -i 's@(PREFIX)/man@(PREFIX)/share/man@g' Makefile
+  make -f Makefile-libbz2_so \$MAKEFLAGS; make clean; make \$MAKEFLAGS
+  make PREFIX=/usr install
+  cp -av libbz2.so.* /usr/lib; ln -sv libbz2.so.1.0.8 /usr/lib/libbz2.so
+  cp -v bzip2-shared /usr/bin/bzip2
+  for i in /usr/bin/{bzcat,bunzip2}; do ln -sfv bzip2 \$i; done
+  rm -fv /usr/lib/libbz2.a
+"
+pkg xz_f     "$SRC/xz-5.6.2.tar.xz"       bash -c "./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/xz-5.6.2; make \$MAKEFLAGS; make install"
+pkg lz4_f    "$SRC/lz4-1.10.0.tar.gz"      bash -c "make BUILD_STATIC=no PREFIX=/usr \$MAKEFLAGS; make BUILD_STATIC=no PREFIX=/usr install"
+pkg zstd_f   "$SRC/zstd-1.5.6.tar.gz"      bash -c "make PREFIX=/usr \$MAKEFLAGS; make PREFIX=/usr install; rm -v /usr/lib/libzstd.a"
+pkg file_f   "$SRC/file-5.45.tar.gz"        bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+
+pkg readline_f "$SRC/readline-8.2.13.tar.gz" bash -c "
+  sed -i '/MV.*old/d' Makefile.in; sed -i '/{OLDSUFF}/c:' support/shlib-install
+  sed -i 's/-Wl,-rpath,[^ ]*//' support/shobj-conf
+  ./configure --prefix=/usr --disable-static --with-curses \
+    --docdir=/usr/share/doc/readline-8.2.13
+  make SHLIB_LIBS='-lncursesw' \$MAKEFLAGS
+  make SHLIB_LIBS='-lncursesw' install
+"
+
+pkg m4_f     "$SRC/m4-1.4.19.tar.xz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg bc_f     "$SRC/bc-6.7.6.tar.xz"        bash -c "CC=gcc ./configure --prefix=/usr -G -O3 -r; make \$MAKEFLAGS; make install"
+pkg flex_f   "$SRC/flex-2.6.4.tar.gz"      bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install; ln -sv flex /usr/bin/lex"
+
+pkg tcl_f    "$SRC/tcl8.6.14-src.tar.gz"   bash -c "
+  SRCDIR=\$(pwd); cd unix
+  ./configure --prefix=/usr --mandir=/usr/share/man
+  make \$MAKEFLAGS
+  sed -e \"s|'\$SRCDIR'|'/usr/src'|\" -i tclConfig.sh
+  sed -e \"s|\$SRCDIR/unix|'/usr/lib'|\" -i tclConfig.sh
+  sed -e \"s|\$SRCDIR|'/usr/include'|\" -i tclConfig.sh
+  sed -e '/SRCDIR/d' -i tclConfig.sh
+  make install; chmod -v u+w /usr/lib/libtcl8.6.so
+  make install-private-headers; ln -sfv tclsh8.6 /usr/bin/tclsh
+"
+
+pkg expect_f   "$SRC/expect5.45.4.tar.gz"  bash -c "
+  ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared \
+    --disable-rpath --mandir=/usr/share/man
+  make \$MAKEFLAGS && make install
+  ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib
+"
+
+pkg dejagnu_f  "$SRC/dejagnu-1.6.3.tar.gz" bash -c "mkdir build && cd build; ../configure --prefix=/usr; make install"
+pkg pkgconf_f  "$SRC/pkgconf-2.3.0.tar.xz" bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install; ln -sv pkgconf /usr/bin/pkg-config"
+
+pkg binutils_f "$SRC/binutils-2.43.1.tar.xz" bash -c "
+  mkdir build && cd build
+  ../configure --prefix=/usr --sysconfdir=/etc --enable-gold --enable-ld=default \
+    --enable-plugins --enable-shared --disable-werror --enable-64-bit-bfd \
+    --enable-new-dtags --with-system-zlib --enable-default-hash-style=gnu
+  make tooldir=/usr \$MAKEFLAGS && make tooldir=/usr install
+  rm -fv /usr/lib/lib{bfd,ctf,ctf-nobfd,gprofng,opcodes,sframe}.a
+"
+
+pkg gmp_f  "$SRC/gmp-6.3.0.tar.xz"  bash -c "./configure --prefix=/usr --enable-cxx --disable-static; make \$MAKEFLAGS; make install"
+pkg mpfr_f "$SRC/mpfr-4.2.1.tar.xz" bash -c "./configure --prefix=/usr --disable-static --enable-thread-safe; make \$MAKEFLAGS; make install"
+pkg mpc_f  "$SRC/mpc-1.3.1.tar.gz"  bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
+pkg attr_f "$SRC/attr-2.5.2.tar.gz" bash -c "./configure --prefix=/usr --disable-static --sysconfdir=/etc; make \$MAKEFLAGS; make install"
+pkg acl_f  "$SRC/acl-2.3.2.tar.xz"  bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
+pkg libcap_f "$SRC/libcap-2.70.tar.xz" bash -c "sed -i '/install -m.*STA/d' libcap/Makefile; make prefix=/usr lib=lib \$MAKEFLAGS; make prefix=/usr lib=lib install"
+pkg libxcrypt_f "$SRC/libxcrypt-4.4.36.tar.xz" bash -c "
+  ./configure --prefix=/usr --enable-hashes=strong,glibc \
+    --enable-obsolete-api=no --disable-static --disable-failure-tokens
+  make \$MAKEFLAGS && make install
+"
+
+pkg shadow_f "$SRC/shadow-4.16.0.tar.xz" bash -c "
+  sed -i 's/groups\$(EXEEXT) //' src/Makefile.in
+  find man -name 'groups.1' -delete; find man -name 'getspnam.3' -delete; find man -name 'passwd.5' -delete
+  sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' \
+      -e 's:/var/spool/mail:/var/mail:'                   \
+      -e '/PATH=/{s@/sbin:@@;s@/bin:@@}'                 \
+      -i etc/login.defs
+  ./configure --sysconfdir=/etc --disable-static \
+    --with-{b,yes}crypt --without-libbsd --with-group-name-max-length=32
+  make \$MAKEFLAGS && make exec_prefix=/usr install && make -C man install-man
+  pwconv && grpconv
+  mkdir -p /etc/default; useradd -D --gid 999
+"
+
+pkg gcc_f "$SRC/gcc-14.2.0.tar.xz" bash -c "
+  sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
+  tar -xf \$SRC/mpfr-4.2.1.tar.xz && mv mpfr-4.2.1 mpfr
+  tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
+  tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
+  mkdir build && cd build
+  ../configure --prefix=/usr LD=ld --enable-languages=c,c++ \
+    --enable-default-pie --enable-default-ssp --enable-host-pie \
+    --disable-multilib --disable-bootstrap --disable-fixincludes --with-system-zlib
+  make \$MAKEFLAGS && make install
+  chown -v -R root:root /usr/lib/gcc/\$(gcc -dumpmachine)/14.2.0/include{,-fixed}
+  ln -svr /usr/bin/cpp /usr/lib; ln -sv gcc.1 /usr/share/man/man1/cc.1
+  ln -sfv ../../libexec/gcc/\$(gcc -dumpmachine)/14.2.0/liblto_plugin.so /usr/lib/bfd-plugins/
+  mkdir -pv /usr/share/gdb/auto-load/usr/lib
+  mv -v /usr/lib/*gdb.py /usr/share/gdb/auto-load/usr/lib
+"
+
+pkg ncurses_f "$SRC/ncurses-6.5.tar.gz" bash -c "
+  ./configure --prefix=/usr --mandir=/usr/share/man --with-shared \
+    --without-debug --without-normal --with-cxx-shared --enable-pc-files \
+    --with-pkg-config-libdir=/usr/lib/pkgconfig
+  make \$MAKEFLAGS && make install
+  for lib in ncurses form panel menu; do
+    ln -sfv lib\${lib}w.so /usr/lib/lib\${lib}.so
+    ln -sfv \${lib}w.pc /usr/lib/pkgconfig/\${lib}.pc
+  done
+  ln -sfv libncursesw.so /usr/lib/libcurses.so
+"
+
+pkg sed_f       "$SRC/sed-4.9.tar.xz"           bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg psmisc_f    "$SRC/psmisc-23.7.tar.xz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg gettext_f   "$SRC/gettext-0.22.5.tar.xz"    bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install; chmod -v 0755 /usr/lib/preloadable_libintl.so"
+pkg grep_f      "$SRC/grep-3.11.tar.xz"         bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg bash_f      "$SRC/bash-5.2.32.tar.gz"       bash -c "./configure --prefix=/usr --without-bash-malloc --with-installed-readline bash_cv_strtold_broken=no; make \$MAKEFLAGS; make install"
+pkg libtool_f   "$SRC/libtool-2.4.7.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libltdl.a"
+pkg gdbm_f      "$SRC/gdbm-1.24.tar.gz"         bash -c "./configure --prefix=/usr --disable-static --enable-libgdbm-compat; make \$MAKEFLAGS; make install"
+pkg gperf_f     "$SRC/gperf-3.1.tar.gz"         bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg expat_f     "$SRC/expat-2.6.2.tar.xz"       bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
+pkg inetutils_f "$SRC/inetutils-2.5.tar.xz"    bash -c "
+  ./configure --prefix=/usr --bindir=/usr/bin --localstatedir=/var \
+    --disable-logger --disable-whois --disable-rcp --disable-rexec \
+    --disable-rlogin --disable-rsh --disable-servers
+  make \$MAKEFLAGS && make install
+  mv -v /usr/{,s}bin/ifconfig
+"
+pkg less_f      "$SRC/less-661.tar.gz"          bash -c "./configure --prefix=/usr --sysconfdir=/etc; make \$MAKEFLAGS; make install"
+pkg xml_parser  "$SRC/XML-Parser-2.47.tar.gz"   bash -c "perl Makefile.PL; make \$MAKEFLAGS; make install"
+pkg intltool_f  "$SRC/intltool-0.51.0.tar.gz"  bash -c "sed -i 's:\\\${:\\\$\\{:' intltool-update.in; ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg autoconf_f  "$SRC/autoconf-2.72.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg automake_f  "$SRC/automake-1.17.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg openssl_f   "$SRC/openssl-3.3.1.tar.gz"    bash -c "./config --prefix=/usr --openssldir=/etc/ssl --libdir=lib shared zlib-dynamic; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libssl.a /usr/lib/libcrypto.a"
+
+pkg kmod_f "$SRC/kmod-33.tar.xz" bash -c "
+  ./configure --prefix=/usr --sysconfdir=/etc --with-openssl --with-xz \
+    --with-zstd --with-zlib --disable-manpages
+  make \$MAKEFLAGS && make install
+  for t in depmod insmod modinfo modprobe rmmod; do ln -sfv ../bin/kmod /usr/sbin/\$t; done
+  ln -sfv kmod /usr/bin/lsmod
+"
+
+pkg elfutils_f  "$SRC/elfutils-0.191.tar.bz2" bash -c "./configure --prefix=/usr --disable-debuginfod --enable-libdebuginfod=dummy; make \$MAKEFLAGS; make install; rm -fv /usr/lib/lib{asm,dw,elf}.a"
+pkg libffi_f    "$SRC/libffi-3.4.6.tar.gz"    bash -c "./configure --prefix=/usr --disable-static --with-gcc-arch=native; make \$MAKEFLAGS; make install"
+
+pkg python3_f "$SRC/Python-3.12.5.tar.xz" bash -c "
+  ./configure --prefix=/usr --enable-shared --with-system-expat --enable-optimizations
+  make \$MAKEFLAGS && make install
+  cat > /etc/pip.conf << 'EOF2'
+[global]
+root-user-action = ignore
+disable-pip-version-check = true
+EOF2
+"
+
+pkg flit_core_f "$SRC/flit_core-3.9.0.tar.gz" bash -c "
+  pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
+  pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist flit_core
+"
+
+pkg wheel_f "$SRC/wheel-0.44.0.tar.gz" bash -c "
+  pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
+  pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist wheel
+"
+
+pkg ninja_f "$SRC/ninja-1.12.1.tar.gz" bash -c "
+  export NINJAJOBS=3
+  python3 configure.py --bootstrap
+  install -vm755 ninja /usr/bin/
+"
+
+pkg meson_f "$SRC/meson-1.5.1.tar.gz" bash -c "
+  pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
+  pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist meson
+"
+
+pkg coreutils_f "$SRC/coreutils-9.5.tar.xz" bash -c "
+  autoreconf -fiv
+  FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr --enable-no-install-program=kill,uptime
+  make \$MAKEFLAGS && make install
+  mv -v /usr/bin/chroot /usr/sbin
+  mv -v /usr/share/man/man1/chroot.1 /usr/share/man/man8/chroot.8
+  sed -i 's/\"1\"/\"8\"/' /usr/share/man/man8/chroot.8
+"
+
+pkg check_f    "$SRC/check-0.15.2.tar.gz"     bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
+pkg diffutils_f "$SRC/diffutils-3.10.tar.xz"  bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg gawk_f     "$SRC/gawk-5.3.0.tar.xz"       bash -c "sed -i 's/extras//' Makefile.in; ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg findutils_f "$SRC/findutils-4.10.0.tar.xz" bash -c "./configure --prefix=/usr --localstatedir=/var/lib/locate; make \$MAKEFLAGS; make install"
+pkg groff_f    "$SRC/groff-1.23.0.tar.gz"     bash -c "PAGE=A4 ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg gzip_f     "$SRC/gzip-1.13.tar.xz"        bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+
+pkg iproute2_f "$SRC/iproute2-6.10.0.tar.xz" bash -c "
+  sed -i /ARPD/d Makefile; rm -fv man/man8/arpd.8
+  make NETNS_RUN_DIR=/run/netns \$MAKEFLAGS
+  make SBINDIR=/usr/sbin install
+"
+
+pkg kbd_f "$SRC/kbd-2.6.4.tar.xz" bash -c "
+  patch -Np1 -i \$SRC/kbd-2.6.4-backspace-1.patch
+  sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
+  sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
+  ./configure --prefix=/usr --disable-vlock
+  make \$MAKEFLAGS && make install
+"
+
+pkg libpipeline_f "$SRC/libpipeline-1.5.7.tar.gz" bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg make_f     "$SRC/make-4.4.1.tar.gz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg patch_f    "$SRC/patch-2.7.6.tar.xz"      bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg tar_f      "$SRC/tar-1.35.tar.xz"         bash -c "FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+
+pkg vim_f "$SRC/vim-9.1.0660.tar.gz" bash -c "
+  echo '#define SYS_VIMRC_FILE \"/etc/vimrc\"' >> src/feature.h
+  ./configure --prefix=/usr; make \$MAKEFLAGS; make install
+  ln -sv vim /usr/bin/vi
+  cat > /etc/vimrc << 'EOF2'
+set nocompatible
+set backspace=2
+set mouse=
+syntax on
+EOF2
+"
+
+pkg eudev_f "$SRC/eudev-3.2.14.tar.gz" bash -c "
+  ./configure --prefix=/usr --bindir=/usr/sbin --sysconfdir=/etc \
+    --enable-manpages --disable-static
+  make \$MAKEFLAGS && make install
+  udevadm hwdb --update
+"
+
+pkg man_db_f "$SRC/man-db-2.12.1.tar.xz" bash -c "
+  ./configure --prefix=/usr --docdir=/usr/share/doc/man-db-2.12.1 \
+    --sysconfdir=/etc --disable-setuid --enable-cache-owner=bin \
+    --with-browser=/usr/bin/lynx --with-vgrind=/usr/bin/vgrind \
+    --with-grap=/usr/bin/grap
+  make \$MAKEFLAGS && make install
+"
+
+pkg procps_f  "$SRC/procps-ng-4.0.4.tar.xz"  bash -c "./configure --prefix=/usr --disable-static --disable-kill; make \$MAKEFLAGS; make install"
+pkg e2fsprogs_f "$SRC/e2fsprogs-1.47.1.tar.gz" bash -c "
+  mkdir build && cd build
+  ../configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs \
+    --disable-libblkid --disable-libuuid --disable-uuidd --disable-fsck
+  make \$MAKEFLAGS && make install
+  rm -fv /usr/lib/{libcom_err,libe2p,libext2fs,libss}.a
+"
+
+pkg sysklogd_f "$SRC/sysklogd-2.6.1.tar.gz" bash -c "
+  ./configure --prefix=/usr --sysconfdir=/etc --runstatedir=/run --without-logger
+  make \$MAKEFLAGS && make install
+  cat > /etc/syslog.conf << 'EOF2'
+auth,authpriv.* -/var/log/auth.log
+*.*;auth,authpriv.none -/var/log/sys.log
+daemon.* -/var/log/daemon.log
+kern.* -/var/log/kern.log
+*.emerg *
+EOF2
+"
+
+pkg sysvinit_f "$SRC/sysvinit-3.10.tar.xz" bash -c "make \$MAKEFLAGS; make install"
+
+# ── System configuration ───────────────────────────────────────────────────────
+if ! done sysconfig; then
+  echo "==> System configuration"
+  ROOT_UUID=$(blkid -s UUID -o value $ROOT 2>/dev/null || echo "CHANGEME")
+  EFI_UUID=$(blkid  -s UUID -o value $EFI  2>/dev/null || echo "CHANGEME")
+  SWAP_UUID=$(blkid -s UUID -o value $SWAP 2>/dev/null || echo "CHANGEME")
+
+  cat > /etc/fstab << EOF2
+UUID=$ROOT_UUID  /         ext4  defaults,noatime 0 1
+UUID=$EFI_UUID   /boot/efi vfat  umask=0077       0 2
+UUID=$SWAP_UUID  none      swap  sw               0 0
+tmpfs            /tmp      tmpfs defaults          0 0
+EOF2
+
+  echo "lfs" > /etc/hostname
+
+  cat > /etc/inittab << 'EOF2'
+id:3:initdefault:
+si::sysinit:/etc/rc.d/init.d/rc sysinit
+l0:0:wait:/etc/rc.d/init.d/rc 0
+l3:3:wait:/etc/rc.d/init.d/rc 3
+l6:6:wait:/etc/rc.d/init.d/rc 6
+ca:12345:ctrlaltdel:/sbin/shutdown -t1 -a -r now
+su:S016:once:/sbin/sulogin
+1:2345:respawn:/sbin/agetty --noclear tty1 9600
+2:2345:respawn:/sbin/agetty tty2 9600
+EOF2
+
+  mkdir -pv /etc/profile.d
+  cat > /etc/profile << 'EOF2'
+for script in /etc/profile.d/*.sh; do
+  [ -r "$script" ] && . "$script"
+done
+unset script
+EOF2
+
+  cat > /etc/profile.d/locale.sh << 'EOF2'
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+EOF2
+
+  cat > /etc/inputrc << 'EOF2'
+set horizontal-scroll-mode Off
+set meta-flag On
+set input-meta On
+set convert-meta Off
+set output-meta On
+set bell-style none
+"\eOd": backward-word
+"\eOc": forward-word
+"\e[1~": beginning-of-line
+"\e[4~": end-of-line
+"\e[3~": delete-char
+"\e[2~": quoted-insert
+EOF2
+
+  cat > /etc/shells << 'EOF2'
+/bin/sh
+/bin/bash
+EOF2
+
+  echo 'root:legendary123' | chpasswd
+  mark sysconfig
+fi
+
+# ── Kernel ────────────────────────────────────────────────────────────────────
+if ! done kernel; then
+  echo "==> Kernel 6.10.5 (MacBook Air 6,2)"
+  bpkg "$SRC/linux-6.10.5.tar.xz" bash -c "
+    make defconfig
+    ./scripts/config -e CONFIG_DRM_I915 -e CONFIG_SND_HDA_INTEL \
+      -e CONFIG_SND_HDA_CODEC_CIRRUS -e CONFIG_HID_APPLE \
+      -e CONFIG_APPLE_PROPERTIES -e CONFIG_SATA_AHCI \
+      -e CONFIG_USB_XHCI_HCD -e CONFIG_USB_EHCI_HCD \
+      -e CONFIG_USB_NET_CDC_ETHER -e CONFIG_USB_NET_RNDIS_HOST \
+      -e CONFIG_BT_HCIBTUSB -e CONFIG_THUNDERBOLT \
+      -e CONFIG_X86_INTEL_PSTATE -e CONFIG_ACPI_BATTERY \
+      -e CONFIG_ACPI_VIDEO -e CONFIG_BACKLIGHT_APPLE \
+      -e CONFIG_MAGIC_SYSRQ -e CONFIG_TMPFS -e CONFIG_EXT4_FS \
+      -e CONFIG_VFAT_FS -e CONFIG_NLS_UTF8 \
+      -e CONFIG_DRM -e CONFIG_DRM_KMS_HELPER -e CONFIG_FB_EFI \
+      -d CONFIG_BRCMSMAC -d CONFIG_BRCMFMAC -d CONFIG_B43 \
+      -d CONFIG_SSB -d CONFIG_INTEL_MEI -d CONFIG_INTEL_MEI_ME \
+      -e CONFIG_RANDOMIZE_BASE -e CONFIG_RANDOMIZE_MEMORY \
+      -e CONFIG_PAGE_TABLE_ISOLATION -e CONFIG_RETPOLINE \
+      -e CONFIG_STRICT_KERNEL_RWX -e CONFIG_STRICT_MODULE_RWX \
+      -e CONFIG_ZSWAP -e CONFIG_ZSWAP_DEFAULT_ON
+    make olddefconfig
+    make CFLAGS='-march=haswell -O2 -pipe' -j3
+    make modules_install
+    cp -v arch/x86/boot/bzImage /boot/vmlinuz-6.10.5-lfs
+    cp -v System.map /boot/System.map-6.10.5
+    cp -v .config /boot/config-6.10.5
+    install -m755 -d /etc/modprobe.d
+    cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF2'
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcma
+EOF2
+    echo 'options hid_apple fnmode=2' > /etc/modprobe.d/hid_apple.conf
+  "
+  mark kernel
+fi
+
+# ── BLFS prerequisites ────────────────────────────────────────────────────────
+pkg wget_f    "$SRC/wget-1.24.5.tar.gz"       bash -c "./configure --prefix=/usr --sysconfdir=/etc --with-ssl=openssl; make \$MAKEFLAGS; make install"
+pkg curl_f    "$SRC/curl-8.9.1.tar.xz"        bash -c "./configure --prefix=/usr --disable-static --with-openssl --enable-threaded-resolver; make \$MAKEFLAGS; make install"
+pkg git_f     "$SRC/git-2.46.0.tar.xz"        bash -c "./configure --prefix=/usr --with-gitconfig=/etc/gitconfig --with-python=python3; make \$MAKEFLAGS all; make install"
+pkg zsh_f     "$SRC/zsh-5.9.tar.xz"           bash -c "./configure --prefix=/usr --sysconfdir=/etc/zsh --enable-multibyte --enable-pcre --enable-cap; make \$MAKEFLAGS; make install; echo '/usr/bin/zsh' >> /etc/shells"
+pkg cmake_f   "$SRC/cmake-3.30.2.tar.gz"      bash -c "./configure --prefix=/usr --parallel=3 -- -DCMAKE_USE_OPENSSL=ON; make \$MAKEFLAGS; make install"
+pkg doas_f    "$SRC/opendoas-6.8.2.tar.gz"    bash -c "./configure --prefix=/usr --sysconfdir=/etc --with-timestamp; make \$MAKEFLAGS; make install"
+
+echo "==> LFS chroot build complete."
+CHROOT
+
+chmod +x "$LFS/tmp/lfs-chroot.sh"
+
+if ! step_done chroot_build; then
+  header "Phase 3 — base system in chroot"
+  source /var/log/lfs-parts.env
+  chroot "$LFS" /usr/bin/env -i \
+    HOME=/root TERM="$TERM" PS1='(lfs) \u:\w\$ ' \
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    MAKEFLAGS="$MAKEFLAGS" \
+    ROOT="$ROOT" EFI="$EFI" SWAP="$SWAP" \
+    /bin/bash /tmp/lfs-chroot.sh
+  mark_step chroot_build
+fi
+
+# ── rEFInd ───────────────────────────────────────────────────────────────────
+if ! step_done refind; then
+  header "Installing rEFInd"
+  if ! command -v refind-install &>/dev/null; then
+    warn "refind-install not found on host — install sys-boot/refind on Gentoo first"
+    warn "  emerge sys-boot/refind"
+    warn "Re-run this script after installing rEFInd to complete the bootloader step."
+  else
+    source /var/log/lfs-parts.env
+    ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
+    refind-install --usedefault "$EFI" --root "$LFS"
+    cat > "$LFS/boot/efi/EFI/BOOT/refind_linux.conf" << EOF
+"Boot LFS" "ro root=UUID=${ROOT_UUID} quiet"
+EOF
+    mark_step refind
+  fi
+fi
+
+# ── Mark LFS complete and unmount ────────────────────────────────────────────
+mkdir -p "$LFS/etc"
+grep -qx "lfs_complete" "$LFS/etc/blfs-setup.state" 2>/dev/null || \
+  echo "lfs_complete" >> "$LFS/etc/blfs-setup.state"
+
+header "Unmounting $LFS"
+umount -R "$LFS/dev" "$LFS/proc" "$LFS/sys" "$LFS/run" 2>/dev/null || true
+umount "$LFS/boot/efi" 2>/dev/null || true
+umount "$LFS"          2>/dev/null || true
+
+echo -e "\n${GREEN}── LFS base system complete ──${NC}"
+echo "1. Boot from $LFS_DISK (select LFS in rEFInd)"
+echo "2. Log in as root (password: legendary123)"
+echo "3. Clone legenddots and rerun this script:"
+echo "   git clone https://github.com/legendarymsr/legenddots ~/legenddots"
+echo "   bash ~/legenddots/blfs/setup"
+echo ""
+echo "WiFi: BCM4360 requires the broadcom-sta wl.ko module — see blfs/README.md."
+exit 0
+
+fi  # end LFS_DONE==false
+
+# =============================================================================
+# PHASE 2 — BLFS DESKTOP (runs inside LFS)
+# =============================================================================
+
 STATE_FILE=/etc/blfs-setup.state
 touch "$STATE_FILE"
 step_done() { grep -qx "$1" "$STATE_FILE"; }
-mark_step() { echo "$1" >> "$STATE_FILE"; }
+mark_step()  { echo "$1" >> "$STATE_FILE"; }
 
-# ── Build environment ─────────────────────────────────────────────────────────
 SOURCES=/sources
 mkdir -p "$SOURCES"
 
@@ -39,15 +1101,10 @@ export MAKEFLAGS="-j3"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig"
 export PATH="/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin"
 
-NPROC=3  # j3 — safe for 8 GB RAM
-
-# ── Package versions ──────────────────────────────────────────────────────────
-# Check https://www.linuxfromscratch.org/blfs/view/stable/ for newer versions.
+NPROC=3
 
 PCRE2_VER="10.44"
 LIBFFI_VER="3.4.6"
-LIBUNISTRING_VER="1.2"
-GETTEXT_VER="0.22.5"
 GLIB_VER="2.82.4"
 LIBPNG_VER="1.6.44"
 LIBJPEG_TURBO_VER="3.0.4"
@@ -72,7 +1129,6 @@ LIBRSVG_VER="2.58.3"
 LLVM_VER="18.1.8"
 MESA_VER="24.3.4"
 SEATD_VER="0.8.0"
-ELOGIND_VER="255.5"
 POLKIT_VER="125"
 PIPEWIRE_VER="1.2.7"
 WIREPLUMBER_VER="0.5.7"
@@ -87,28 +1143,21 @@ GRIM_VER="1.4.1"
 SLURP_VER="1.5.0"
 WL_CLIPBOARD_VER="2.2.1"
 BRIGHTNESSCTL_VER="0.5.1"
-NETWORKMANAGER_VER="1.50.0"
 DBUS_VER="1.14.10"
 
-# ── Download + extract helpers ────────────────────────────────────────────────
 fetch() {
   local url="$1"
   local out="$SOURCES/$(basename "$url")"
   if [[ ! -f "$out" ]]; then
     info "Fetching $(basename "$url")..."
-    wget -q --show-progress -c -O "$out" "$url" || {
-      rm -f "$out"
-      die "Download failed: $url"
-    }
+    wget -q --show-progress -c -O "$out" "$url" || { rm -f "$out"; die "Download failed: $url"; }
   fi
   echo "$out"
 }
 
-# Extract archive into a temp subdir of SOURCES, cd into it, run commands, clean up.
 bpkg() {
   local archive="$1"; shift
-  local bdir
-  bdir=$(mktemp -d "$SOURCES/build.XXXXXX")
+  local bdir; bdir=$(mktemp -d "$SOURCES/build.XXXXXX")
   tar -xf "$archive" -C "$bdir" --strip-components=1
   pushd "$bdir" >/dev/null
   "$@"
@@ -119,29 +1168,22 @@ bpkg() {
 }
 
 gnome_url() {
-  # gnome_url <package> <full-version>  →  gnome ftp URL
   local pkg="$1" ver="$2"
   local minor="${ver%.*}"
   echo "https://download.gnome.org/sources/${pkg}/${minor}/${pkg}-${ver}.tar.xz"
 }
 
 # =============================================================================
-# 1. D-BUS (needed by many packages)
+# 1. D-Bus
 # =============================================================================
 if ! step_done dbus; then
   header "D-Bus ${DBUS_VER}"
   a=$(fetch "https://dbus.freedesktop.org/releases/dbus/dbus-${DBUS_VER}.tar.xz")
   bpkg "$a" bash -c "
-    ./configure --prefix=/usr          \
-                --sysconfdir=/etc      \
-                --localstatedir=/var   \
-                --disable-static       \
-                --disable-doxygen-docs \
-                --disable-xml-docs     \
-                --with-systemdsystemunitdir=no \
-                --with-console-auth-dir=/run/console
-    make -j${NPROC}
-    make install
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+      --disable-static --disable-doxygen-docs --disable-xml-docs \
+      --with-systemdsystemunitdir=no --with-console-auth-dir=/run/console
+    make -j${NPROC} && make install
     ln -sfv /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
   "
   mark_step dbus
@@ -154,16 +1196,10 @@ if ! step_done pcre2; then
   header "PCRE2 ${PCRE2_VER}"
   a=$(fetch "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE2_VER}/pcre2-${PCRE2_VER}.tar.bz2")
   bpkg "$a" bash -c "
-    ./configure --prefix=/usr             \
-                --enable-unicode          \
-                --enable-jit              \
-                --enable-pcre2-16         \
-                --enable-pcre2-32         \
-                --enable-pcre2grep-libz   \
-                --enable-pcre2grep-libbz2 \
-                --disable-static
-    make -j${NPROC}
-    make install
+    ./configure --prefix=/usr --enable-unicode --enable-jit \
+      --enable-pcre2-16 --enable-pcre2-32 \
+      --enable-pcre2grep-libz --enable-pcre2grep-libbz2 --disable-static
+    make -j${NPROC} && make install
   "
   mark_step pcre2
 fi
@@ -176,8 +1212,7 @@ if ! step_done libffi; then
   a=$(fetch "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VER}/libffi-${LIBFFI_VER}.tar.gz")
   bpkg "$a" bash -c "
     ./configure --prefix=/usr --disable-static --with-gcc-arch=haswell
-    make -j${NPROC}
-    make install
+    make -j${NPROC} && make install
   "
   mark_step libffi
 fi
@@ -190,81 +1225,48 @@ if ! step_done glib; then
   a=$(fetch "$(gnome_url glib ${GLIB_VER})")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr              \
-                --buildtype=release        \
-                -D introspection=disabled  \
-                -D man-pages=disabled      \
-                -D tests=false             \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D introspection=disabled -D man-pages=disabled -D tests=false ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step glib
 fi
 
 # =============================================================================
-# 5. libpng
+# 5–8. Image libraries
 # =============================================================================
 if ! step_done libpng; then
   header "libpng ${LIBPNG_VER}"
   a=$(fetch "https://downloads.sourceforge.net/libpng/libpng-${LIBPNG_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    ./configure --prefix=/usr --disable-static
-    make -j${NPROC}
-    make install
-  "
+  bpkg "$a" bash -c "./configure --prefix=/usr --disable-static; make -j${NPROC}; make install"
   mark_step libpng
 fi
 
-# =============================================================================
-# 6. libjpeg-turbo
-# =============================================================================
 if ! step_done libjpeg_turbo; then
   header "libjpeg-turbo ${LIBJPEG_TURBO_VER}"
   a=$(fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/${LIBJPEG_TURBO_VER}/libjpeg-turbo-${LIBJPEG_TURBO_VER}.tar.gz")
   bpkg "$a" bash -c "
-    cmake -DCMAKE_INSTALL_PREFIX=/usr         \
-          -DCMAKE_BUILD_TYPE=Release           \
-          -DCMAKE_INSTALL_DEFAULT_LIBDIR=lib   \
-          -DENABLE_STATIC=FALSE                \
-          -G Ninja .
-    ninja -j${NPROC}
-    ninja install
+    cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_DEFAULT_LIBDIR=lib -DENABLE_STATIC=FALSE -G Ninja .
+    ninja -j${NPROC} && ninja install
   "
   mark_step libjpeg_turbo
 fi
 
-# =============================================================================
-# 7. libtiff
-# =============================================================================
 if ! step_done libtiff; then
   header "libtiff ${LIBTIFF_VER}"
   a=$(fetch "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    cmake -DCMAKE_INSTALL_PREFIX=/usr \
-          -DCMAKE_BUILD_TYPE=Release   \
-          -G Ninja ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -G Ninja ..; ninja -j${NPROC}; ninja install"
   mark_step libtiff
 fi
 
-# =============================================================================
-# 8. libwebp
-# =============================================================================
 if ! step_done libwebp; then
   header "libwebp ${LIBWEBP_VER}"
   a=$(fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VER}.tar.gz")
   bpkg "$a" bash -c "
-    ./configure --prefix=/usr   \
-                --enable-libwebpmux    \
-                --enable-libwebpdemux  \
-                --enable-libwebpdecoder \
-                --disable-static
-    make -j${NPROC}
-    make install
+    ./configure --prefix=/usr --enable-libwebpmux --enable-libwebpdemux \
+      --enable-libwebpdecoder --disable-static
+    make -j${NPROC} && make install
   "
   mark_step libwebp
 fi
@@ -277,81 +1279,47 @@ if ! step_done libdrm; then
   a=$(fetch "https://dri.freedesktop.org/libdrm/libdrm-${LIBDRM_VER}.tar.xz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D udev=true           \
-                -D valgrind=disabled   \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release -D udev=true -D valgrind=disabled ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step libdrm
 fi
 
 # =============================================================================
-# 10. Wayland
+# 10–11. Wayland
 # =============================================================================
 if ! step_done wayland; then
   header "Wayland ${WAYLAND_VER}"
   a=$(fetch "https://gitlab.freedesktop.org/wayland/wayland/-/releases/${WAYLAND_VER}/downloads/wayland-${WAYLAND_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr      \
-                --buildtype=release \
-                -D documentation=false \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D documentation=false ..; ninja -j${NPROC}; ninja install"
   mark_step wayland
 fi
 
-# =============================================================================
-# 11. wayland-protocols
-# =============================================================================
 if ! step_done wayland_protocols; then
   header "wayland-protocols ${WAYLAND_PROTO_VER}"
   a=$(fetch "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/${WAYLAND_PROTO_VER}/downloads/wayland-protocols-${WAYLAND_PROTO_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step wayland_protocols
 fi
 
 # =============================================================================
-# 12. xkeyboard-config
+# 12–13. XKB
 # =============================================================================
 if ! step_done xkb_config; then
   header "xkeyboard-config ${XKB_CONFIG_VER}"
   a=$(fetch "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-${XKB_CONFIG_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step xkb_config
 fi
 
-# =============================================================================
-# 13. libxkbcommon
-# =============================================================================
 if ! step_done xkbcommon; then
   header "libxkbcommon ${XKBCOMMON_VER}"
   a=$(fetch "https://xkbcommon.org/download/libxkbcommon-${XKBCOMMON_VER}.tar.xz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D enable-docs=false   \
-                -D enable-wayland=true \
-                -D enable-x11=false    \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D enable-docs=false -D enable-wayland=true -D enable-x11=false ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step xkbcommon
 fi
@@ -362,64 +1330,36 @@ fi
 if ! step_done pixman; then
   header "pixman ${PIXMAN_VER}"
   a=$(fetch "https://cairographics.org/releases/pixman-${PIXMAN_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step pixman
 fi
 
 # =============================================================================
-# 15. FreeType (first pass — no HarfBuzz yet)
+# 15–17. FreeType / HarfBuzz (two-pass)
 # =============================================================================
 if ! step_done freetype_pass1; then
   header "FreeType ${FREETYPE_VER} (pass 1)"
   a=$(fetch "https://downloads.sourceforge.net/freetype/freetype-${FREETYPE_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    ./configure --prefix=/usr            \
-                --enable-freetype-config \
-                --disable-static
-    make -j${NPROC}
-    make install
-  "
+  bpkg "$a" bash -c "./configure --prefix=/usr --enable-freetype-config --disable-static; make -j${NPROC}; make install"
   mark_step freetype_pass1
 fi
 
-# =============================================================================
-# 16. HarfBuzz
-# =============================================================================
 if ! step_done harfbuzz; then
   header "HarfBuzz ${HARFBUZZ_VER}"
   a=$(fetch "https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VER}/harfbuzz-${HARFBUZZ_VER}.tar.xz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D graphite2=disabled  \
-                -D tests=disabled      \
-                -D docs=disabled       \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D graphite2=disabled -D tests=disabled -D docs=disabled ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step harfbuzz
 fi
 
-# =============================================================================
-# 17. FreeType (second pass — with HarfBuzz for hinting)
-# =============================================================================
 if ! step_done freetype_pass2; then
   header "FreeType ${FREETYPE_VER} (pass 2 — with HarfBuzz)"
   a=$(fetch "https://downloads.sourceforge.net/freetype/freetype-${FREETYPE_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    ./configure --prefix=/usr            \
-                --enable-freetype-config \
-                --disable-static
-    make -j${NPROC}
-    make install
-  "
+  bpkg "$a" bash -c "./configure --prefix=/usr --enable-freetype-config --disable-static; make -j${NPROC}; make install"
   mark_step freetype_pass2
 fi
 
@@ -430,90 +1370,42 @@ if ! step_done fontconfig; then
   header "fontconfig ${FONTCONFIG_VER}"
   a=$(fetch "https://www.freedesktop.org/software/fontconfig/release/fontconfig-${FONTCONFIG_VER}.tar.xz")
   bpkg "$a" bash -c "
-    ./configure --prefix=/usr  \
-                --sysconfdir=/etc \
-                --localstatedir=/var \
-                --disable-static \
-                --docdir=/usr/share/doc/fontconfig
-    make -j${NPROC}
-    make install
-    install -dm755 /usr/share/fonts/OTF
-    fc-cache
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+      --disable-static --docdir=/usr/share/doc/fontconfig
+    make -j${NPROC} && make install
+    install -dm755 /usr/share/fonts/OTF; fc-cache
   "
   mark_step fontconfig
 fi
 
 # =============================================================================
-# 19. Cairo
+# 19–22. Cairo / Pango / gdk-pixbuf / ATK
 # =============================================================================
 if ! step_done cairo; then
   header "Cairo ${CAIRO_VER}"
   a=$(fetch "https://cairographics.org/releases/cairo-${CAIRO_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D tests=disabled      \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D tests=disabled ..; ninja -j${NPROC}; ninja install"
   mark_step cairo
 fi
 
-# =============================================================================
-# 20. Pango
-# =============================================================================
 if ! step_done pango; then
   header "Pango ${PANGO_VER}"
   a=$(fetch "$(gnome_url pango ${PANGO_VER})")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D introspection=disabled \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D introspection=disabled ..; ninja -j${NPROC}; ninja install"
   mark_step pango
 fi
 
-# =============================================================================
-# 21. gdk-pixbuf
-# =============================================================================
 if ! step_done gdk_pixbuf; then
   header "gdk-pixbuf ${GDK_PIXBUF_VER}"
   a=$(fetch "$(gnome_url gdk-pixbuf ${GDK_PIXBUF_VER})")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr         \
-                --buildtype=release    \
-                -D introspection=disabled \
-                -D man=false           \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D introspection=disabled -D man=false ..; ninja -j${NPROC}; ninja install"
   mark_step gdk_pixbuf
 fi
 
-# =============================================================================
-# 22. ATK
-# =============================================================================
 if ! step_done atk; then
   header "ATK ${ATK_VER}"
   a=$(fetch "$(gnome_url atk ${ATK_VER})")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D introspection=false  \
-                -D docs=false           \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D introspection=false -D docs=false ..; ninja -j${NPROC}; ninja install"
   mark_step atk
 fi
 
@@ -523,16 +1415,7 @@ fi
 if ! step_done at_spi2; then
   header "at-spi2-core ${AT_SPI2_CORE_VER}"
   a=$(fetch "$(gnome_url at-spi2-core ${AT_SPI2_CORE_VER})")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D introspection=no     \
-                -D docs=false           \
-                ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release -D introspection=no -D docs=false ..; ninja -j${NPROC}; ninja install"
   mark_step at_spi2
 fi
 
@@ -544,24 +1427,16 @@ if ! step_done gtk3; then
   a=$(fetch "$(gnome_url gtk+ ${GTK3_VER})")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D introspection=false  \
-                -D wayland-backend=true \
-                -D x11-backend=false    \
-                -D broadway-backend=false \
-                -D demos=false          \
-                -D examples=false       \
-                -D tests=false          \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D introspection=false -D wayland-backend=true -D x11-backend=false \
+      -D broadway-backend=false -D demos=false -D examples=false -D tests=false ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step gtk3
 fi
 
 # =============================================================================
-# 25. Rust toolchain (needed by librsvg, niri, alacritty)
+# 25. Rust toolchain
 # =============================================================================
 if ! step_done rust; then
   header "Rust toolchain"
@@ -570,8 +1445,7 @@ if ! step_done rust; then
     chmod +x "$SOURCES/rustup-init"
     RUSTUP_HOME=/usr/share/rustup CARGO_HOME=/usr/share/cargo \
       "$SOURCES/rustup-init" -y --no-modify-path \
-        --default-toolchain stable \
-        --profile minimal
+        --default-toolchain stable --profile minimal
   fi
   cat > /etc/profile.d/rust.sh << 'EOF'
 export RUSTUP_HOME=/usr/share/rustup
@@ -584,28 +1458,24 @@ fi
 source /etc/profile.d/rust.sh 2>/dev/null || true
 
 # =============================================================================
-# 26. librsvg (needs Rust + GTK3 chain)
+# 26. librsvg
 # =============================================================================
 if ! step_done librsvg; then
   header "librsvg ${LIBRSVG_VER}"
   a=$(fetch "$(gnome_url librsvg ${LIBRSVG_VER})")
   bpkg "$a" bash -c "
-    ./configure --prefix=/usr   \
-                --disable-static \
-                --disable-introspection \
-                --disable-vala
-    make -j${NPROC}
-    make install
+    ./configure --prefix=/usr --disable-static --disable-introspection --disable-vala
+    make -j${NPROC} && make install
   "
   mark_step librsvg
 fi
 
 # =============================================================================
-# 27. LLVM (required by Mesa iris driver — WARNING: very long build ~4-8h)
+# 27. LLVM (~4–8 hours)
 # =============================================================================
 if ! step_done llvm; then
   header "LLVM ${LLVM_VER}"
-  warn "LLVM build takes 4-8 hours on this hardware. Go get coffee."
+  warn "LLVM build takes 4-8 hours on this hardware."
   a=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-${LLVM_VER}.src.tar.xz")
   cf=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/cmake-${LLVM_VER}.src.tar.xz")
   bdir=$(mktemp -d "$SOURCES/llvm-build.XXXXXX")
@@ -614,47 +1484,31 @@ if ! step_done llvm; then
   tar -xf "$cf" --strip-components=1 -C "$bdir/cmake"
   pushd "$bdir" >/dev/null
   mkdir build && cd build
-  cmake -DCMAKE_INSTALL_PREFIX=/usr              \
-        -DCMAKE_BUILD_TYPE=Release               \
-        -DLLVM_ENABLE_FFI=ON                     \
-        -DLLVM_BUILD_LLVM_DYLIB=ON               \
-        -DLLVM_LINK_LLVM_DYLIB=ON                \
-        -DLLVM_ENABLE_RTTI=ON                    \
-        -DLLVM_TARGETS_TO_BUILD="X86"            \
-        -DLLVM_BINUTILS_INCDIR=/usr/include      \
-        -DLLVM_ENABLE_BINDINGS=OFF               \
-        -Wno-dev -G Ninja ..
-  ninja -j${NPROC}
-  ninja install
+  cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_ENABLE_FFI=ON -DLLVM_BUILD_LLVM_DYLIB=ON \
+        -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_TARGETS_TO_BUILD="X86" -DLLVM_BINUTILS_INCDIR=/usr/include \
+        -DLLVM_ENABLE_BINDINGS=OFF -Wno-dev -G Ninja ..
+  ninja -j${NPROC} && ninja install
   popd >/dev/null
   rm -rf "$bdir"
   mark_step llvm
 fi
 
 # =============================================================================
-# 28. Mesa (Intel iris — requires LLVM above)
+# 28. Mesa
 # =============================================================================
 if ! step_done mesa; then
   header "Mesa ${MESA_VER}"
   a=$(fetch "https://mesa.freedesktop.org/archive/mesa-${MESA_VER}.tar.xz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr            \
-                --buildtype=release       \
-                -D platforms=wayland      \
-                -D gallium-drivers=iris,crocus,swrast \
-                -D vulkan-drivers=intel   \
-                -D glx=disabled           \
-                -D egl=enabled            \
-                -D gles1=disabled         \
-                -D gles2=enabled          \
-                -D llvm=enabled           \
-                -D shared-llvm=enabled    \
-                -D video-codecs=all       \
-                -D intel-clc=auto         \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D platforms=wayland -D gallium-drivers=iris,crocus,swrast \
+      -D vulkan-drivers=intel -D glx=disabled -D egl=enabled \
+      -D gles1=disabled -D gles2=enabled -D llvm=enabled \
+      -D shared-llvm=enabled -D video-codecs=all -D intel-clc=auto ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step mesa
 fi
@@ -667,16 +1521,10 @@ if ! step_done seatd; then
   a=$(fetch "https://git.sr.ht/~kennylevinsen/seatd/archive/${SEATD_VER}.tar.gz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D server=enabled       \
-                -D builtin=enabled      \
-                -D examples=disabled    \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D server=enabled -D builtin=enabled -D examples=disabled ..
+    ninja -j${NPROC} && ninja install
   "
-  # seatd OpenRC service
   cat > /etc/init.d/seatd << 'EOF'
 #!/sbin/openrc-run
 description="Seat management daemon"
@@ -701,18 +1549,13 @@ if ! step_done polkit; then
   bpkg "$a" bash -c "
     groupadd -fg 27 polkitd 2>/dev/null || true
     useradd -c 'PolicyKit Daemon Owner' -d /etc/polkit-1 \
-            -u 27 -g polkitd -s /bin/false polkitd 2>/dev/null || true
+      -u 27 -g polkitd -s /bin/false polkitd 2>/dev/null || true
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D session_tracking=elogind \
-                -D introspection=false  \
-                -D man=false            \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D session_tracking=elogind -D introspection=false -D man=false ..
+    ninja -j${NPROC} && ninja install
     chown -v root:polkitd /usr/lib/polkit-1/polkitd
-    chmod -v  4755        /usr/lib/polkit-1/polkitd
+    chmod -v 4755          /usr/lib/polkit-1/polkitd
   "
   mark_step polkit
 fi
@@ -725,17 +1568,10 @@ if ! step_done pipewire; then
   a=$(fetch "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/${PIPEWIRE_VER}/pipewire-${PIPEWIRE_VER}.tar.gz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D session-managers=[]  \
-                -D gstreamer=disabled   \
-                -D bluez5=disabled      \
-                -D jack=disabled        \
-                -D tests=disabled       \
-                -D examples=disabled    \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D session-managers=[] -D gstreamer=disabled -D bluez5=disabled \
+      -D jack=disabled -D tests=disabled -D examples=disabled ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step pipewire
 fi
@@ -748,15 +1584,9 @@ if ! step_done wireplumber; then
   a=$(fetch "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/${WIREPLUMBER_VER}/wireplumber-${WIREPLUMBER_VER}.tar.gz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D elogind=enabled      \
-                -D systemd=disabled     \
-                -D tests=disabled       \
-                -D doc=disabled         \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D elogind=enabled -D systemd=disabled -D tests=disabled -D doc=disabled ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step wireplumber
 fi
@@ -787,65 +1617,30 @@ if ! step_done alacritty; then
     source /etc/profile.d/rust.sh
     cargo build --release --locked
     install -Dm755 target/release/alacritty /usr/bin/alacritty
-    install -Dm644 extra/linux/Alacritty.desktop \
-      /usr/share/applications/Alacritty.desktop
-    install -Dm644 extra/alacritty.bash \
-      /usr/share/bash-completion/completions/alacritty 2>/dev/null || true
+    install -Dm644 extra/linux/Alacritty.desktop /usr/share/applications/Alacritty.desktop
   "
   mark_step alacritty
 fi
 
 # =============================================================================
-# 35. waybar (needs GTK3, pipewire, wayland)
+# 35. waybar (+ deps: fmt, spdlog, jsoncpp)
 # =============================================================================
 if ! step_done waybar; then
   header "waybar ${WAYBAR_VER}"
-  # waybar needs jsoncpp, libxkbregistry, fmt, spdlog, date
-  # Install fmt first
   fmt_a=$(fetch "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz")
-  bpkg "$fmt_a" bash -c "
-    cmake -DCMAKE_INSTALL_PREFIX=/usr \
-          -DCMAKE_BUILD_TYPE=Release   \
-          -DFMT_TEST=OFF               \
-          -G Ninja .
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$fmt_a" bash -c "cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DFMT_TEST=OFF -G Ninja .; ninja -j${NPROC}; ninja install"
   spdlog_a=$(fetch "https://github.com/gabime/spdlog/archive/refs/tags/v1.14.1.tar.gz")
-  bpkg "$spdlog_a" bash -c "
-    cmake -DCMAKE_INSTALL_PREFIX=/usr \
-          -DCMAKE_BUILD_TYPE=Release   \
-          -DSPDLOG_FMT_EXTERNAL=ON     \
-          -G Ninja .
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$spdlog_a" bash -c "cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DSPDLOG_FMT_EXTERNAL=ON -G Ninja .; ninja -j${NPROC}; ninja install"
   jsoncpp_a=$(fetch "https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.6.tar.gz")
-  bpkg "$jsoncpp_a" bash -c "
-    cmake -DCMAKE_INSTALL_PREFIX=/usr   \
-          -DCMAKE_BUILD_TYPE=Release     \
-          -DJSONCPP_WITH_TESTS=OFF       \
-          -DBUILD_SHARED_LIBS=ON         \
-          -G Ninja .
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$jsoncpp_a" bash -c "cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DJSONCPP_WITH_TESTS=OFF -DBUILD_SHARED_LIBS=ON -G Ninja .; ninja -j${NPROC}; ninja install"
   a=$(fetch "https://github.com/Alexays/Waybar/archive/refs/tags/${WAYBAR_VER}.tar.gz")
   bpkg "$a" bash -c "
     mkdir build && cd build
-    meson setup --prefix=/usr          \
-                --buildtype=release     \
-                -D niri=enabled         \
-                -D tray=enabled         \
-                -D systemd=disabled     \
-                -D pulseaudio=disabled  \
-                -D pipewire=enabled     \
-                -D mpris=disabled       \
-                -D jack=disabled        \
-                -D tests=disabled       \
-                ..
-    ninja -j${NPROC}
-    ninja install
+    meson setup --prefix=/usr --buildtype=release \
+      -D niri=enabled -D tray=enabled -D systemd=disabled \
+      -D pulseaudio=disabled -D pipewire=enabled \
+      -D mpris=disabled -D jack=disabled -D tests=disabled ..
+    ninja -j${NPROC} && ninja install
   "
   mark_step waybar
 fi
@@ -856,12 +1651,7 @@ fi
 if ! step_done fuzzel; then
   header "fuzzel ${FUZZEL_VER}"
   a=$(fetch "https://codeberg.org/dnkl/fuzzel/archive/${FUZZEL_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step fuzzel
 fi
 
@@ -871,13 +1661,7 @@ fi
 if ! step_done swaylock; then
   header "swaylock ${SWAYLOCK_VER}"
   a=$(fetch "https://github.com/swaywm/swaylock/releases/download/v${SWAYLOCK_VER}/swaylock-v${SWAYLOCK_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-    chmod a+s /usr/bin/swaylock
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install; chmod a+s /usr/bin/swaylock"
   mark_step swaylock
 fi
 
@@ -887,12 +1671,7 @@ fi
 if ! step_done swaybg; then
   header "swaybg ${SWAYBG_VER}"
   a=$(fetch "https://github.com/swaywm/swaybg/releases/download/v${SWAYBG_VER}/swaybg-v${SWAYBG_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step swaybg
 fi
 
@@ -902,10 +1681,7 @@ fi
 if ! step_done dunst; then
   header "dunst ${DUNST_VER}"
   a=$(fetch "https://github.com/dunst-project/dunst/releases/download/v${DUNST_VER}/dunst-${DUNST_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    make -j${NPROC} WAYLAND=1 SYSTEMD=0
-    make install SYSTEMD=0 PREFIX=/usr
-  "
+  bpkg "$a" bash -c "make -j${NPROC} WAYLAND=1 SYSTEMD=0; make install SYSTEMD=0 PREFIX=/usr"
   mark_step dunst
 fi
 
@@ -915,12 +1691,7 @@ fi
 if ! step_done grim; then
   header "grim ${GRIM_VER}"
   a=$(fetch "https://gitlab.freedesktop.org/emersion/grim/-/releases/v${GRIM_VER}/downloads/grim-${GRIM_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step grim
 fi
 
@@ -930,12 +1701,7 @@ fi
 if ! step_done slurp; then
   header "slurp ${SLURP_VER}"
   a=$(fetch "https://github.com/emersion/slurp/releases/download/v${SLURP_VER}/slurp-${SLURP_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step slurp
 fi
 
@@ -945,12 +1711,7 @@ fi
 if ! step_done wl_clipboard; then
   header "wl-clipboard ${WL_CLIPBOARD_VER}"
   a=$(fetch "https://github.com/bugaevc/wl-clipboard/releases/download/v${WL_CLIPBOARD_VER}/wl-clipboard-${WL_CLIPBOARD_VER}.tar.xz")
-  bpkg "$a" bash -c "
-    mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release ..
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "mkdir build && cd build; meson setup --prefix=/usr --buildtype=release ..; ninja -j${NPROC}; ninja install"
   mark_step wl_clipboard
 fi
 
@@ -960,11 +1721,7 @@ fi
 if ! step_done brightnessctl; then
   header "brightnessctl ${BRIGHTNESSCTL_VER}"
   a=$(fetch "https://github.com/Hummer12007/brightnessctl/archive/refs/tags/${BRIGHTNESSCTL_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    make -j${NPROC}
-    make install PREFIX=/usr
-  "
-  # udev rule for backlight control without root
+  bpkg "$a" bash -c "make -j${NPROC}; make install PREFIX=/usr"
   cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
 ACTION=="add", SUBSYSTEM=="backlight", \
   RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
@@ -977,16 +1734,10 @@ fi
 # 44. fastfetch
 # =============================================================================
 if ! step_done fastfetch; then
-  header "fastfetch (latest)"
+  header "fastfetch"
   FF_VER="2.26.1"
   a=$(fetch "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/${FF_VER}.tar.gz")
-  bpkg "$a" bash -c "
-    cmake -DCMAKE_INSTALL_PREFIX=/usr \
-          -DCMAKE_BUILD_TYPE=Release   \
-          -G Ninja .
-    ninja -j${NPROC}
-    ninja install
-  "
+  bpkg "$a" bash -c "cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -G Ninja .; ninja -j${NPROC}; ninja install"
   mark_step fastfetch
 fi
 
@@ -994,18 +1745,12 @@ fi
 # 45. Fonts
 # =============================================================================
 if ! step_done fonts; then
-  header "Fonts — JetBrainsMono Nerd Font + Noto Emoji"
+  header "Fonts"
   mkdir -p /usr/share/fonts/nerd-fonts /usr/share/fonts/noto
-
-  # JetBrainsMono Nerd Font
-  jb_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.tar.xz"
-  jb_a=$(fetch "$jb_url")
+  jb_a=$(fetch "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.tar.xz")
   tar -xf "$jb_a" -C /usr/share/fonts/nerd-fonts
-
-  # Noto Emoji
-  noto_url="https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf"
-  wget -q -O /usr/share/fonts/noto/NotoColorEmoji.ttf "$noto_url"
-
+  wget -q -O /usr/share/fonts/noto/NotoColorEmoji.ttf \
+    "https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf"
   fc-cache -fv
   mark_step fonts
 fi
@@ -1021,15 +1766,13 @@ if ! step_done user_setup; then
           -s /bin/zsh legend 2>/dev/null || true
   echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
 
-  # doas
-  if ! command -v doas &>/dev/null; then
-    warn "doas not found — configure sudo or doas manually for 'legend'"
-  else
+  if command -v doas &>/dev/null; then
     printf 'permit persist legend as root\n' > /etc/doas.conf
     chmod 0400 /etc/doas.conf
+  else
+    warn "doas not found — configure sudo or doas manually for 'legend'"
   fi
 
-  # Symlink configs from legenddots
   su - legend -c "
     git clone https://github.com/legendarymsr/legenddots ~/legenddots 2>/dev/null || \
       (cd ~/legenddots && git pull --ff-only)
@@ -1048,20 +1791,15 @@ if ! step_done user_setup; then
 fi
 
 # =============================================================================
-# 47. MacBook Air 6,2 — hardware quirks
+# 47. MacBook Air 6,2 hardware quirks
 # =============================================================================
 if ! step_done macbook_hw; then
   header "MacBook Air 6,2 hardware config"
-
-  # Apple keyboard: fn keys act as standard F1-F12
   echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
-
-  # Broadcom BCM4360 WiFi — must be built separately; broadcom-sta is non-free
   warn "WiFi: BCM4360 requires broadcom-sta. Build the wl.ko module manually:"
   warn "  https://www.lwfinger.com/downloads/hybrid-v35_64-nodebug-pcoem-6_30_223_271.tar.gz"
   warn "  make -C /lib/modules/\$(uname -r)/build M=\$(pwd) modules"
-  warn "  install -m644 wl.ko /lib/modules/\$(uname -r)/updates/"
-  warn "  depmod -a"
+  warn "  install -m644 wl.ko /lib/modules/\$(uname -r)/updates/ && depmod -a"
   cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
 blacklist brcmfmac
 blacklist brcmsmac
@@ -1070,13 +1808,10 @@ blacklist b43legacy
 blacklist ssb
 blacklist bcma
 EOF
-
-  # OpenRC: enable seatd at boot
   rc-update add seatd default 2>/dev/null || true
-
   mark_step macbook_hw
 fi
 
-echo -e "\n${GREEN}BLFS setup complete.${NC}"
-echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 12-20 hours (LLVM is the main bottleneck).${NC}"
-echo -e "${CYAN}Reboot into your LFS system and start a niri session as 'legend'.${NC}"
+echo -e "\n${GREEN}Setup complete.${NC}"
+echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 12–20 hours (LLVM is the bottleneck).${NC}"
+echo -e "${CYAN}Reboot and start a niri session as 'legend'.${NC}"
