@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  String names excluded from the blanket "Fennec"/"Firefox" -> APP_NAME
+  rename that scripts/rebrand-apk.sh applies across res/values*/strings.xml
+  (config/branding.env's APP_NAME). These name real external Mozilla
+  products/services that keep their own name no matter what this browser is
+  rebranded to, so renaming them would be misleading.
+
+  Only the `name` attribute is read by rebrand-apk.sh; the string content
+  here is just documentation of why each one is excluded.
+-->
+<resources>
+    <!-- "Firefox Relay" is Mozilla's email-masking service at
+         relay.firefox.com, not part of this app. -->
+    <string name="firefox_relay">Firefox Relay</string>
+</resources>

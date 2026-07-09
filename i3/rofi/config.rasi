@@ -1,0 +1,83 @@
+configuration {
+    modi: "drun,run,window";
+    show-icons: true;
+    icon-theme: "Papirus-Dark";
+    font: "JetBrainsMono Nerd Font 12";
+    drun-display-format: "{name}";
+    display-drun: " ";
+    display-run: " ";
+    display-window: " ";
+}
+
+* {
+    bg:      #1a1b26f2;
+    fg:      #c0caf5;
+    blue:    #7aa2f7;
+    dim:     #414868;
+    muted:   #a9b1d6;
+    red:     #f7768e;
+
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+window {
+    background-color: @bg;
+    border:           2px solid;
+    border-color:     @blue;
+    border-radius:    10px;
+    width:            480px;
+    padding:          12px;
+}
+
+mainbox {
+    background-color: transparent;
+    children: [inputbar, listview];
+    spacing: 8px;
+}
+
+inputbar {
+    background-color: #24283b;
+    border-radius:    8px;
+    padding:          10px 14px;
+    children:         [prompt, entry];
+    spacing:          6px;
+}
+
+prompt {
+    text-color: @blue;
+}
+
+entry {
+    text-color:   @fg;
+    placeholder:  "Search...";
+    placeholder-color: @dim;
+}
+
+listview {
+    background-color: transparent;
+    lines:   8;
+    columns: 1;
+    spacing: 4px;
+}
+
+element {
+    background-color: transparent;
+    border-radius:    6px;
+    padding:          8px 12px;
+    spacing:          8px;
+    orientation:      horizontal;
+}
+
+element selected {
+    background-color: #7aa2f726;
+    text-color:       @blue;
+}
+
+element-icon {
+    size: 22px;
+}
+
+element-text {
+    vertical-align: 0.5;
+}

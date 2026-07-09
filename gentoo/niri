@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Launch niri on Gentoo/OpenRC (no systemd/dinit).
+set -euo pipefail
+
+UID_=$(id -u)
+USER_=$(id -un)
+GRP_=$(id -gn)
+XDG_RUNTIME_DIR="/run/user/$UID_"
+export XDG_RUNTIME_DIR
+
+# Find seatd binary (not always in PATH on Gentoo)
+SEATD_BIN=$(command -v seatd 2>/dev/null || true)
+[[ -z "$SEATD_BIN" ]] && for _p in /usr/bin/seatd /usr/sbin/seatd; do
+  [[ -x "$_p" ]] && { SEATD_BIN="$_p"; break; }
+done
+[[ -z "$SEATD_BIN" ]] && { echo "seatd not found — emerge sys-auth/seatd with USE=server"; exit 1; }
+
+# All privileged setup in ONE doas call → one password prompt
+SETUP=$(mktemp)
+cat > "$SETUP" << EOF
+#!/bin/sh
+set -e
+mkdir -p "$XDG_RUNTIME_DIR"
+chown "$USER_:$GRP_" "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+rc-service dbus    status || rc-service dbus    start
+rc-service elogind status || rc-service elogind start
+groupadd -f render
+id -nG "$USER_" | grep -qw render || usermod -aG render "$USER_"
+chgrp render /dev/dri/renderD* 2>/dev/null || true
+chmod 660   /dev/dri/renderD* 2>/dev/null || true
+# MacBook trackpad driver — not always auto-loaded on Gentoo
+modprobe bcm5974 2>/dev/null || true
+if [ ! -f /etc/init.d/seatd ]; then
+  cat > /etc/init.d/seatd << 'INITEOF'
+#!/sbin/openrc-run
+name="seatd"
+description="Seat management daemon"
+command="$SEATD_BIN"
+command_args="-g seat"
+command_background="yes"
+pidfile="/run/\${RC_SVCNAME}.pid"
+INITEOF
+  chmod +x /etc/init.d/seatd
+  rc-update add seatd default
+fi
+rc-service seatd status || rc-service seatd start
+for i in \$(seq 1 30); do [ -S /run/seatd.sock ] && break; sleep 0.2; done
+[ -S /run/seatd.sock ] || { echo "seatd socket never appeared"; exit 1; }
+chmod 777 /run/seatd.sock
+VT=\$(fgconsole 2>/dev/null || echo 1)
+ALT=\$(( VT == 1 ? 2 : 1 ))
+chvt "\$ALT"
+sleep 0.5
+chvt "\$VT"
+sleep 1
+EOF
+doas sh "$SETUP"
+rm -f "$SETUP"
+
+export SEATD_SOCK=/run/seatd.sock
+export LIBSEAT_BACKEND=seatd
+exec dbus-run-session niri

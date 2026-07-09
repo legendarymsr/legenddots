@@ -1,0 +1,69 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 32,
+  "spacing": 4,
+  "margin-top": 6,
+  "margin-left": 10,
+  "margin-right": 10,
+
+  "modules-left": ["hyprland/workspaces", "hyprland/window"],
+  "modules-center": ["clock"],
+  "modules-right": ["wireplumber", "network", "cpu", "memory", "battery", "tray"],
+
+  "hyprland/workspaces": {
+    "format": "{id}",
+    "on-scroll-up": "hyprctl dispatch workspace e+1",
+    "on-scroll-down": "hyprctl dispatch workspace e-1"
+  },
+
+  "hyprland/window": {
+    "format": "{title}",
+    "max-length": 50,
+    "separate-outputs": true
+  },
+
+  "clock": {
+    "format": " {:%H:%M}",
+    "format-alt": " {:%Y-%m-%d}",
+    "tooltip-format": "<tt>{calendar}</tt>"
+  },
+
+  "cpu": {
+    "format": " {usage}%",
+    "interval": 2
+  },
+
+  "memory": {
+    "format": " {}%",
+    "interval": 2
+  },
+
+  "battery": {
+    "format": "{icon} {capacity}%",
+    "format-icons": ["", "", "", "", ""],
+    "format-charging": " {capacity}%",
+    "states": {
+      "warning": 30,
+      "critical": 15
+    }
+  },
+
+  "network": {
+    "format-wifi": " {essid}",
+    "format-ethernet": " {ifname}",
+    "format-disconnected": "󰖪",
+    "tooltip-format": "{ipaddr} via {gwaddr}"
+  },
+
+  "wireplumber": {
+    "format": "{icon} {volume}%",
+    "format-muted": "󰝟",
+    "format-icons": ["", "", ""],
+    "on-click": "pavucontrol"
+  },
+
+  "tray": {
+    "spacing": 8
+  }
+}

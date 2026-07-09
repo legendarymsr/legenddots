@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+from textual.app import App, ComposeResult
+from textual.widgets import Input, Markdown, Header, Footer
+from textual.containers import Container, VerticalScroll
+import httpx
+import html2text
+from bs4 import BeautifulSoup
+
+class LegendBrowser(App):
+    # --- TACTICAL TOKYO NIGHT CSS ---
+    CSS = """
+    /* 1. Global Screen Settings */
+    Screen {
+        background: #1a1b26;
+        color: #c0caf5;
+        align: center middle; /* CENTERS EVERYTHING */
+    }
+
+    /* 2. The Address Bar */
+    Input { 
+        dock: top; 
+        height: 3;
+        margin: 0 0 1 0;
+        border: heavy #7aa2f7; 
+        background: #15161e;
+        color: #c0caf5;
+    }
+    Input:focus { border: heavy #bb9af7; }
+
+    /* 3. The Content Container */
+    VerticalScroll {
+        width: 100%;
+        height: 100%;
+        align: center middle; /* Center content vertically/horizontally */
+    }
+
+    /* 4. The Markdown Content Box */
+    Markdown { 
+        background: #1a1b26;
+        color: #c0caf5;
+        padding: 2;
+        max-width: 80%; /* Don't stretch to edges */
+        border: blank;
+    }
+    
+    /* 5. SPECIFIC TEXT STYLING */
+    
+    /* H1: Make it BIG and RED */
+    MarkdownH1 {
+        color: #f7768e; /* Tokyo Red */
+        text-style: bold;
+        background: #1a1b26;
+        border-bottom: heavy #f7768e;
+        text-align: center;
+        padding: 1;
+    }
+    
+    /* Links: Cyan */
+    MarkdownLink {
+        color: #7dcfff;
+        text-style: underline;
+    }
+
+    /* Code Blocks: Green Border */
+    MarkdownFence {
+        background: #15161e;
+        border: solid #9ece6a;
+        color: #9ece6a;
+    }
+    
+    /* Paragraphs: Centered text for the vibe */
+    MarkdownP {
+        text-align: center;
+    }
+    """
+
+    BINDINGS = [("q", "quit", "Quit")]
+
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Input(placeholder="http://localhost:8080", id="address_bar")
+        # Container to hold centered content
+        with VerticalScroll():
+            yield Markdown("# SYSTEM READY", id="content_view")
+        yield Footer()
+
+    async def on_input_submitted(self, message: Input.Submitted) -> None:
+        url = message.value
+        if not url.startswith("http"):
+            url = "https://" + url
+        await self.fetch_url(url)
+
+    async def fetch_url(self, url: str):
+        content_view = self.query_one("#content_view", Markdown)
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+                response = await client.get(url)
+                
+                # Manual Tweaks to make your site look cool in TUI
+                soup = BeautifulSoup(response.text, "html.parser")
+                
+                # 1. Fake the Strikethrough for VS CODE
+                # Find the span with class 'microsoft' and wrap it in ~~ tildes
+                for span in soup.find_all("span", class_="microsoft"):
+                    span.string = f"~~{span.text}~~"
+                
+                # 2. Convert to Markdown
+                converter = html2text.HTML2Text()
+                converter.ignore_links = False
+                converter.body_width = 0 
+                md = converter.handle(str(soup))
+                
+                content_view.update(md)
+        except Exception as e:
+            content_view.update(f"# ERROR\n{str(e)}")
+
+if __name__ == "__main__":
+    app = LegendBrowser()
+    app.run()

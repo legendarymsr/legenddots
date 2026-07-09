@@ -1,0 +1,49 @@
+name: CaulkLinux ISO
+
+on:
+  push:
+    tags:
+      - 'caulklinux-v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: pacman -Syu --noconfirm archiso gcc dosfstools squashfs-tools
+
+      - name: Compile installer
+        working-directory: caulklinux
+        run: gcc -std=c99 -O2 -Wall -Wextra -pedantic -static -o installer/install installer/install.c
+
+      - name: Build ISO
+        working-directory: caulklinux
+        run: |
+          cp installer/install iso/airootfs/usr/bin/caulk-install
+          chmod +x iso/airootfs/usr/bin/caulk-install
+          mkarchiso -v -w /tmp/caulk-work -o . iso
+
+      - name: Rename ISO
+        working-directory: caulklinux
+        run: mv *.iso caulklinux-${{ github.ref_name }}-x86_64.iso
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CaulkLinux ${{ github.ref_name }}
+          body: |
+            Minimal Arch-based ISO — single-file C TUI installer, zero ncurses.
+
+            **Install modes:** i3 · Hyprland · Niri
+            **Keyboard:** SE · **Timezone:** Europe/Brussels
+
+            ```sh
+            dd if=caulklinux-*.iso of=/dev/sdX bs=4M status=progress oflag=sync
+            ```
+          files: caulklinux/caulklinux-${{ github.ref_name }}-x86_64.iso
