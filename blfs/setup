@@ -1,0 +1,1082 @@
+#!/usr/bin/env bash
+# =============================================================================
+# BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
+# Builds the full desktop stack from source following BLFS procedures.
+#
+# Prerequisites: LFS 12.x base system with gcc, make, cmake, meson, ninja,
+#   pkg-config, python3, perl, bison, flex, gperf, diffutils, patch, which.
+#
+# Run as root inside the LFS environment (chroot or booted LFS partition).
+# Re-runnable: completed steps are skipped via /etc/blfs-setup.state.
+# =============================================================================
+set -euo pipefail
+
+[[ $EUID -eq 0 ]] || { echo "Run as root"; exit 1; }
+
+# ── Colors & helpers ──────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[0;33m'; NC='\033[0m'
+header() { echo -e "\n\033[1m\033[36m── $* ──\033[0m"; }
+info()   { echo -e "${CYAN}  → $*${NC}"; }
+ok()     { echo -e "${GREEN}  ✓ $*${NC}"; }
+warn()   { echo -e "${YELLOW}  ! $*${NC}"; }
+die()    { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+
+# ── Checkpointing ─────────────────────────────────────────────────────────────
+STATE_FILE=/etc/blfs-setup.state
+touch "$STATE_FILE"
+step_done() { grep -qx "$1" "$STATE_FILE"; }
+mark_step() { echo "$1" >> "$STATE_FILE"; }
+
+# ── Build environment ─────────────────────────────────────────────────────────
+SOURCES=/sources
+mkdir -p "$SOURCES"
+
+export CC="gcc"
+export CXX="g++"
+export CFLAGS="-march=haswell -O2 -pipe"
+export CXXFLAGS="-march=haswell -O2 -pipe"
+export MAKEFLAGS="-j3"
+export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig"
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin"
+
+NPROC=3  # j3 — safe for 8 GB RAM
+
+# ── Package versions ──────────────────────────────────────────────────────────
+# Check https://www.linuxfromscratch.org/blfs/view/stable/ for newer versions.
+
+PCRE2_VER="10.44"
+LIBFFI_VER="3.4.6"
+LIBUNISTRING_VER="1.2"
+GETTEXT_VER="0.22.5"
+GLIB_VER="2.82.4"
+LIBPNG_VER="1.6.44"
+LIBJPEG_TURBO_VER="3.0.4"
+LIBTIFF_VER="4.7.0"
+LIBWEBP_VER="1.4.0"
+LIBDRM_VER="2.4.123"
+WAYLAND_VER="1.23.1"
+WAYLAND_PROTO_VER="1.37"
+XKB_CONFIG_VER="2.43"
+XKBCOMMON_VER="1.7.0"
+PIXMAN_VER="0.43.4"
+FREETYPE_VER="2.13.3"
+HARFBUZZ_VER="10.1.0"
+FONTCONFIG_VER="2.15.0"
+CAIRO_VER="1.18.2"
+PANGO_VER="1.54.0"
+GDK_PIXBUF_VER="2.42.12"
+ATK_VER="2.38.0"
+AT_SPI2_CORE_VER="2.54.0"
+GTK3_VER="3.24.43"
+LIBRSVG_VER="2.58.3"
+LLVM_VER="18.1.8"
+MESA_VER="24.3.4"
+SEATD_VER="0.8.0"
+ELOGIND_VER="255.5"
+POLKIT_VER="125"
+PIPEWIRE_VER="1.2.7"
+WIREPLUMBER_VER="0.5.7"
+NIRI_VER="0.1.10"
+ALACRITTY_VER="0.15.0"
+WAYBAR_VER="0.10.4"
+FUZZEL_VER="1.10.3"
+SWAYLOCK_VER="1.7.2"
+SWAYBG_VER="1.2.1"
+DUNST_VER="1.11.0"
+GRIM_VER="1.4.1"
+SLURP_VER="1.5.0"
+WL_CLIPBOARD_VER="2.2.1"
+BRIGHTNESSCTL_VER="0.5.1"
+NETWORKMANAGER_VER="1.50.0"
+DBUS_VER="1.14.10"
+
+# ── Download + extract helpers ────────────────────────────────────────────────
+fetch() {
+  local url="$1"
+  local out="$SOURCES/$(basename "$url")"
+  if [[ ! -f "$out" ]]; then
+    info "Fetching $(basename "$url")..."
+    wget -q --show-progress -c -O "$out" "$url" || {
+      rm -f "$out"
+      die "Download failed: $url"
+    }
+  fi
+  echo "$out"
+}
+
+# Extract archive into a temp subdir of SOURCES, cd into it, run commands, clean up.
+bpkg() {
+  local archive="$1"; shift
+  local bdir
+  bdir=$(mktemp -d "$SOURCES/build.XXXXXX")
+  tar -xf "$archive" -C "$bdir" --strip-components=1
+  pushd "$bdir" >/dev/null
+  "$@"
+  local rc=$?
+  popd >/dev/null
+  rm -rf "$bdir"
+  return $rc
+}
+
+gnome_url() {
+  # gnome_url <package> <full-version>  →  gnome ftp URL
+  local pkg="$1" ver="$2"
+  local minor="${ver%.*}"
+  echo "https://download.gnome.org/sources/${pkg}/${minor}/${pkg}-${ver}.tar.xz"
+}
+
+# =============================================================================
+# 1. D-BUS (needed by many packages)
+# =============================================================================
+if ! step_done dbus; then
+  header "D-Bus ${DBUS_VER}"
+  a=$(fetch "https://dbus.freedesktop.org/releases/dbus/dbus-${DBUS_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr          \
+                --sysconfdir=/etc      \
+                --localstatedir=/var   \
+                --disable-static       \
+                --disable-doxygen-docs \
+                --disable-xml-docs     \
+                --with-systemdsystemunitdir=no \
+                --with-console-auth-dir=/run/console
+    make -j${NPROC}
+    make install
+    ln -sfv /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
+  "
+  mark_step dbus
+fi
+
+# =============================================================================
+# 2. PCRE2
+# =============================================================================
+if ! step_done pcre2; then
+  header "PCRE2 ${PCRE2_VER}"
+  a=$(fetch "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE2_VER}/pcre2-${PCRE2_VER}.tar.bz2")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr             \
+                --enable-unicode          \
+                --enable-jit              \
+                --enable-pcre2-16         \
+                --enable-pcre2-32         \
+                --enable-pcre2grep-libz   \
+                --enable-pcre2grep-libbz2 \
+                --disable-static
+    make -j${NPROC}
+    make install
+  "
+  mark_step pcre2
+fi
+
+# =============================================================================
+# 3. libffi
+# =============================================================================
+if ! step_done libffi; then
+  header "libffi ${LIBFFI_VER}"
+  a=$(fetch "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VER}/libffi-${LIBFFI_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr --disable-static --with-gcc-arch=haswell
+    make -j${NPROC}
+    make install
+  "
+  mark_step libffi
+fi
+
+# =============================================================================
+# 4. GLib
+# =============================================================================
+if ! step_done glib; then
+  header "GLib ${GLIB_VER}"
+  a=$(fetch "$(gnome_url glib ${GLIB_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr              \
+                --buildtype=release        \
+                -D introspection=disabled  \
+                -D man-pages=disabled      \
+                -D tests=false             \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step glib
+fi
+
+# =============================================================================
+# 5. libpng
+# =============================================================================
+if ! step_done libpng; then
+  header "libpng ${LIBPNG_VER}"
+  a=$(fetch "https://downloads.sourceforge.net/libpng/libpng-${LIBPNG_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr --disable-static
+    make -j${NPROC}
+    make install
+  "
+  mark_step libpng
+fi
+
+# =============================================================================
+# 6. libjpeg-turbo
+# =============================================================================
+if ! step_done libjpeg_turbo; then
+  header "libjpeg-turbo ${LIBJPEG_TURBO_VER}"
+  a=$(fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/${LIBJPEG_TURBO_VER}/libjpeg-turbo-${LIBJPEG_TURBO_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    cmake -DCMAKE_INSTALL_PREFIX=/usr         \
+          -DCMAKE_BUILD_TYPE=Release           \
+          -DCMAKE_INSTALL_DEFAULT_LIBDIR=lib   \
+          -DENABLE_STATIC=FALSE                \
+          -G Ninja .
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step libjpeg_turbo
+fi
+
+# =============================================================================
+# 7. libtiff
+# =============================================================================
+if ! step_done libtiff; then
+  header "libtiff ${LIBTIFF_VER}"
+  a=$(fetch "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_BUILD_TYPE=Release   \
+          -G Ninja ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step libtiff
+fi
+
+# =============================================================================
+# 8. libwebp
+# =============================================================================
+if ! step_done libwebp; then
+  header "libwebp ${LIBWEBP_VER}"
+  a=$(fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr   \
+                --enable-libwebpmux    \
+                --enable-libwebpdemux  \
+                --enable-libwebpdecoder \
+                --disable-static
+    make -j${NPROC}
+    make install
+  "
+  mark_step libwebp
+fi
+
+# =============================================================================
+# 9. libdrm
+# =============================================================================
+if ! step_done libdrm; then
+  header "libdrm ${LIBDRM_VER}"
+  a=$(fetch "https://dri.freedesktop.org/libdrm/libdrm-${LIBDRM_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D udev=true           \
+                -D valgrind=disabled   \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step libdrm
+fi
+
+# =============================================================================
+# 10. Wayland
+# =============================================================================
+if ! step_done wayland; then
+  header "Wayland ${WAYLAND_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/wayland/wayland/-/releases/${WAYLAND_VER}/downloads/wayland-${WAYLAND_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr      \
+                --buildtype=release \
+                -D documentation=false \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step wayland
+fi
+
+# =============================================================================
+# 11. wayland-protocols
+# =============================================================================
+if ! step_done wayland_protocols; then
+  header "wayland-protocols ${WAYLAND_PROTO_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/${WAYLAND_PROTO_VER}/downloads/wayland-protocols-${WAYLAND_PROTO_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step wayland_protocols
+fi
+
+# =============================================================================
+# 12. xkeyboard-config
+# =============================================================================
+if ! step_done xkb_config; then
+  header "xkeyboard-config ${XKB_CONFIG_VER}"
+  a=$(fetch "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-${XKB_CONFIG_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step xkb_config
+fi
+
+# =============================================================================
+# 13. libxkbcommon
+# =============================================================================
+if ! step_done xkbcommon; then
+  header "libxkbcommon ${XKBCOMMON_VER}"
+  a=$(fetch "https://xkbcommon.org/download/libxkbcommon-${XKBCOMMON_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D enable-docs=false   \
+                -D enable-wayland=true \
+                -D enable-x11=false    \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step xkbcommon
+fi
+
+# =============================================================================
+# 14. pixman
+# =============================================================================
+if ! step_done pixman; then
+  header "pixman ${PIXMAN_VER}"
+  a=$(fetch "https://cairographics.org/releases/pixman-${PIXMAN_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step pixman
+fi
+
+# =============================================================================
+# 15. FreeType (first pass — no HarfBuzz yet)
+# =============================================================================
+if ! step_done freetype_pass1; then
+  header "FreeType ${FREETYPE_VER} (pass 1)"
+  a=$(fetch "https://downloads.sourceforge.net/freetype/freetype-${FREETYPE_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr            \
+                --enable-freetype-config \
+                --disable-static
+    make -j${NPROC}
+    make install
+  "
+  mark_step freetype_pass1
+fi
+
+# =============================================================================
+# 16. HarfBuzz
+# =============================================================================
+if ! step_done harfbuzz; then
+  header "HarfBuzz ${HARFBUZZ_VER}"
+  a=$(fetch "https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VER}/harfbuzz-${HARFBUZZ_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D graphite2=disabled  \
+                -D tests=disabled      \
+                -D docs=disabled       \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step harfbuzz
+fi
+
+# =============================================================================
+# 17. FreeType (second pass — with HarfBuzz for hinting)
+# =============================================================================
+if ! step_done freetype_pass2; then
+  header "FreeType ${FREETYPE_VER} (pass 2 — with HarfBuzz)"
+  a=$(fetch "https://downloads.sourceforge.net/freetype/freetype-${FREETYPE_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr            \
+                --enable-freetype-config \
+                --disable-static
+    make -j${NPROC}
+    make install
+  "
+  mark_step freetype_pass2
+fi
+
+# =============================================================================
+# 18. fontconfig
+# =============================================================================
+if ! step_done fontconfig; then
+  header "fontconfig ${FONTCONFIG_VER}"
+  a=$(fetch "https://www.freedesktop.org/software/fontconfig/release/fontconfig-${FONTCONFIG_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr  \
+                --sysconfdir=/etc \
+                --localstatedir=/var \
+                --disable-static \
+                --docdir=/usr/share/doc/fontconfig
+    make -j${NPROC}
+    make install
+    install -dm755 /usr/share/fonts/OTF
+    fc-cache
+  "
+  mark_step fontconfig
+fi
+
+# =============================================================================
+# 19. Cairo
+# =============================================================================
+if ! step_done cairo; then
+  header "Cairo ${CAIRO_VER}"
+  a=$(fetch "https://cairographics.org/releases/cairo-${CAIRO_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D tests=disabled      \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step cairo
+fi
+
+# =============================================================================
+# 20. Pango
+# =============================================================================
+if ! step_done pango; then
+  header "Pango ${PANGO_VER}"
+  a=$(fetch "$(gnome_url pango ${PANGO_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D introspection=disabled \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step pango
+fi
+
+# =============================================================================
+# 21. gdk-pixbuf
+# =============================================================================
+if ! step_done gdk_pixbuf; then
+  header "gdk-pixbuf ${GDK_PIXBUF_VER}"
+  a=$(fetch "$(gnome_url gdk-pixbuf ${GDK_PIXBUF_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr         \
+                --buildtype=release    \
+                -D introspection=disabled \
+                -D man=false           \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step gdk_pixbuf
+fi
+
+# =============================================================================
+# 22. ATK
+# =============================================================================
+if ! step_done atk; then
+  header "ATK ${ATK_VER}"
+  a=$(fetch "$(gnome_url atk ${ATK_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D introspection=false  \
+                -D docs=false           \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step atk
+fi
+
+# =============================================================================
+# 23. at-spi2-core
+# =============================================================================
+if ! step_done at_spi2; then
+  header "at-spi2-core ${AT_SPI2_CORE_VER}"
+  a=$(fetch "$(gnome_url at-spi2-core ${AT_SPI2_CORE_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D introspection=no     \
+                -D docs=false           \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step at_spi2
+fi
+
+# =============================================================================
+# 24. GTK+ 3
+# =============================================================================
+if ! step_done gtk3; then
+  header "GTK+ ${GTK3_VER}"
+  a=$(fetch "$(gnome_url gtk+ ${GTK3_VER})")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D introspection=false  \
+                -D wayland-backend=true \
+                -D x11-backend=false    \
+                -D broadway-backend=false \
+                -D demos=false          \
+                -D examples=false       \
+                -D tests=false          \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step gtk3
+fi
+
+# =============================================================================
+# 25. Rust toolchain (needed by librsvg, niri, alacritty)
+# =============================================================================
+if ! step_done rust; then
+  header "Rust toolchain"
+  if ! command -v rustc &>/dev/null; then
+    fetch "https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init"
+    chmod +x "$SOURCES/rustup-init"
+    RUSTUP_HOME=/usr/share/rustup CARGO_HOME=/usr/share/cargo \
+      "$SOURCES/rustup-init" -y --no-modify-path \
+        --default-toolchain stable \
+        --profile minimal
+  fi
+  cat > /etc/profile.d/rust.sh << 'EOF'
+export RUSTUP_HOME=/usr/share/rustup
+export CARGO_HOME=/usr/share/cargo
+export PATH="$CARGO_HOME/bin:$PATH"
+EOF
+  source /etc/profile.d/rust.sh
+  mark_step rust
+fi
+source /etc/profile.d/rust.sh 2>/dev/null || true
+
+# =============================================================================
+# 26. librsvg (needs Rust + GTK3 chain)
+# =============================================================================
+if ! step_done librsvg; then
+  header "librsvg ${LIBRSVG_VER}"
+  a=$(fetch "$(gnome_url librsvg ${LIBRSVG_VER})")
+  bpkg "$a" bash -c "
+    ./configure --prefix=/usr   \
+                --disable-static \
+                --disable-introspection \
+                --disable-vala
+    make -j${NPROC}
+    make install
+  "
+  mark_step librsvg
+fi
+
+# =============================================================================
+# 27. LLVM (required by Mesa iris driver — WARNING: very long build ~4-8h)
+# =============================================================================
+if ! step_done llvm; then
+  header "LLVM ${LLVM_VER}"
+  warn "LLVM build takes 4-8 hours on this hardware. Go get coffee."
+  a=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-${LLVM_VER}.src.tar.xz")
+  cf=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/cmake-${LLVM_VER}.src.tar.xz")
+  bdir=$(mktemp -d "$SOURCES/llvm-build.XXXXXX")
+  tar -xf "$a"  -C "$bdir" --strip-components=1
+  mkdir -p "$bdir/cmake/modules"
+  tar -xf "$cf" --strip-components=1 -C "$bdir/cmake"
+  pushd "$bdir" >/dev/null
+  mkdir build && cd build
+  cmake -DCMAKE_INSTALL_PREFIX=/usr              \
+        -DCMAKE_BUILD_TYPE=Release               \
+        -DLLVM_ENABLE_FFI=ON                     \
+        -DLLVM_BUILD_LLVM_DYLIB=ON               \
+        -DLLVM_LINK_LLVM_DYLIB=ON                \
+        -DLLVM_ENABLE_RTTI=ON                    \
+        -DLLVM_TARGETS_TO_BUILD="X86"            \
+        -DLLVM_BINUTILS_INCDIR=/usr/include      \
+        -DLLVM_ENABLE_BINDINGS=OFF               \
+        -Wno-dev -G Ninja ..
+  ninja -j${NPROC}
+  ninja install
+  popd >/dev/null
+  rm -rf "$bdir"
+  mark_step llvm
+fi
+
+# =============================================================================
+# 28. Mesa (Intel iris — requires LLVM above)
+# =============================================================================
+if ! step_done mesa; then
+  header "Mesa ${MESA_VER}"
+  a=$(fetch "https://mesa.freedesktop.org/archive/mesa-${MESA_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr            \
+                --buildtype=release       \
+                -D platforms=wayland      \
+                -D gallium-drivers=iris,crocus,swrast \
+                -D vulkan-drivers=intel   \
+                -D glx=disabled           \
+                -D egl=enabled            \
+                -D gles1=disabled         \
+                -D gles2=enabled          \
+                -D llvm=enabled           \
+                -D shared-llvm=enabled    \
+                -D video-codecs=all       \
+                -D intel-clc=auto         \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step mesa
+fi
+
+# =============================================================================
+# 29. seatd
+# =============================================================================
+if ! step_done seatd; then
+  header "seatd ${SEATD_VER}"
+  a=$(fetch "https://git.sr.ht/~kennylevinsen/seatd/archive/${SEATD_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D server=enabled       \
+                -D builtin=enabled      \
+                -D examples=disabled    \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  # seatd OpenRC service
+  cat > /etc/init.d/seatd << 'EOF'
+#!/sbin/openrc-run
+description="Seat management daemon"
+command="/usr/bin/seatd"
+command_args="-g seat"
+pidfile="/run/seatd.pid"
+command_background=true
+depend() { need localmount; }
+EOF
+  chmod 755 /etc/init.d/seatd
+  groupadd -f seat
+  rc-update add seatd default 2>/dev/null || true
+  mark_step seatd
+fi
+
+# =============================================================================
+# 30. polkit
+# =============================================================================
+if ! step_done polkit; then
+  header "polkit ${POLKIT_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/polkit/polkit/-/archive/${POLKIT_VER}/polkit-${POLKIT_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    groupadd -fg 27 polkitd 2>/dev/null || true
+    useradd -c 'PolicyKit Daemon Owner' -d /etc/polkit-1 \
+            -u 27 -g polkitd -s /bin/false polkitd 2>/dev/null || true
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D session_tracking=elogind \
+                -D introspection=false  \
+                -D man=false            \
+                ..
+    ninja -j${NPROC}
+    ninja install
+    chown -v root:polkitd /usr/lib/polkit-1/polkitd
+    chmod -v  4755        /usr/lib/polkit-1/polkitd
+  "
+  mark_step polkit
+fi
+
+# =============================================================================
+# 31. PipeWire
+# =============================================================================
+if ! step_done pipewire; then
+  header "PipeWire ${PIPEWIRE_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/${PIPEWIRE_VER}/pipewire-${PIPEWIRE_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D session-managers=[]  \
+                -D gstreamer=disabled   \
+                -D bluez5=disabled      \
+                -D jack=disabled        \
+                -D tests=disabled       \
+                -D examples=disabled    \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step pipewire
+fi
+
+# =============================================================================
+# 32. WirePlumber
+# =============================================================================
+if ! step_done wireplumber; then
+  header "WirePlumber ${WIREPLUMBER_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/${WIREPLUMBER_VER}/wireplumber-${WIREPLUMBER_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D elogind=enabled      \
+                -D systemd=disabled     \
+                -D tests=disabled       \
+                -D doc=disabled         \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step wireplumber
+fi
+
+# =============================================================================
+# 33. niri
+# =============================================================================
+if ! step_done niri; then
+  header "niri ${NIRI_VER}"
+  a=$(fetch "https://github.com/YaLTeR/niri/archive/refs/tags/v${NIRI_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    source /etc/profile.d/rust.sh
+    cargo build --release --locked
+    install -Dm755 target/release/niri /usr/bin/niri
+    install -Dm644 resources/niri.desktop \
+      /usr/share/wayland-sessions/niri.desktop 2>/dev/null || true
+  "
+  mark_step niri
+fi
+
+# =============================================================================
+# 34. Alacritty
+# =============================================================================
+if ! step_done alacritty; then
+  header "Alacritty ${ALACRITTY_VER}"
+  a=$(fetch "https://github.com/alacritty/alacritty/archive/refs/tags/v${ALACRITTY_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    source /etc/profile.d/rust.sh
+    cargo build --release --locked
+    install -Dm755 target/release/alacritty /usr/bin/alacritty
+    install -Dm644 extra/linux/Alacritty.desktop \
+      /usr/share/applications/Alacritty.desktop
+    install -Dm644 extra/alacritty.bash \
+      /usr/share/bash-completion/completions/alacritty 2>/dev/null || true
+  "
+  mark_step alacritty
+fi
+
+# =============================================================================
+# 35. waybar (needs GTK3, pipewire, wayland)
+# =============================================================================
+if ! step_done waybar; then
+  header "waybar ${WAYBAR_VER}"
+  # waybar needs jsoncpp, libxkbregistry, fmt, spdlog, date
+  # Install fmt first
+  fmt_a=$(fetch "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz")
+  bpkg "$fmt_a" bash -c "
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_BUILD_TYPE=Release   \
+          -DFMT_TEST=OFF               \
+          -G Ninja .
+    ninja -j${NPROC}
+    ninja install
+  "
+  spdlog_a=$(fetch "https://github.com/gabime/spdlog/archive/refs/tags/v1.14.1.tar.gz")
+  bpkg "$spdlog_a" bash -c "
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_BUILD_TYPE=Release   \
+          -DSPDLOG_FMT_EXTERNAL=ON     \
+          -G Ninja .
+    ninja -j${NPROC}
+    ninja install
+  "
+  jsoncpp_a=$(fetch "https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.6.tar.gz")
+  bpkg "$jsoncpp_a" bash -c "
+    cmake -DCMAKE_INSTALL_PREFIX=/usr   \
+          -DCMAKE_BUILD_TYPE=Release     \
+          -DJSONCPP_WITH_TESTS=OFF       \
+          -DBUILD_SHARED_LIBS=ON         \
+          -G Ninja .
+    ninja -j${NPROC}
+    ninja install
+  "
+  a=$(fetch "https://github.com/Alexays/Waybar/archive/refs/tags/${WAYBAR_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr          \
+                --buildtype=release     \
+                -D niri=enabled         \
+                -D tray=enabled         \
+                -D systemd=disabled     \
+                -D pulseaudio=disabled  \
+                -D pipewire=enabled     \
+                -D mpris=disabled       \
+                -D jack=disabled        \
+                -D tests=disabled       \
+                ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step waybar
+fi
+
+# =============================================================================
+# 36. fuzzel
+# =============================================================================
+if ! step_done fuzzel; then
+  header "fuzzel ${FUZZEL_VER}"
+  a=$(fetch "https://codeberg.org/dnkl/fuzzel/archive/${FUZZEL_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step fuzzel
+fi
+
+# =============================================================================
+# 37. swaylock
+# =============================================================================
+if ! step_done swaylock; then
+  header "swaylock ${SWAYLOCK_VER}"
+  a=$(fetch "https://github.com/swaywm/swaylock/releases/download/v${SWAYLOCK_VER}/swaylock-v${SWAYLOCK_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+    chmod a+s /usr/bin/swaylock
+  "
+  mark_step swaylock
+fi
+
+# =============================================================================
+# 38. swaybg
+# =============================================================================
+if ! step_done swaybg; then
+  header "swaybg ${SWAYBG_VER}"
+  a=$(fetch "https://github.com/swaywm/swaybg/releases/download/v${SWAYBG_VER}/swaybg-v${SWAYBG_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step swaybg
+fi
+
+# =============================================================================
+# 39. dunst
+# =============================================================================
+if ! step_done dunst; then
+  header "dunst ${DUNST_VER}"
+  a=$(fetch "https://github.com/dunst-project/dunst/releases/download/v${DUNST_VER}/dunst-${DUNST_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    make -j${NPROC} WAYLAND=1 SYSTEMD=0
+    make install SYSTEMD=0 PREFIX=/usr
+  "
+  mark_step dunst
+fi
+
+# =============================================================================
+# 40. grim
+# =============================================================================
+if ! step_done grim; then
+  header "grim ${GRIM_VER}"
+  a=$(fetch "https://gitlab.freedesktop.org/emersion/grim/-/releases/v${GRIM_VER}/downloads/grim-${GRIM_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step grim
+fi
+
+# =============================================================================
+# 41. slurp
+# =============================================================================
+if ! step_done slurp; then
+  header "slurp ${SLURP_VER}"
+  a=$(fetch "https://github.com/emersion/slurp/releases/download/v${SLURP_VER}/slurp-${SLURP_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step slurp
+fi
+
+# =============================================================================
+# 42. wl-clipboard
+# =============================================================================
+if ! step_done wl_clipboard; then
+  header "wl-clipboard ${WL_CLIPBOARD_VER}"
+  a=$(fetch "https://github.com/bugaevc/wl-clipboard/releases/download/v${WL_CLIPBOARD_VER}/wl-clipboard-${WL_CLIPBOARD_VER}.tar.xz")
+  bpkg "$a" bash -c "
+    mkdir build && cd build
+    meson setup --prefix=/usr --buildtype=release ..
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step wl_clipboard
+fi
+
+# =============================================================================
+# 43. brightnessctl
+# =============================================================================
+if ! step_done brightnessctl; then
+  header "brightnessctl ${BRIGHTNESSCTL_VER}"
+  a=$(fetch "https://github.com/Hummer12007/brightnessctl/archive/refs/tags/${BRIGHTNESSCTL_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    make -j${NPROC}
+    make install PREFIX=/usr
+  "
+  # udev rule for backlight control without root
+  cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
+ACTION=="add", SUBSYSTEM=="backlight", \
+  RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
+  RUN+="/bin/chmod g+w   /sys/class/backlight/%k/brightness"
+EOF
+  mark_step brightnessctl
+fi
+
+# =============================================================================
+# 44. fastfetch
+# =============================================================================
+if ! step_done fastfetch; then
+  header "fastfetch (latest)"
+  FF_VER="2.26.1"
+  a=$(fetch "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/${FF_VER}.tar.gz")
+  bpkg "$a" bash -c "
+    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_BUILD_TYPE=Release   \
+          -G Ninja .
+    ninja -j${NPROC}
+    ninja install
+  "
+  mark_step fastfetch
+fi
+
+# =============================================================================
+# 45. Fonts
+# =============================================================================
+if ! step_done fonts; then
+  header "Fonts — JetBrainsMono Nerd Font + Noto Emoji"
+  mkdir -p /usr/share/fonts/nerd-fonts /usr/share/fonts/noto
+
+  # JetBrainsMono Nerd Font
+  jb_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.tar.xz"
+  jb_a=$(fetch "$jb_url")
+  tar -xf "$jb_a" -C /usr/share/fonts/nerd-fonts
+
+  # Noto Emoji
+  noto_url="https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf"
+  wget -q -O /usr/share/fonts/noto/NotoColorEmoji.ttf "$noto_url"
+
+  fc-cache -fv
+  mark_step fonts
+fi
+
+# =============================================================================
+# 46. User setup — legend
+# =============================================================================
+if ! step_done user_setup; then
+  header "User setup — legend"
+  groupadd -f seat; groupadd -f render; groupadd -f video
+  groupadd -f audio; groupadd -f input
+  useradd -m -G wheel,audio,video,render,input,seat \
+          -s /bin/zsh legend 2>/dev/null || true
+  echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
+
+  # doas
+  if ! command -v doas &>/dev/null; then
+    warn "doas not found — configure sudo or doas manually for 'legend'"
+  else
+    printf 'permit persist legend as root\n' > /etc/doas.conf
+    chmod 0400 /etc/doas.conf
+  fi
+
+  # Symlink configs from legenddots
+  su - legend -c "
+    git clone https://github.com/legendarymsr/legenddots ~/legenddots 2>/dev/null || \
+      (cd ~/legenddots && git pull --ff-only)
+    mkdir -p ~/Pictures/Screenshots
+    mkdir -p ~/.config/alacritty ~/.config/niri ~/.config/fastfetch
+    ln -sfn ~/legenddots/alacritty.toml         ~/.config/alacritty/alacritty.toml
+    ln -sfn ~/legenddots/.zshrc                 ~/.zshrc
+    ln -sfn ~/legenddots/niri/config.kdl        ~/.config/niri/config.kdl
+    ln -sfn ~/legenddots/niri/waybar            ~/.config/waybar
+    ln -sfn ~/legenddots/niri/fuzzel            ~/.config/fuzzel
+    ln -sfn ~/legenddots/niri/dunst             ~/.config/dunst
+    ln -sfn ~/legenddots/niri/swaylock          ~/.config/swaylock
+    ln -sfn ~/legenddots/fastfetch/config.jsonc ~/.config/fastfetch/config.jsonc
+  "
+  mark_step user_setup
+fi
+
+# =============================================================================
+# 47. MacBook Air 6,2 — hardware quirks
+# =============================================================================
+if ! step_done macbook_hw; then
+  header "MacBook Air 6,2 hardware config"
+
+  # Apple keyboard: fn keys act as standard F1-F12
+  echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
+
+  # Broadcom BCM4360 WiFi — must be built separately; broadcom-sta is non-free
+  warn "WiFi: BCM4360 requires broadcom-sta. Build the wl.ko module manually:"
+  warn "  https://www.lwfinger.com/downloads/hybrid-v35_64-nodebug-pcoem-6_30_223_271.tar.gz"
+  warn "  make -C /lib/modules/\$(uname -r)/build M=\$(pwd) modules"
+  warn "  install -m644 wl.ko /lib/modules/\$(uname -r)/updates/"
+  warn "  depmod -a"
+  cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcma
+EOF
+
+  # OpenRC: enable seatd at boot
+  rc-update add seatd default 2>/dev/null || true
+
+  mark_step macbook_hw
+fi
+
+echo -e "\n${GREEN}BLFS setup complete.${NC}"
+echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 12-20 hours (LLVM is the main bottleneck).${NC}"
+echo -e "${CYAN}Reboot into your LFS system and start a niri session as 'legend'.${NC}"

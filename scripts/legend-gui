@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+import sys
+import os
+from PyQt6.QtCore import QUrl
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLineEdit, QVBoxLayout, QWidget
+from PyQt6.QtWebEngineCore import QWebEngineUrlRequestInterceptor, QWebEngineProfile, QWebEngineScript
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+# --- 0. FORCE DARK MODE ---
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--blink-settings=forceDarkModeEnabled=true"
+
+# --- 1. THE NETWORK FILTER ---
+class AdBlocker(QWebEngineUrlRequestInterceptor):
+    def __init__(self):
+        super().__init__()
+        self.blacklist = [
+            "doubleclick.net", "googleadservices.com", "google-analytics.com",
+            "facebook.com/tr", "criteo.com", "amazon-adsystem.com",
+            "adnxs.com", "hotjar.com", "cookiebot.com", "onetrust.com",
+            "pagead2.googlesyndication.com", "taboola.com", "outbrain.com"
+        ]
+
+    def interceptRequest(self, info):
+        url = info.requestUrl().toString()
+        for bad in self.blacklist:
+            if bad in url:
+                print(f"🛡️ BLOCKED: {url}")
+                info.block(True)
+                return
+
+# --- 2. THE GUI FRAME ---
+class LegendChrome(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("LegendChrome // SILENCER")
+        self.setGeometry(100, 100, 1200, 800)
+
+        self.interceptor = AdBlocker()
+        self.profile = QWebEngineProfile.defaultProfile()
+        self.profile.setUrlRequestInterceptor(self.interceptor)
+        
+        self.inject_killer_scripts()
+
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        self.url_bar = QLineEdit()
+        self.url_bar.setPlaceholderText("Enter URL...")
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
+        self.url_bar.setStyleSheet("""
+            QLineEdit {
+                background-color: #1a1b26; color: #c0caf5;
+                border: none; padding: 10px;
+                font-family: 'JetBrainsMono Nerd Font'; font-size: 14px;
+                border-bottom: 2px solid #7aa2f7;
+            }
+        """)
+
+        self.browser = QWebEngineView()
+        self.browser.setUrl(QUrl("https://www.youtube.com")) 
+        self.browser.urlChanged.connect(self.update_url_bar)
+
+        main_layout.addWidget(self.url_bar)
+        main_layout.addWidget(self.browser)
+
+        container = QWidget()
+        container.setLayout(main_layout)
+        self.setCentralWidget(container)
+
+    def inject_killer_scripts(self):
+        # A. CSS: Force Fonts & Hide Layout Bloat
+        css_raw = """
+        body, p, h1, h2, h3, span, div, a { 
+            font-family: 'JetBrainsMono Nerd Font', monospace !important; 
+        }
+        #cookie-banner, .cookie-banner, #onetrust-banner-sdk, 
+        .fc-ab-root, ytd-ad-slot-renderer, .ytp-ad-module,
+        .video-ads, .ytp-ad-overlay-container,
+        ytd-banner-promo-renderer-background
+        { display: none !important; }
+        """
+        clean_css = css_raw.replace('\n', ' ')
+        
+        # B. JS: The Auto-Skipper
+        # We use a placeholder ###CSS### to avoid Python syntax errors
+        js_template = """
+        (function() {
+            const style = document.createElement('style');
+            style.innerText = `###CSS###`;
+            document.head.appendChild(style);
+
+            setInterval(() => {
+                const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .videoAdUiSkipButton');
+                const adVideo = document.querySelector('video');
+                const adOverlay = document.querySelector('.ytp-ad-module');
+                
+                if (skipBtn) { 
+                    skipBtn.click(); 
+                    console.log('LegendChrome: Ad Skipped');
+                }
+                
+                if (adOverlay && adOverlay.children.length > 0 && adVideo) {
+                    adVideo.playbackRate = 16.0;
+                    adVideo.muted = true;
+                }
+                
+                const popup = document.querySelector('ytd-popup-container');
+                if (popup) popup.style.display = 'none';
+            }, 500);
+        })();
+        """
+        
+        # Safe Injection
+        final_js = js_template.replace("###CSS###", clean_css)
+        
+        script = QWebEngineScript()
+        script.setName("KillerScript")
+        script.setSourceCode(final_js)
+        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        self.profile.scripts().insert(script)
+
+    def navigate_to_url(self):
+        url = self.url_bar.text()
+        if not url.startswith("http"): url = "https://" + url
+        self.browser.setUrl(QUrl(url))
+
+    def update_url_bar(self, q):
+        self.url_bar.setText(q.toString())
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = LegendChrome()
+    window.show()
+    sys.exit(app.exec())

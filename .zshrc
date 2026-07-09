@@ -1,0 +1,249 @@
+#!/data/data/com.termux/files/usr/bin/env zsh
+# =============================================================================
+# ZSH Configuration File (.zshrc)
+# Based on:- https://github.com/zdharma-continuum/zinit-configs/tree/master/vladdoster
+# =============================================================================
+
+# Enable auto-cd
+setopt AUTO_CD
+# Turn off "no match" errors
+setopt nonomatch
+
+fastfetch
+
+# -----------------------------------------------------------------------------
+# ZINIT PLUGIN MANAGER INSTALLATION
+# -----------------------------------------------------------------------------
+# Auto-install Zinit if not present
+if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
+    # Only show output if not using instant prompt
+    if [[ -z "$P9K_INSTANT_PROMPT" ]]; then
+        print -P "%F{33}Installing %F{220}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager...%f"
+
+        # Create directory structure
+        if command mkdir -p "$HOME/.local/share/zinit" && command chmod g-rwX "$HOME/.local/share/zinit"; then
+            # Try to clone the repository
+            if command git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git"; then
+                print -P "%F{33}Installation successful.%f"
+            else
+                print -P "%F{160}Git clone failed. Please check your internet connection and try again.%f"
+                return 1
+            fi
+        else
+            print -P "%F{160}Failed to create zinit directory.%f"
+            return 1
+        fi
+    else
+        # Silent installation during instant prompt
+        command mkdir -p "$HOME/.local/share/zinit" && command chmod g-rwX "$HOME/.local/share/zinit"
+        command git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git" >/dev/null 2>&1
+    fi
+fi
+
+# Load Zinit
+source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
+autoload -Uz _zinit
+(( ${+_comps} )) && _comps[zinit]=_zinit
+
+# -----------------------------------------------------------------------------
+# ZINIT CONFIGURATION
+# -----------------------------------------------------------------------------
+# Zinit directory structure - UPDATED TO MATCH DEFAULT PATH
+typeset -gAH ZINIT
+ZINIT[HOME_DIR]="$HOME/.local/share/zinit"
+ZINIT[BIN_DIR]="$ZINIT[HOME_DIR]/zinit.git"
+ZINIT[COMPLETIONS_DIR]="$ZINIT[HOME_DIR]/completions"
+ZINIT[SNIPPETS_DIR]="$ZINIT[HOME_DIR]/snippets"
+ZINIT[ZCOMPDUMP_PATH]="$ZINIT[HOME_DIR]/zcompdump"
+ZINIT[PLUGINS_DIR]="$ZINIT[HOME_DIR]/plugins"
+ZINIT[OPTIMIZE_OUT_DISK_ACCESSES]=1
+
+# Zinit variables
+ZI_REPO='zdharma-continuum'
+
+# -----------------------------------------------------------------------------
+# OH-MY-ZSH & PREZTO PLUGINS
+# -----------------------------------------------------------------------------
+# Load useful Oh My Zsh library functions and plugins
+zi for is-snippet \
+    OMZL::{compfix,completion,git,key-bindings}.zsh \
+    PZT::modules/{history}
+
+# Load completions for specific tools
+zi as'completion' for \
+    OMZP::{pip/_pip,terraform/_terraform}
+
+# -----------------------------------------------------------------------------
+# ZINIT ANNEXES
+# -----------------------------------------------------------------------------
+# Load useful Zinit extensions
+zi light-mode for \
+    "$ZI_REPO"/zinit-annex-{binary-symlink,patch-dl,submods}
+
+# -----------------------------------------------------------------------------
+# PYTHON CONFIGURATION
+# -----------------------------------------------------------------------------
+# Custom pip completion function
+function _pip_completion() {
+    local words cword
+    read -Ac words
+    read -cn cword
+    reply=(
+        $(
+            COMP_WORDS="$words[*]"
+            COMP_CWORD=$(( cword-1 ))
+            PIP_AUTO_COMPLETE=1 $words 2>/dev/null
+        )
+    )
+}
+compctl -K _pip_completion pip3
+
+# -----------------------------------------------------------------------------
+# ZSH ENHANCEMENT PLUGINS
+# -----------------------------------------------------------------------------
+
+# Enhanced completions - Additional completion definitions
+zi ice zsh-users/zsh-completions
+
+# Auto-suggestions - Suggests commands as you type based on history
+zi ice atload'_zsh_autosuggest_start' \
+    atinit'
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=50
+bindkey "^_" autosuggest-execute
+bindkey "^ " autosuggest-accept'
+zi light zsh-users/zsh-autosuggestions
+
+# Fast syntax highlighting - Real-time command syntax validation
+zi light-mode for \
+    $ZI_REPO/fast-syntax-highlighting
+
+
+# FZF history search - Fuzzy search through command history
+zi ice joshskidmore/zsh-fzf-history-search
+
+# Zsh autocomplete - Real-time type-ahead autocompletion
+zi ice atload'
+bindkey              "^I" menu-select
+bindkey -M menuselect "$terminfo[kcbt]" reverse-menu-complete'
+zi light marlonrichert/zsh-autocomplete
+
+# -----------------------------------------------------------------------------
+# FINALIZATION
+# -----------------------------------------------------------------------------
+# Initialize completions and replay cached completions
+# at the end of a Zinit configuration to ensure that after all plugins are loaded,
+# the completion system is properly initialized and
+# syntax highlighting/autosuggestion widgets are correctly bound
+#
+# Uncomment it if you have issue with highlighting/autosuggestion
+#
+# zi for atload'
+#       zicompinit; zicdreplay
+#       _zsh_highlight_bind_widgets
+#       _zsh_autosuggest_bind_widgets' \
+    #     as'null' id-as'zinit/cleanup' lucid nocd wait \
+    #   $ZI_REPO/null
+    #
+    #   # --- BEGIN CUSTOM ZSH BAR PROMPT (TPUT + Zsh Native Colors - FINAL ATTEMPT) ---
+
+# Clear any options that might interfere with prompt rendering.
+# This ensures a clean slate for prompt processing.
+unfunction precmd 2>/dev/null
+unfunction preexec 2>/dev/null
+setopt noprompt_sp 2>/dev/null
+setopt no_aliases 2>/dev/null
+
+# --- Define Prompt Colors & Glyphs using tput for robustness ---
+# tput will get the correct escape sequence for your terminal.
+# %{...%} wrappers tell Zsh that these sequences are non-printing.
+# The 'sgr0' ensures a full reset.
+
+local BLUE="%{$(tput setaf 4)%}"       # Standard ANSI Blue
+local WHITE="%{$(tput setaf 7)%}"      # Standard ANSI White
+local MAGENTA="%{$(tput setaf 5)%}"    # Standard ANSI Magenta (closest to hot pink without 256 colors)
+local CYAN="%{$(tput setaf 6)%}"       # Standard ANSI Cyan
+local GREY="%{$(tput setaf 8)%}"       # Standard ANSI Grey (or 90 for bright black)
+local RESET="%{$(tput sgr0)%}"         # Reset all attributes
+
+# --- Essential for current directory to show ~/... instead of full path ---
+PROMPT_DIRTRIM=2 # Show ~/parent/current_dir
+
+# --- PS1 (Left Prompt) - Using tput-generated colors ---
+# Format: [GentooLogo legend@Yuki] [path]
+
+PS1=""
+
+# Segment 1: [GentooLogo legend@Yuki] - TPUT Colors
+PS1+="${BLUE}[${RESET}"                 # Start blue bracket
+PS1+="${BLUE} ${RESET}"                 # Blue Gentoo logo
+PS1+="${BLUE}legend${RESET}"            # 'legend' username in blue
+PS1+="${BLUE}@${MAGENTA}Yuki${RESET}"   # '@' in blue, 'Yuki' in magenta
+PS1+="${BLUE}]${RESET} "                 # End blue bracket, space
+
+# Segment 2: [current_path]
+PS1+="${BLUE}[${RESET}"                 # Start blue bracket
+PS1+="${CYAN}%~${RESET}"                 # Cyan path (~ for home)
+PS1+="${BLUE}]${RESET}"                 # End blue bracket
+
+# End of prompt line, new line for command input (grey >)
+PS1+="\n${GREY}> ${RESET}"
+
+# --- RPROMPT (Right Prompt - Removed for simplicity) ---
+
+# --- Custom apt override (KEEP THIS AT THE END) ---
+# Ensure any existing 'apt' alias is removed early
+unalias apt 2>/dev/null
+unset -f apt 2>/dev/null
+
+# Define a unique function name for our package management logic
+update_termux_packages() {
+    local arg1="${1:-update}"
+    if [[ "$arg1" == "update" ]]; then
+        echo "---------------------------------------------------"
+        echo "Intercepted 'apt update'."
+        echo "Running automated pkg update && pkg upgrade -y..."
+        /data/data/com.termux/files/usr/bin/pkg update && /data/data/com.termux/files/usr/bin/pkg upgrade -y
+        if [ $? -eq 0 ]; then
+            echo "Package operations successful. Attempting to update fastfetch date..."
+            if [ -x "$HOME/update_fastfetch_date.sh" ]; then
+                "$HOME/update_fastfetch_date.sh"
+            else
+                echo "Error: ~/update_fastfetch_date.sh not found or not executable. Please ensure it exists and has +x permissions."
+            fi
+        else
+            echo "Error during pkg update/upgrade. Skipping fastfetch date update."
+        fi
+        echo "Automated 'apt update' sequence complete."
+        echo "---------------------------------------------------"
+    else
+        /data/data/com.termux/files/usr/bin/pkg "$@"
+    fi
+}
+# The alias is NOT added here; use 'update_termux_packages' directly.
+
+# --- END CUSTOM ZSH BAR PROMPT ---
+export PATH="$HOME/.cargo/bin:$PATH"
+# Legend's Mommy Hook
+precmd() {
+    # This runs before every new prompt
+    # We call the mommy command we just created
+    # But we only want it to talk if the previous command was successful
+    if [ $? -eq 0 ]; then
+        mommy
+    fi
+    local exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        # Praise on success
+        mommy
+    else
+        # Discipline/Encouragement on failure
+        echo -e "\e[38;5;203mOh no, did my puppy make a mistake? Mommy knows you can do better~\e[0m"
+    fi
+}
+if [[ -d /data/data/com.termux ]]; then
+    # STUFF ONLY FOR YOUR PHONE
+    alias ls='ls --color=auto -F'
+else
+    alias ls='ls --color=auto --group-directories-first'
+    alias nmap='sudo nmap'
+fi

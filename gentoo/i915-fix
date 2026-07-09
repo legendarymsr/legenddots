@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Fix i915 KMS for niri: remove nomodeset from rEFInd boot config.
+set -euo pipefail
+
+echo "=== kernel cmdline ==="
+cat /proc/cmdline
+echo ""
+
+if ! grep -q nomodeset /proc/cmdline; then
+    echo "nomodeset is NOT present — i915 KMS should already be active"
+    echo ""
+    echo "=== DRI devices ==="
+    ls -la /dev/dri/
+    if [[ -e /dev/dri/renderD128 ]]; then
+        echo "renderD128 exists — run: bash gentoo/niri"
+    else
+        echo "renderD128 still missing — check dmesg:"
+        dmesg | grep -iE 'i915|drm' | tail -20
+    fi
+    exit 0
+fi
+
+echo "Problem found: nomodeset is blocking i915 KMS and the DRI render node."
+echo ""
+echo "=== fixing /boot/refind_linux.conf ==="
+CONF=/boot/refind_linux.conf
+if [[ ! -f "$CONF" ]]; then
+    echo "ERROR: $CONF not found — locate your boot config with:"
+    echo "  find /boot -name '*.conf' | xargs grep -l nomodeset 2>/dev/null"
+    exit 1
+fi
+echo "Before:"
+cat "$CONF"
+doas sed -i 's/ nomodeset//g; s/nomodeset //g; s/nomodeset//g' "$CONF"
+echo ""
+echo "After:"
+cat "$CONF"
+echo ""
+echo "Reboot, then run: bash gentoo/niri"
+echo "(Early boot may flicker while i915 initialises — that is normal.)"

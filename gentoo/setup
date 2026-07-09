@@ -1,0 +1,352 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Gentoo Software Setup — MacBook Air 6,2
+# Installs all packages and configures the system on an already-installed
+# Gentoo. Does NOT touch disks, partitions, bootloader, or kernel image.
+# Run as root.
+# =============================================================================
+set -euo pipefail
+
+[[ $EUID -eq 0 ]] || { echo "Run as root: doas bash gentoo/setup"; exit 1; }
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+
+# ── Options ──────────────────────────────────────────────────────────────────
+if [[ -z "${ENABLE_WD40:-}" ]]; then
+  echo -e "${CYAN}Apply WD-40 (mask rust USE flag where optional)? [Y/n] (10s, default: Y)${NC}"
+  read -t 10 -r WD40_ANSWER || true; echo
+  case "${WD40_ANSWER,,}" in n|no) ENABLE_WD40="false" ;; *) ENABLE_WD40="true" ;; esac
+fi
+if [[ -z "${PRIV_ESC:-}" ]]; then
+  echo -e "${CYAN}Privilege escalation tool? [doas/sudo] (10s, default: doas)${NC}"
+  read -t 10 -r PRIV_ANSWER || true; echo
+  case "${PRIV_ANSWER,,}" in sudo) PRIV_ESC="sudo" ;; *) PRIV_ESC="doas" ;; esac
+fi
+ENABLE_WD40="${ENABLE_WD40:-true}"
+PRIV_ESC="${PRIV_ESC:-doas}"
+
+# ── Checkpointing ─────────────────────────────────────────────────────────────
+STATE_FILE=/etc/gentoo-setup.state
+touch "$STATE_FILE"
+step_done() { grep -qx "$1" "$STATE_FILE"; }
+mark_step() { echo "$1" >> "$STATE_FILE"; }
+
+export DEBUGINFOD_URLS="" DEBUGINFOD_URLS_CERT_PATH=""
+set +u; source /etc/profile; set -u
+export PATH="/usr/sbin:/usr/local/sbin:/sbin:${PATH}"
+echo 1 > /proc/sys/vm/overcommit_memory
+echo 262144 > /proc/sys/vm/max_map_count
+
+# 1. PORTAGE SYNC & PROFILE
+if ! step_done portage_sync; then
+  header "Syncing portage tree..."
+  emerge-webrsync
+  eselect profile set default/linux/amd64/23.0/hardened
+  mark_step portage_sync
+fi
+
+# 2. KEYWORDS
+mkdir -p /etc/portage/package.accept_keywords
+{
+  echo "*/*::guru ~amd64"
+  echo "*/*::hyproverlay ~amd64"
+  echo "*/*::another-brave-overlay ~amd64"
+} > /etc/portage/package.accept_keywords/legend
+
+# 3. MAKE.CONF
+if ! step_done make_conf; then
+  header "Writing make.conf..."
+  cat > /etc/portage/make.conf << 'EOF'
+COMMON_FLAGS="-march=haswell -O2 -pipe"
+CFLAGS="${COMMON_FLAGS}"
+CXXFLAGS="${COMMON_FLAGS}"
+MAKEOPTS="-j3"
+EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100 --autounmask-write=y --autounmask-continue=y"
+CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
+VIDEO_CARDS="intel iris"
+ABI_X86="64"
+LLVM_TARGETS="X86"
+USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
+PYTHON_TARGETS="python3_13"
+PYTHON_SINGLE_TARGET="python3_13"
+FEATURES="ccache parallel-fetch buildpkg"
+CCACHE_DIR="/var/cache/ccache"
+PKGDIR="/var/cache/binpkgs"
+ACCEPT_KEYWORDS="~amd64"
+ACCEPT_LICENSE="*"
+GENTOO_MIRRORS="https://ftp.lysator.liu.se/gentoo https://mirrors.dotsrc.org/gentoo"
+EOF
+  mkdir -p /var/cache/ccache /var/cache/binpkgs
+  chown -R portage:portage /var/cache/ccache /var/cache/binpkgs
+  mark_step make_conf
+fi
+
+# 4. PACKAGE USE FLAGS
+if ! step_done package_use; then
+  header "Writing package.use..."
+  mkdir -p /etc/portage/package.use /etc/portage/package.env /etc/portage/package.env
+  { echo "llvm-core/llvm -debug -binutils-plugin -libffi"
+    echo "llvm-core/clang -debug -extra -static-analyzer"
+  } > /etc/portage/package.use/llvm
+  echo "llvm-runtimes/clang-runtime -sanitize -openmp" > /etc/portage/package.use/llvm-runtimes
+  echo "media-video/pipewire sound-server"              > /etc/portage/package.use/pipewire
+  echo "media-video/wireplumber elogind"                > /etc/portage/package.use/wireplumber
+  echo "sys-auth/polkit elogind"                        > /etc/portage/package.use/polkit
+  echo "net-misc/networkmanager tools"                  > /etc/portage/package.use/networkmanager
+  echo "sys-auth/elogind pam"                           > /etc/portage/package.use/elogind
+  echo "gui-apps/waybar tray"                           > /etc/portage/package.use/waybar
+  echo "media-fonts/nerdfonts jetbrainsmono"            > /etc/portage/package.use/nerdfonts
+  echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
+  echo "media-libs/mesa -llvm"                          > /etc/portage/package.use/mesa
+  echo "sys-auth/seatd server"                          > /etc/portage/package.use/seatd
+  { echo "x11-libs/cairo X"
+    echo "x11-libs/pango X"
+    echo "x11-libs/libxkbcommon X"
+    echo "dev-libs/libdbusmenu gtk3"
+    echo "dev-cpp/cairomm X"
+    echo "dev-cpp/atkmm X"
+    echo "x11-libs/gtk+:3 introspection"
+    echo "dev-libs/atk introspection"
+  } > /etc/portage/package.use/xlibs
+  echo "gnome-base/librsvg -introspection -vala" > /etc/portage/package.use/librsvg
+
+  # O1 env for slow build-tool packages
+  mkdir -p /etc/portage/env
+  printf 'CFLAGS="-march=haswell -O1 -pipe"\nCXXFLAGS="-march=haswell -O1 -pipe"\nLDFLAGS="-fuse-ld=mold"\n' \
+    > /etc/portage/env/O1.conf
+  { echo "llvm-core/llvm O1.conf"
+    echo "llvm-core/clang O1.conf"
+    echo "media-libs/mesa O1.conf"
+  } > /etc/portage/package.env/O1
+
+  mark_step package_use
+fi
+
+# 5. OVERLAYS
+if ! step_done overlays; then
+  header "Setting up overlays..."
+  emerge --oneshot app-eselect/eselect-repository dev-vcs/git
+  eselect repository enable guru
+  eselect repository add another-brave-overlay git \
+      https://github.com/falbrechtskirchinger/another-brave-overlay.git || true
+  eselect repository add hyproverlay git \
+      https://codeberg.org/hyproverlay/hyproverlay.git || true
+  emaint sync --repo guru                  || true
+  emaint sync --repo another-brave-overlay || true
+  emaint sync --repo hyproverlay           || true
+  mark_step overlays
+fi
+
+# 6. WD-40
+if ! step_done wd40; then
+  if [[ "$ENABLE_WD40" == "true" ]]; then
+    header "Applying WD-40 (masking optional rust)..."
+    eselect repository create local || true
+    echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
+    mkdir -p /var/db/repos/local/profiles/wd40-hardened
+    echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
+    { echo "gentoo:default/linux/amd64/23.0/hardened"
+      echo "gentoo:features/wd40"
+    } > /var/db/repos/local/profiles/wd40-hardened/parent
+    echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
+    WD40_NUM=$(eselect profile list | sed -n 's/^[[:space:]]*\[\([0-9]\+\)\][[:space:]]\+local:wd40-hardened.*/\1/p')
+    eselect profile set "${WD40_NUM}"
+    mkdir -p /etc/portage/package.unmask
+    { echo "x11-terms/alacritty"
+      echo "gnome-base/librsvg"
+    } > /etc/portage/package.unmask/wd40-exceptions
+    rm -f /etc/portage/package.unmask/alacritty
+  fi
+  mark_step wd40
+fi
+
+# 7. CCACHE & MOLD
+if ! step_done ccache; then
+  header "Installing ccache..."
+  emerge dev-util/ccache
+  CCACHE_DIR=/var/cache/ccache ccache --max-size=12G
+  CCACHE_DIR=/var/cache/ccache ccache --set-config=compression=true
+  chown -R portage:portage /var/cache/ccache
+  mark_step ccache
+fi
+if ! step_done mold; then
+  header "Installing mold linker..."
+  echo "sys-devel/mold -debug -mimalloc -test" > /etc/portage/package.use/mold
+  emerge sys-devel/mold
+  mark_step mold
+fi
+
+# 8. BASE SYSTEM
+if ! step_done base_system; then
+  header "Emerging base system..."
+  groupadd -f plugdev; groupadd -f bluetooth
+
+  PRIV_PKG="app-admin/doas"
+  [[ "$PRIV_ESC" == "sudo" ]] && PRIV_PKG="app-admin/sudo"
+
+  emerge \
+    sys-apps/pciutils sys-apps/usbutils sys-process/procps \
+    app-misc/figlet x11-apps/igt-gpu-tools \
+    sys-auth/elogind net-misc/networkmanager net-wireless/wpa_supplicant \
+    sys-auth/seatd net-wireless/broadcom-sta net-wireless/bluez \
+    "$PRIV_PKG" sys-apps/dbus sys-auth/polkit \
+    sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
+    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim \
+    media-video/pipewire media-video/wireplumber \
+    x11-terms/alacritty llvm-core/llvm llvm-core/clang
+  mark_step base_system
+fi
+
+# Always ensure gtk+ introspection is set (bypasses package_use checkpoint for reruns)
+{ echo "x11-libs/gtk+:3 introspection"
+  echo "dev-libs/atk introspection"
+} > /etc/portage/package.use/gtk-introspection
+
+# 9. DESKTOP
+if ! step_done desktop; then
+  header "Emerging desktop (niri + Wayland stack)..."
+  # Fix nerdfonts ebuild if broken (missing S="${WORKDIR}")
+  NERDFONTS_EBUILD="/var/db/repos/guru/media-fonts/nerdfonts/nerdfonts-3.4.0.ebuild"
+  if [[ -f "$NERDFONTS_EBUILD" ]] && ! grep -q '^S="${WORKDIR}"' "$NERDFONTS_EBUILD"; then
+    sed -i '/^FONT_SUFFIX=""$/a\S="${WORKDIR}"' "$NERDFONTS_EBUILD"
+  fi
+  emerge --oneshot dev-perl/XML-Parser
+  emerge \
+    gui-wm/niri gui-apps/waybar gui-apps/fuzzel gui-apps/swaylock \
+    gui-apps/swaybg gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
+    x11-misc/dunst gui-libs/xdg-desktop-portal-wlr gnome-extra/polkit-gnome \
+    media-sound/pavucontrol x11-misc/xdg-utils x11-misc/xdg-user-dirs \
+    media-fonts/nerdfonts www-client/brave-browser-nightly
+  mark_step desktop
+fi
+
+# 10. LOCALIZATION & USER
+if ! step_done localization_user; then
+  header "Localization and user setup..."
+  echo "Europe/Stockholm" > /etc/timezone
+  emerge --config sys-libs/timezone-data
+  sed -i 's/keymap="us"/keymap="se"/' /etc/conf.d/keymaps
+  grep -q "en_US.UTF-8" /etc/locale.gen || echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  grep -q "sv_SE.UTF-8" /etc/locale.gen || echo "sv_SE.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen
+  eselect locale set en_US.utf8
+  env-update && set +u && source /etc/profile && set -u
+
+  groupadd -f seat; groupadd -f render
+  useradd -m -G wheel,audio,video,render,input,usb,plugdev,bluetooth,seat -s /bin/zsh legend || true
+  echo "legend:$(openssl passwd -6 'legendary')" | chpasswd -e
+  echo "root:$(openssl passwd -6 'legendary123')" | chpasswd -e
+
+  if [[ "$PRIV_ESC" == "sudo" ]]; then
+    echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/wheel
+    chmod 0440 /etc/sudoers.d/wheel
+  else
+    SEATD_BIN=$(command -v seatd 2>/dev/null || echo /usr/bin/seatd)
+    printf 'permit nopass legend as root cmd %s\npermit persist legend as root\n' "$SEATD_BIN" \
+      > /etc/doas.conf
+    chmod 0400 /etc/doas.conf
+  fi
+
+  su - legend -c "
+    git clone https://github.com/legendarymsr/legenddots ~/legenddots || \
+      (cd ~/legenddots && git pull)
+    mkdir -p ~/Pictures/Screenshots
+    mkdir -p ~/.config/alacritty ~/.config/niri
+    ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
+    ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+    ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
+    ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
+    ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
+    ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
+    ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
+  "
+  xdg-user-dirs-update || true
+  mark_step localization_user
+fi
+
+# 11. SYSTEM CONFIG
+if ! step_done sysconfig; then
+  header "System configuration..."
+
+  # Broadcom WiFi
+  emerge --quiet net-wireless/broadcom-sta
+  cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcma
+EOF
+  grep -q 'modules="wl"' /etc/conf.d/modules 2>/dev/null || \
+    echo 'modules="wl"' >> /etc/conf.d/modules
+
+  # Apple keyboard fn-mode (fn keys act as standard F1-F12 by default)
+  echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
+
+  # Backlight permissions
+  mkdir -p /etc/udev/rules.d
+  cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+EOF
+
+  # seatd OpenRC init script
+  SEATD_BIN=$(command -v seatd 2>/dev/null || echo /usr/bin/seatd)
+  if [[ ! -f /etc/init.d/seatd ]]; then
+    cat > /etc/init.d/seatd << EOF
+#!/sbin/openrc-run
+name="seatd"
+description="Seat management daemon"
+command="$SEATD_BIN"
+command_args="-g seat"
+command_background="yes"
+pidfile="/run/\${RC_SVCNAME}.pid"
+EOF
+    chmod +x /etc/init.d/seatd
+  fi
+
+  rc-update add seatd         default
+  rc-update add NetworkManager default
+  rc-update add bluetooth      default
+  rc-update add dbus           default
+  rc-update add elogind        default
+  rc-update add acpid          default
+  rc-update add tlp            default
+
+  depmod -a "$(uname -r)"
+  mark_step sysconfig
+fi
+
+# 12. BCM5974 TRACKPAD MODULE
+if ! step_done bcm5974; then
+  header "Building bcm5974 trackpad module..."
+  KSRC=/usr/src/linux
+  if [[ -f "$KSRC/Makefile" ]]; then
+    cd "$KSRC"
+    ./scripts/config -m CONFIG_MOUSE_BCM5974
+    make olddefconfig
+    # Build only the mouse driver directory — fast, no full kernel rebuild needed.
+    # Build artifacts from the original kernel compile must be present (they are
+    # if the kernel was built in-tree, which gentoo-sources always does).
+    make -j3 M=drivers/input/mouse
+    make M=drivers/input/mouse modules_install
+    depmod -a "$(make -s kernelrelease)"
+    # usbmouse can race bcm5974 and steal the trackpad USB interface before
+    # bcm5974 loads. Blacklist it — standard USB mice work fine via usbhid.
+    echo "blacklist usbmouse" > /etc/modprobe.d/blacklist-usbmouse.conf
+    modprobe -r usbmouse 2>/dev/null || true
+    modprobe bcm5974 && echo "bcm5974 loaded — trackpad active" || \
+      echo "modprobe bcm5974 failed — check dmesg"
+    # Auto-load at boot (OpenRC reads /etc/conf.d/modules)
+    grep -q bcm5974 /etc/conf.d/modules 2>/dev/null || \
+      echo 'modules="${modules} bcm5974"' >> /etc/conf.d/modules
+    mark_step bcm5974
+  else
+    echo "Kernel source not found at $KSRC — skipping"
+    echo "Install with: emerge sys-kernel/gentoo-sources && eselect kernel set 1"
+  fi
+fi
+
+echo -e "\n${GREEN}Setup complete. Reboot for all changes to take effect.${NC}"
