@@ -96,49 +96,101 @@ bash ~/legenddots/blfs/setup   # reruns mesa only
 
 ## Build Order & Estimated Time
 
-**Total wall-clock time on MacBook Air 6,2: ~30–40 hours across both phases.**
-LLVM is the overwhelming bottleneck in Phase 2.
+Times are wall-clock on a MacBook Air 6,2 (Haswell i5-4250U, `MAKEFLAGS=-j3`).
+**Total across both phases: ~30–40 hours.** LLVM is the overwhelming bottleneck.
 
 ### Phase 1 — LFS base system (~8–12 hours)
 
-| Step | What | Estimated time |
-|------|------|----------------|
+| Step | What | Time |
+|------|------|------|
 | Disk | Partition + format | ~1 min |
-| Sources | Download ~80 tarballs | ~20–60 min (network speed) |
-| Phase 1a | Cross-toolchain (binutils, gcc p1, glibc, libstdc++) | ~45 min |
-| Phase 1b | Temporary tools (bash, coreutils, gcc p2, etc.) | ~60 min |
-| Phase 1c | Base system in chroot (~75 packages) | ~4–6 h |
-| Kernel | Linux 6.16.1 with MacBook hardware config | ~30 min |
-| rEFInd | Bootloader | ~2 min |
+| Sources | Download ~90 tarballs | ~20–60 min (network) |
+| **Cross-toolchain** | | |
+| | binutils pass 1 | ~5 min |
+| | gcc pass 1 | ~12 min |
+| | Linux API headers | ~1 min |
+| | glibc 2.42 | ~20 min |
+| | libstdc++ pass 1 | ~5 min |
+| **Temporary tools** | (run as `lfs` user) | |
+| | m4, ncurses, bash, coreutils, diffutils, file, findutils | ~10 min |
+| | gawk, grep, gzip, make, patch, sed, tar, xz | ~5 min |
+| | gettext (tools only) | ~5 min |
+| | binutils pass 2, gcc pass 2 | ~20 min |
+| **Chroot — base packages** | | |
+| | glibc (final), zlib, bzip2, xz, zstd | ~25 min |
+| | file, readline, m4, bc, flex, tcl | ~8 min |
+| | binutils (final) | ~12 min |
+| | mpfr, gmp, mpc, attr, acl, libcap, libxcrypt, shadow | ~8 min |
+| | **gcc 15.2.0 (final)** | **~25 min** |
+| | ncurses, sed, psmisc | ~5 min |
+| | gettext, grep, bash, libtool, gdbm, gperf, expat | ~10 min |
+| | inetutils, less, perl, XML-Parser, intltool | ~10 min |
+| | autoconf, automake, openssl | ~8 min |
+| | kmod, elfutils, libffi | ~5 min |
+| | Python 3.13.7 | ~10 min |
+| | flit_core, wheel, markupsafe, jinja2, packaging, setuptools | ~5 min |
+| | ninja, meson | ~3 min |
+| | coreutils, check, diffutils, gawk, findutils, groff | ~8 min |
+| | gzip, iproute2, kbd, libpipeline, make, patch, tar | ~5 min |
+| | vim | ~5 min |
+| | eudev, man-db, procps, e2fsprogs | ~8 min |
+| | sysklogd, sysvinit | ~2 min |
+| | wget, curl, git, zsh, cmake, doas | ~15 min |
+| | System config (fstab, inittab, locale, etc.) | ~1 min |
+| **Kernel** | Linux 6.16.1, MacBook Air 6,2 config | ~30 min |
+| **rEFInd** | Bootloader install | ~2 min |
 
 ### Phase 2 — BLFS desktop (~20–30 hours)
 
-| Step | Package(s) | Estimated time |
-|------|------------|----------------|
+| Step | Package | Time |
+|------|---------|------|
 | 1 | D-Bus | ~3 min |
 | 2 | PCRE2 | ~2 min |
 | 3 | libffi | ~1 min |
 | 4 | GLib | ~8 min |
-| 5–8 | libpng, libjpeg-turbo, libtiff, libwebp | ~5 min |
+| 5 | libpng | ~2 min |
+| 6 | libjpeg-turbo | ~2 min |
+| 7 | libtiff | ~3 min |
+| 8 | libwebp | ~2 min |
 | 9 | libdrm | ~2 min |
-| 10–11 | Wayland + wayland-protocols | ~3 min |
-| 12–13 | xkeyboard-config + libxkbcommon | ~3 min |
-| 14 | pixman | ~2 min |
-| 15–17 | FreeType (×2) + HarfBuzz | ~10 min |
+| 10 | Wayland | ~2 min |
+| 11 | wayland-protocols | ~1 min |
+| 12 | xkeyboard-config | ~1 min |
+| 13 | libxkbcommon | ~3 min |
+| 14 | pixman | ~3 min |
+| 15 | FreeType (without HarfBuzz) | ~3 min |
+| 16 | HarfBuzz | ~8 min |
+| 17 | FreeType (with HarfBuzz) | ~3 min |
 | 18 | fontconfig | ~3 min |
-| 19–22 | Cairo, Pango, gdk-pixbuf, ATK | ~12 min |
+| 19 | Cairo | ~5 min |
+| 20 | Pango | ~4 min |
+| 21 | gdk-pixbuf | ~4 min |
+| 22 | ATK | ~3 min |
 | 23 | at-spi2-core | ~3 min |
 | 24 | GTK+ 3 | ~20 min |
-| 25 | Rust toolchain | ~5 min (downloads pre-built) |
+| 25 | Rust toolchain (rustup, pre-built) | ~5 min |
 | 26 | librsvg | ~8 min |
-| **27** | **LLVM 18** | **~6–10 hours** |
-| 28 | Mesa (iris + crocus + Vulkan) | ~45 min |
-| 29–32 | seatd, polkit, PipeWire, WirePlumber | ~15 min |
-| 33–34 | niri, alacritty | ~25 min |
-| 35–43 | waybar, fuzzel, swaylock, swaybg, dunst, grim, slurp, wl-clipboard, brightnessctl | ~25 min |
+| **27** | **LLVM 18** | **~6–10 h** |
+| 28 | Mesa (iris + crocus + ANV Vulkan) | ~45 min |
+| 29 | seatd | ~2 min |
+| 30 | polkit | ~5 min |
+| 31 | PipeWire | ~8 min |
+| 32 | WirePlumber | ~5 min |
+| 33 | niri (`cargo build --release`) | ~15 min |
+| 34 | alacritty (`cargo build --release`) | ~10 min |
+| 35 | waybar | ~8 min |
+| 36 | fuzzel | ~3 min |
+| 37 | swaylock | ~3 min |
+| 38 | swaybg | ~2 min |
+| 39 | dunst | ~3 min |
+| 40 | grim | ~2 min |
+| 41 | slurp | ~2 min |
+| 42 | wl-clipboard | ~2 min |
+| 43 | brightnessctl | ~1 min |
 | 44 | fastfetch | ~3 min |
 | 45 | Fonts | ~2 min |
-| 46–47 | User setup + hardware config | ~1 min |
+| 46 | User setup + dotfile symlinks | ~1 min |
+| 47 | MacBook Air 6,2 hardware config | ~1 min |
 
 ---
 
