@@ -76,6 +76,7 @@ class LegendBrowser(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
+        Binding("ctrl+q", "quit", "Quit", show=False),
         Binding("ctrl+l", "focus_url", "URL bar"),
         Binding("j", "scroll_down", "Down", show=False),
         Binding("k", "scroll_up", "Up", show=False),
