@@ -14,16 +14,37 @@ with extra telemetry and a Bing infestation. Both are spyware with a UI.
 
 A terminal-based web browser built with [Textual](https://github.com/Textualize/textual).
 Fetches pages over HTTP, converts HTML to Markdown, and renders it in the terminal.
+Works on desktop and **Termux (Android)**.
 
-**Dependencies:** `textual`, `httpx`, `html2text`, `beautifulsoup4`
+**Install — Termux:**
+```sh
+pkg install python ca-certificates
+pip install textual httpx html2text beautifulsoup4
+```
 
+**Install — desktop:**
+```sh
+pip install textual httpx html2text beautifulsoup4
+```
+
+**Run:**
 ```sh
 python browser
 ```
 
-- Address bar at the top, type a URL and press Enter
-- `q` to quit
+| Key | Action |
+|-----|--------|
+| Enter (in URL bar) | Load URL |
+| `Ctrl+L` | Focus URL bar |
+| `j` / `k` | Scroll down / up |
+| `Ctrl+D` / `Ctrl+U` | Page down / up |
+| `g` / `G` | Jump to top / bottom |
+| `r` | Reload current page |
+| `q` | Quit |
+
 - Renders headings, links, and code blocks with Tokyo Night styling
+- After loading, the URL bar updates to the final redirected URL
+- SSL errors show a specific Termux fix hint (`pkg install ca-certificates`)
 - Has a special case to strikethrough anything with class `microsoft` on a page
 
 ---

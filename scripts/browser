@@ -1,119 +1,175 @@
 #!/usr/bin/env python3
-from textual.app import App, ComposeResult
-from textual.widgets import Input, Markdown, Header, Footer
-from textual.containers import Container, VerticalScroll
-import httpx
-import html2text
-from bs4 import BeautifulSoup
+"""
+Terminal browser — works on Termux (Android) and desktop.
+
+Termux setup:
+    pkg install python ca-certificates
+    pip install textual httpx html2text beautifulsoup4
+"""
+
+import sys
+
+try:
+    from textual.app import App, ComposeResult
+    from textual.widgets import Input, Markdown, Header, Footer
+    from textual.containers import VerticalScroll
+    from textual.binding import Binding
+    import httpx
+    import html2text
+    from bs4 import BeautifulSoup
+except ImportError as e:
+    print(f"\nMissing dependency: {e}")
+    print("\nInstall with:")
+    print("  Termux:   pkg install python ca-certificates")
+    print("            pip install textual httpx html2text beautifulsoup4")
+    print("  Desktop:  pip install textual httpx html2text beautifulsoup4")
+    sys.exit(1)
+
 
 class LegendBrowser(App):
-    # --- TACTICAL TOKYO NIGHT CSS ---
     CSS = """
-    /* 1. Global Screen Settings */
     Screen {
         background: #1a1b26;
         color: #c0caf5;
-        align: center middle; /* CENTERS EVERYTHING */
     }
 
-    /* 2. The Address Bar */
-    Input { 
-        dock: top; 
+    Input {
+        dock: top;
         height: 3;
         margin: 0 0 1 0;
-        border: heavy #7aa2f7; 
+        border: heavy #7aa2f7;
         background: #15161e;
         color: #c0caf5;
     }
     Input:focus { border: heavy #bb9af7; }
 
-    /* 3. The Content Container */
     VerticalScroll {
         width: 100%;
-        height: 100%;
-        align: center middle; /* Center content vertically/horizontally */
+        height: 1fr;
     }
 
-    /* 4. The Markdown Content Box */
-    Markdown { 
+    Markdown {
         background: #1a1b26;
         color: #c0caf5;
-        padding: 2;
-        max-width: 80%; /* Don't stretch to edges */
-        border: blank;
+        padding: 1 2;
     }
-    
-    /* 5. SPECIFIC TEXT STYLING */
-    
-    /* H1: Make it BIG and RED */
+
     MarkdownH1 {
-        color: #f7768e; /* Tokyo Red */
+        color: #f7768e;
         text-style: bold;
         background: #1a1b26;
-        border-bottom: heavy #f7768e;
-        text-align: center;
+        border: heavy #f7768e;
         padding: 1;
     }
-    
-    /* Links: Cyan */
+
     MarkdownLink {
         color: #7dcfff;
         text-style: underline;
     }
 
-    /* Code Blocks: Green Border */
     MarkdownFence {
         background: #15161e;
         border: solid #9ece6a;
         color: #9ece6a;
     }
-    
-    /* Paragraphs: Centered text for the vibe */
-    MarkdownP {
-        text-align: center;
-    }
     """
 
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS = [
+        Binding("q", "quit", "Quit"),
+        Binding("ctrl+l", "focus_url", "URL bar"),
+        Binding("j", "scroll_down", "Down", show=False),
+        Binding("k", "scroll_up", "Up", show=False),
+        Binding("ctrl+d", "page_down", "Page ↓", show=False),
+        Binding("ctrl+u", "page_up", "Page ↑", show=False),
+        Binding("g", "scroll_home", "Top", show=False),
+        Binding("G", "scroll_end", "Bottom", show=False),
+        Binding("r", "reload", "Reload"),
+    ]
+
+    def __init__(self):
+        super().__init__()
+        self._current_url: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Input(placeholder="http://localhost:8080", id="address_bar")
-        # Container to hold centered content
-        with VerticalScroll():
-            yield Markdown("# SYSTEM READY", id="content_view")
+        yield Input(placeholder="Enter URL (e.g. wikipedia.org)", id="address_bar")
+        with VerticalScroll(id="scroll"):
+            yield Markdown("# SYSTEM READY\n\nType a URL above and press Enter.", id="content")
         yield Footer()
 
+    def action_focus_url(self) -> None:
+        self.query_one("#address_bar", Input).focus()
+
+    def action_scroll_down(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_down()
+
+    def action_scroll_up(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_up()
+
+    def action_page_down(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_page_down()
+
+    def action_page_up(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_page_up()
+
+    def action_scroll_home(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_home()
+
+    def action_scroll_end(self) -> None:
+        self.query_one("#scroll", VerticalScroll).scroll_end()
+
+    async def action_reload(self) -> None:
+        if self._current_url:
+            await self.fetch_url(self._current_url)
+
     async def on_input_submitted(self, message: Input.Submitted) -> None:
-        url = message.value
-        if not url.startswith("http"):
+        url = message.value.strip()
+        if not url:
+            return
+        if not url.startswith(("http://", "https://")):
             url = "https://" + url
         await self.fetch_url(url)
 
-    async def fetch_url(self, url: str):
-        content_view = self.query_one("#content_view", Markdown)
+    async def fetch_url(self, url: str) -> None:
+        content = self.query_one("#content", Markdown)
+        bar = self.query_one("#address_bar", Input)
+        await content.update(f"# Loading…\n\n`{url}`")
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+            async with httpx.AsyncClient(
+                follow_redirects=True,
+                timeout=15.0,
+            ) as client:
                 response = await client.get(url)
-                
-                # Manual Tweaks to make your site look cool in TUI
-                soup = BeautifulSoup(response.text, "html.parser")
-                
-                # 1. Fake the Strikethrough for VS CODE
-                # Find the span with class 'microsoft' and wrap it in ~~ tildes
-                for span in soup.find_all("span", class_="microsoft"):
-                    span.string = f"~~{span.text}~~"
-                
-                # 2. Convert to Markdown
-                converter = html2text.HTML2Text()
-                converter.ignore_links = False
-                converter.body_width = 0 
-                md = converter.handle(str(soup))
-                
-                content_view.update(md)
+
+            self._current_url = str(response.url)
+            bar.value = self._current_url
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            for span in soup.find_all("span", class_="microsoft"):
+                span.string = f"~~{span.get_text()}~~"
+
+            converter = html2text.HTML2Text()
+            converter.ignore_links = False
+            converter.body_width = 0
+            md = converter.handle(str(soup))
+
+            await content.update(md)
+            self.query_one("#scroll", VerticalScroll).scroll_home(animate=False)
+
+        except httpx.SSLError:
+            await content.update(
+                "# SSL Error\n\nCertificate verification failed.\n\n"
+                "**On Termux:** run `pkg install ca-certificates` then retry.\n\n"
+                "Or prefix the URL with `http://` to skip HTTPS."
+            )
+        except httpx.ConnectError as e:
+            await content.update(f"# Connection Error\n\n{e}")
+        except httpx.TimeoutException:
+            await content.update(f"# Timeout\n\nNo response from `{url}` within 15s.")
         except Exception as e:
-            content_view.update(f"# ERROR\n{str(e)}")
+            await content.update(f"# Error\n\n```\n{type(e).__name__}: {e}\n```")
+
 
 if __name__ == "__main__":
-    app = LegendBrowser()
-    app.run()
+    LegendBrowser().run()
