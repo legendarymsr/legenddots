@@ -92,10 +92,13 @@ class LegendBrowser(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Input(placeholder="Enter URL (e.g. wikipedia.org)", id="address_bar")
-        with VerticalScroll(id="scroll"):
+        yield Input(placeholder="Enter URL — press Enter to load", id="address_bar")
+        with VerticalScroll(id="scroll", can_focus=True):
             yield Markdown("# SYSTEM READY\n\nType a URL above and press Enter.", id="content")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#address_bar", Input).focus()
 
     def action_focus_url(self) -> None:
         self.query_one("#address_bar", Input).focus()
@@ -155,7 +158,9 @@ class LegendBrowser(App):
             md = converter.handle(str(soup))
 
             await content.update(md)
-            self.query_one("#scroll", VerticalScroll).scroll_home(animate=False)
+            scroll = self.query_one("#scroll", VerticalScroll)
+            scroll.scroll_home(animate=False)
+            scroll.focus()
 
         except httpx.SSLError:
             await content.update(
@@ -163,12 +168,16 @@ class LegendBrowser(App):
                 "**On Termux:** run `pkg install ca-certificates` then retry.\n\n"
                 "Or prefix the URL with `http://` to skip HTTPS."
             )
+            self.query_one("#scroll", VerticalScroll).focus()
         except httpx.ConnectError as e:
             await content.update(f"# Connection Error\n\n{e}")
+            self.query_one("#scroll", VerticalScroll).focus()
         except httpx.TimeoutException:
             await content.update(f"# Timeout\n\nNo response from `{url}` within 15s.")
+            self.query_one("#scroll", VerticalScroll).focus()
         except Exception as e:
             await content.update(f"# Error\n\n```\n{type(e).__name__}: {e}\n```")
+            self.query_one("#scroll", VerticalScroll).focus()
 
 
 if __name__ == "__main__":
