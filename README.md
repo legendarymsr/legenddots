@@ -167,6 +167,54 @@ Install scripts symlink configs and back up any existing ones.
 
 ---
 
+## Neovim
+
+Config lives in `init.lua` (lazy.nvim) and `modules/home/nixvim.nix` (NixVim declarative).
+
+### LSP
+
+Five language servers, installed automatically via Mason on first launch:
+
+| Server | Language |
+|--------|----------|
+| `lua_ls` | Lua |
+| `pyright` | Python |
+| `bashls` | Bash / sh |
+| `nixd` | Nix |
+| `rust_analyzer` | Rust |
+
+Uses Neovim's built-in LSP client (0.11+) — no nvim-lspconfig. Mason handles binary installation; `vim.lsp.enable` wires the servers up.
+
+#### Keybinds (normal mode, buffer-local on attach)
+
+| Key | Action |
+|-----|--------|
+| `gd` | Go to definition |
+| `gr` | References |
+| `gi` | Go to implementation |
+| `K` | Hover docs |
+| `<leader>rn` | Rename symbol |
+| `<leader>ca` | Code action |
+| `<leader>dd` | Diagnostics float |
+| `[d` / `]d` | Prev / next diagnostic |
+| `<leader>dl` | Diagnostics list (Telescope) |
+
+#### Diagnostics
+
+Inline virtual text with `●` prefix, underlines, and a rounded floating window showing the source. Sorted by severity. Does not update in insert mode.
+
+#### Completion
+
+nvim-cmp with sources: LSP → LuaSnip snippets → buffer words.
+
+| Key | Action |
+|-----|--------|
+| `Tab` / `S-Tab` | Next / prev item (or expand/jump snippet) |
+| `Enter` | Confirm selection |
+| `Ctrl+Space` | Force completion |
+
+---
+
 ## Terminal
 
 `alacritty.toml` — Tokyo Night, JetBrainsMono Nerd Font, 95% opacity.
