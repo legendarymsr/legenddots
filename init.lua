@@ -97,6 +97,81 @@ require("lazy").setup({
     config = function() require("nvim-tree").setup() end,
     keys = { { "<leader>e", "<cmd>NvimTreeToggle<CR>" } }
   },
+
+  -- LSP + COMPLETION (built-in LSP, Neovim 0.11+)
+  {
+    "williamboman/mason.nvim",
+    dependencies = {
+      "williamboman/mason-lspconfig.nvim",
+      "hrsh7th/nvim-cmp",
+      "hrsh7th/cmp-nvim-lsp",
+      "hrsh7th/cmp-buffer",
+      "L3MON4D3/LuaSnip",
+      "saadparwaiz1/cmp_luasnip",
+    },
+    config = function()
+      require("mason").setup()
+      require("mason-lspconfig").setup({
+        ensure_installed = { "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer" },
+      })
+
+      vim.lsp.config("*", { capabilities = require("cmp_nvim_lsp").default_capabilities() })
+
+      vim.api.nvim_create_autocmd("LspAttach", {
+        callback = function(ev)
+          local buf = ev.buf
+          local map = function(k, v, d)
+            vim.keymap.set("n", k, v, { buffer = buf, desc = d })
+          end
+          map("gd",         vim.lsp.buf.definition,    "Go to definition")
+          map("gr",         vim.lsp.buf.references,    "References")
+          map("gi",         vim.lsp.buf.implementation,"Go to implementation")
+          map("K",          vim.lsp.buf.hover,         "Hover docs")
+          map("<leader>rn", vim.lsp.buf.rename,        "Rename symbol")
+          map("<leader>ca", vim.lsp.buf.code_action,   "Code action")
+          map("<leader>dd", vim.diagnostic.open_float, "Diagnostics float")
+          map("[d",         vim.diagnostic.goto_prev,  "Prev diagnostic")
+          map("]d",         vim.diagnostic.goto_next,  "Next diagnostic")
+          map("<leader>dl", "<cmd>Telescope diagnostics<cr>", "Diagnostics list")
+        end,
+      })
+
+      vim.lsp.enable({ "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer" })
+
+      vim.diagnostic.config({
+        virtual_text    = { prefix = "●" },
+        signs           = true,
+        underline       = true,
+        update_in_insert = false,
+        severity_sort   = true,
+        float           = { border = "rounded", source = true },
+      })
+
+      local cmp     = require("cmp")
+      local luasnip = require("luasnip")
+      cmp.setup({
+        snippet = { expand = function(args) luasnip.lsp_expand(args.body) end },
+        mapping = cmp.mapping.preset.insert({
+          ["<C-Space>"] = cmp.mapping.complete(),
+          ["<CR>"]      = cmp.mapping.confirm({ select = true }),
+          ["<Tab>"]     = cmp.mapping(function(fallback)
+            if cmp.visible() then cmp.select_next_item()
+            elseif luasnip.expand_or_jumpable() then luasnip.expand_or_jump()
+            else fallback() end
+          end, { "i", "s" }),
+          ["<S-Tab>"]   = cmp.mapping(function(fallback)
+            if cmp.visible() then cmp.select_prev_item()
+            else fallback() end
+          end, { "i", "s" }),
+        }),
+        sources = {
+          { name = "nvim_lsp" },
+          { name = "luasnip" },
+          { name = "buffer" },
+        },
+      })
+    end,
+  },
 })
 
 -- 4. RECON FUNCTIONS
