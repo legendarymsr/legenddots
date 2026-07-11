@@ -19,13 +19,16 @@ Works on desktop and **Termux (Android)**.
 **Install — Termux:**
 ```sh
 pkg install python ca-certificates
-pip install textual httpx html2text beautifulsoup4
+pip install textual httpx html2text beautifulsoup4 pygments
 ```
 
 **Install — desktop:**
 ```sh
-pip install textual httpx html2text beautifulsoup4
+pip install textual httpx html2text beautifulsoup4 pygments
 ```
+
+`pygments` enables syntax highlighting in code blocks (`<pre><code class="language-X">`).
+Language is auto-detected from the class attribute.
 
 **Run:**
 ```sh
@@ -40,7 +43,8 @@ python browser
 | `Ctrl+D` / `Ctrl+U` | Page down / up |
 | `g` / `G` | Jump to top / bottom |
 | `r` | Reload current page |
-| `q` | Quit |
+| `d` | Toggle diagnostics bar |
+| `q` / `Ctrl+Q` | Quit |
 
 - Renders headings, links, and code blocks with Tokyo Night styling
 - After loading, the URL bar updates to the final redirected URL
