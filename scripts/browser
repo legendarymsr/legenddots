@@ -4,14 +4,21 @@ Terminal browser — works on Termux (Android) and desktop.
 
 Termux setup:
     pkg install python ca-certificates
-    pip install textual httpx html2text beautifulsoup4
+    pip install textual httpx html2text beautifulsoup4 pygments
+
+Desktop:
+    pip install textual httpx html2text beautifulsoup4 pygments
+
+pygments enables syntax highlighting in code blocks.
 """
 
 import sys
+import re
+import time as _time
 
 try:
     from textual.app import App, ComposeResult
-    from textual.widgets import Input, Markdown, Header, Footer
+    from textual.widgets import Input, Markdown, Header, Footer, Static
     from textual.containers import VerticalScroll
     from textual.binding import Binding
     import httpx
@@ -21,10 +28,101 @@ except ImportError as e:
     print(f"\nMissing dependency: {e}")
     print("\nInstall with:")
     print("  Termux:   pkg install python ca-certificates")
-    print("            pip install textual httpx html2text beautifulsoup4")
-    print("  Desktop:  pip install textual httpx html2text beautifulsoup4")
+    print("            pip install textual httpx html2text beautifulsoup4 pygments")
+    print("  Desktop:  pip install textual httpx html2text beautifulsoup4 pygments")
     sys.exit(1)
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _detect_lang(tag) -> str:
+    """Pull a language name from class/data attributes on a BeautifulSoup tag."""
+    for attr in ("class", "data-lang", "data-language"):
+        val = tag.get(attr)
+        if not val:
+            continue
+        items = val if isinstance(val, list) else [val]
+        for item in items:
+            m = re.match(r"(?:language-|lang-)(.+)", item, re.I)
+            if m:
+                return m.group(1).strip().lower()
+    return ""
+
+
+def _html_to_md(html: str) -> str:
+    """
+    Convert HTML → Markdown, preserving code block language info so that
+    Textual's Markdown widget (via Pygments) can syntax-highlight them.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Special case: class="microsoft" → strikethrough
+    for span in soup.find_all("span", class_="microsoft"):
+        span.string = f"~~{span.get_text()}~~"
+
+    # Extract <pre><code> blocks before html2text strips the language class
+    placeholders: dict[str, str] = {}
+    for i, pre in enumerate(soup.find_all("pre")):
+        code = pre.find("code")
+        src  = code if code else pre
+        lang = _detect_lang(src)
+        if not lang and code:
+            lang = _detect_lang(pre)
+        text    = src.get_text()
+        marker  = f"LEGENDFENCE{i}ENDFENCE"
+        placeholders[marker] = f"```{lang}\n{text.rstrip()}\n```"
+        pre.replace_with(f"\n\n{marker}\n\n")
+
+    converter = html2text.HTML2Text()
+    converter.ignore_links   = False
+    converter.ignore_images  = True   # raw <img> URLs are noise in TUI
+    converter.body_width     = 0
+    md = converter.handle(str(soup))
+
+    # Splice highlighted fences back in
+    for marker, fence in placeholders.items():
+        md = md.replace(marker, fence)
+
+    return md
+
+
+def _diagnostics(response: httpx.Response, soup: BeautifulSoup, elapsed: float) -> str:
+    """Build a Rich-markup diagnostics line for the status bar."""
+    status = response.status_code
+    reason = getattr(response, "reason_phrase", "")
+    if status < 300:
+        status_str = f"[bold green]{status} {reason}[/bold green]"
+    elif status < 400:
+        status_str = f"[bold yellow]{status} {reason}[/bold yellow]"
+    else:
+        status_str = f"[bold red]{status} {reason}[/bold red]"
+
+    ctype   = response.headers.get("content-type", "?").split(";")[0].strip()
+    size_kb = len(response.content) / 1024
+    links   = len(soup.find_all("a",   href=True))
+    images  = len(soup.find_all("img"))
+    scripts = len(soup.find_all("script"))
+    fences  = len(soup.find_all("pre"))
+
+    warnings: list[str] = []
+    if str(response.url).startswith("http://"):
+        warnings.append("[yellow]⚠ no TLS[/yellow]")
+    if size_kb > 500:
+        warnings.append(f"[yellow]⚠ large ({size_kb:.0f} KB)[/yellow]")
+    if scripts > 10:
+        warnings.append(f"[yellow]⚠ {scripts} scripts[/yellow]")
+    if not response.headers.get("content-security-policy"):
+        warnings.append("[dim]no CSP[/dim]")
+
+    stats = (
+        f"[dim]{elapsed:.2f}s · {size_kb:.1f} KB · "
+        f"{links} links · {images} imgs · {fences} code blocks[/dim]"
+    )
+    warn_str = ("  " + "  ".join(warnings)) if warnings else ""
+    return f" {status_str}  [cyan]{ctype}[/cyan]  {stats}{warn_str}"
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
 
 class LegendBrowser(App):
     CSS = """
@@ -70,61 +168,87 @@ class LegendBrowser(App):
     MarkdownFence {
         background: #15161e;
         border: solid #9ece6a;
-        color: #9ece6a;
+        padding: 0 1;
     }
+
+    #diag-bar {
+        dock: bottom;
+        height: auto;
+        padding: 0 1;
+        background: #15161e;
+        border-top: solid #3b4261;
+    }
+
+    #diag-bar.hidden { display: none; }
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
-        Binding("ctrl+q", "quit", "Quit", show=False),
-        Binding("ctrl+l", "focus_url", "URL bar"),
-        Binding("j", "scroll_down", "Down", show=False),
-        Binding("k", "scroll_up", "Up", show=False),
-        Binding("ctrl+d", "page_down", "Page ↓", show=False),
-        Binding("ctrl+u", "page_up", "Page ↑", show=False),
-        Binding("g", "scroll_home", "Top", show=False),
-        Binding("G", "scroll_end", "Bottom", show=False),
-        Binding("r", "reload", "Reload"),
+        Binding("ctrl+q",  "quit",        "Quit"),
+        Binding("q",       "quit",        "Quit",        show=False),
+        Binding("ctrl+l",  "focus_url",   "URL bar"),
+        Binding("r",       "reload",      "Reload"),
+        Binding("d",       "toggle_diag", "Diagnostics"),
+        Binding("j",       "scroll_down", "↓",           show=False),
+        Binding("k",       "scroll_up",   "↑",           show=False),
+        Binding("ctrl+d",  "page_down",   "Page ↓",      show=False),
+        Binding("ctrl+u",  "page_up",     "Page ↑",      show=False),
+        Binding("g",       "scroll_home", "Top",         show=False),
+        Binding("G",       "scroll_end",  "Bottom",      show=False),
     ]
 
     def __init__(self):
         super().__init__()
-        self._current_url: str = ""
+        self._current_url  = ""
+        self._diag_visible = True
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Input(placeholder="Enter URL — press Enter to load", id="address_bar")
         with VerticalScroll(id="scroll", can_focus=True):
-            yield Markdown("# SYSTEM READY\n\nType a URL above and press Enter.", id="content")
+            yield Markdown(
+                "# SYSTEM READY\n\nType a URL above and press Enter.\n\n"
+                "`d` — toggle diagnostics bar  ·  `Ctrl+L` — focus URL bar",
+                id="content",
+            )
+        yield Static("", id="diag-bar", markup=True)
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#address_bar", Input).focus()
 
-    def action_focus_url(self) -> None:
+    # ── actions ───────────────────────────────────────────────────────────────
+
+    def action_focus_url(self)   -> None:
         self.query_one("#address_bar", Input).focus()
 
     def action_scroll_down(self) -> None:
         self.query_one("#scroll", VerticalScroll).scroll_down()
 
-    def action_scroll_up(self) -> None:
+    def action_scroll_up(self)   -> None:
         self.query_one("#scroll", VerticalScroll).scroll_up()
 
-    def action_page_down(self) -> None:
+    def action_page_down(self)   -> None:
         self.query_one("#scroll", VerticalScroll).scroll_page_down()
 
-    def action_page_up(self) -> None:
+    def action_page_up(self)     -> None:
         self.query_one("#scroll", VerticalScroll).scroll_page_up()
 
     def action_scroll_home(self) -> None:
         self.query_one("#scroll", VerticalScroll).scroll_home()
 
-    def action_scroll_end(self) -> None:
+    def action_scroll_end(self)  -> None:
         self.query_one("#scroll", VerticalScroll).scroll_end()
+
+    def action_toggle_diag(self) -> None:
+        self._diag_visible = not self._diag_visible
+        bar = self.query_one("#diag-bar", Static)
+        bar.remove_class("hidden") if self._diag_visible else bar.add_class("hidden")
 
     async def action_reload(self) -> None:
         if self._current_url:
-            await self.fetch_url(self._current_url)
+            await self._load(self._current_url)
+
+    # ── URL submission ────────────────────────────────────────────────────────
 
     async def on_input_submitted(self, message: Input.Submitted) -> None:
         url = message.value.strip()
@@ -132,33 +256,33 @@ class LegendBrowser(App):
             return
         if not url.startswith(("http://", "https://")):
             url = "https://" + url
-        await self.fetch_url(url)
+        await self._load(url)
 
-    async def fetch_url(self, url: str) -> None:
-        content = self.query_one("#content", Markdown)
-        bar = self.query_one("#address_bar", Input)
+    # ── Core fetch ────────────────────────────────────────────────────────────
+
+    async def _load(self, url: str) -> None:
+        content = self.query_one("#content",   Markdown)
+        bar     = self.query_one("#address_bar", Input)
+        diag    = self.query_one("#diag-bar",  Static)
+
         await content.update(f"# Loading…\n\n`{url}`")
+        diag.update(f"[dim]fetching {url}…[/dim]")
+
         try:
-            async with httpx.AsyncClient(
-                follow_redirects=True,
-                timeout=15.0,
-            ) as client:
+            t0 = _time.monotonic()
+            async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
                 response = await client.get(url)
+            elapsed = _time.monotonic() - t0
 
             self._current_url = str(response.url)
             bar.value = self._current_url
 
             soup = BeautifulSoup(response.text, "html.parser")
-
-            for span in soup.find_all("span", class_="microsoft"):
-                span.string = f"~~{span.get_text()}~~"
-
-            converter = html2text.HTML2Text()
-            converter.ignore_links = False
-            converter.body_width = 0
-            md = converter.handle(str(soup))
+            md   = _html_to_md(response.text)
 
             await content.update(md)
+            diag.update(_diagnostics(response, soup, elapsed))
+
             scroll = self.query_one("#scroll", VerticalScroll)
             scroll.scroll_home(animate=False)
             scroll.focus()
@@ -166,18 +290,25 @@ class LegendBrowser(App):
         except httpx.SSLError:
             await content.update(
                 "# SSL Error\n\nCertificate verification failed.\n\n"
-                "**On Termux:** run `pkg install ca-certificates` then retry.\n\n"
-                "Or prefix the URL with `http://` to skip HTTPS."
+                "**On Termux:** `pkg install ca-certificates` then retry.\n\n"
+                "Or prefix with `http://` to skip HTTPS."
             )
+            diag.update("[bold red]SSL Error[/bold red]")
             self.query_one("#scroll", VerticalScroll).focus()
+
         except httpx.ConnectError as e:
-            await content.update(f"# Connection Error\n\n{e}")
+            await content.update(f"# Connection Error\n\n```\n{e}\n```")
+            diag.update("[bold red]Connection failed[/bold red]")
             self.query_one("#scroll", VerticalScroll).focus()
+
         except httpx.TimeoutException:
-            await content.update(f"# Timeout\n\nNo response from `{url}` within 15s.")
+            await content.update(f"# Timeout\n\nNo response from `{url}` within 15 s.")
+            diag.update("[bold red]Timed out[/bold red]")
             self.query_one("#scroll", VerticalScroll).focus()
+
         except Exception as e:
             await content.update(f"# Error\n\n```\n{type(e).__name__}: {e}\n```")
+            diag.update(f"[bold red]{type(e).__name__}[/bold red]")
             self.query_one("#scroll", VerticalScroll).focus()
 
 
