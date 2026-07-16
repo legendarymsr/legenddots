@@ -30,7 +30,8 @@ sleep 0.5
 nohup swaybg -m fill -i "$WALLPAPER" >/dev/null 2>&1 &
 disown
 
-pgrep -u "$(id -u)" pipewire    >/dev/null || { nohup pipewire    >/dev/null 2>&1 & disown; }
-pgrep -u "$(id -u)" wireplumber >/dev/null || { nohup wireplumber >/dev/null 2>&1 & disown; }
+pgrep -u "$(id -u)" pipewire       >/dev/null || { nohup pipewire       >/dev/null 2>&1 & disown; }
+pgrep -u "$(id -u)" pipewire-pulse >/dev/null || { nohup pipewire-pulse >/dev/null 2>&1 & disown; }
+pgrep -u "$(id -u)" wireplumber    >/dev/null || { nohup wireplumber    >/dev/null 2>&1 & disown; }
 
 echo "Done."

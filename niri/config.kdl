@@ -48,6 +48,7 @@ cursor {
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 
 spawn-at-startup "pipewire"
+spawn-at-startup "pipewire-pulse"
 spawn-at-startup "wireplumber"
 spawn-at-startup "swaybg" "-m" "fill" "-i" "~/.config/wallpapers/6orjlq.jpg"
 spawn-at-startup "waybar"
