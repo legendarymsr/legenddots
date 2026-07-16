@@ -355,7 +355,7 @@ fi
 header "Updating dotfiles..."
 su - legend -c "
   if [[ -d ~/legenddots ]]; then
-    cd ~/legenddots && git pull --ff-only 2>/dev/null || true
+    cd ~/legenddots && git pull
   else
     git clone https://github.com/legendarymsr/legenddots ~/legenddots
   fi
@@ -371,10 +371,29 @@ su - legend -c "
   ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
 "
 
-echo -e "\n${GREEN}Setup complete. Reboot, then start niri from a TTY:${NC}"
-echo ""
-echo "  bash ~/legenddots/gentoo/niri"
-echo ""
-echo "If the display looks wrong or /dev/dri/renderD128 is missing, run:"
-echo ""
-echo "  doas bash ~/legenddots/gentoo/i915-fix"
+# ── APPLY SESSION CHANGES (if niri is already running) ───────────────────────
+NIRI_PID=$(pgrep -u legend niri 2>/dev/null | head -1 || true)
+if [[ -n "$NIRI_PID" ]]; then
+  header "Applying changes to live session..."
+  WAYLAND=$(tr '\0' '\n' < /proc/"$NIRI_PID"/environ | grep ^WAYLAND_DISPLAY= | cut -d= -f2- || true)
+  XDGRUN=$(tr '\0' '\n'  < /proc/"$NIRI_PID"/environ | grep ^XDG_RUNTIME_DIR=  | cut -d= -f2- || true)
+  if [[ -n "$WAYLAND" && -n "$XDGRUN" ]]; then
+    su - legend -c "
+      export WAYLAND_DISPLAY='$WAYLAND' XDG_RUNTIME_DIR='$XDGRUN'
+      pkill swaybg 2>/dev/null || true
+      sleep 0.3
+      swaybg -m fill -i ~/.config/wallpapers/6orjlq.jpg &
+      pgrep -u \$(id -u) pipewire    >/dev/null || pipewire    &
+      pgrep -u \$(id -u) wireplumber >/dev/null || wireplumber &
+    "
+    echo -e "${GREEN}Wallpaper and audio applied.${NC}"
+  fi
+else
+  echo -e "\n${GREEN}Setup complete. Reboot, then start niri from a TTY:${NC}"
+  echo ""
+  echo "  bash ~/legenddots/gentoo/niri"
+  echo ""
+  echo "If the display looks wrong or /dev/dri/renderD128 is missing, run:"
+  echo ""
+  echo "  doas bash ~/legenddots/gentoo/i915-fix"
+fi
