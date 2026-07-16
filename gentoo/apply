@@ -18,11 +18,19 @@ ln -sfn "$REPO/niri/dunst"      ~/.config/dunst
 ln -sfn "$REPO/niri/swaylock"   ~/.config/swaylock
 ln -sfn "$REPO/wallpapers"      ~/.config/wallpapers
 
-pkill swaybg 2>/dev/null || true
-sleep 0.3
-swaybg -m fill -i ~/.config/wallpapers/6orjlq.jpg &
+WALLPAPER="$REPO/wallpapers/6orjlq.jpg"
+if [[ ! -f "$WALLPAPER" ]]; then
+    echo "Wallpaper file missing: $WALLPAPER"
+    echo "Run: cd $REPO && git pull"
+    exit 1
+fi
 
-pgrep -u "$(id -u)" pipewire    >/dev/null || pipewire    &
-pgrep -u "$(id -u)" wireplumber >/dev/null || wireplumber &
+pkill swaybg 2>/dev/null || true
+sleep 0.5
+nohup swaybg -m fill -i "$WALLPAPER" >/dev/null 2>&1 &
+disown
+
+pgrep -u "$(id -u)" pipewire    >/dev/null || { nohup pipewire    >/dev/null 2>&1 & disown; }
+pgrep -u "$(id -u)" wireplumber >/dev/null || { nohup wireplumber >/dev/null 2>&1 & disown; }
 
 echo "Done."
