@@ -371,4 +371,10 @@ su - legend -c "
   ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
 "
 
-echo -e "\n${GREEN}Setup complete. Reboot for all changes to take effect.${NC}"
+echo -e "\n${GREEN}Setup complete. Reboot, then start niri from a TTY:${NC}"
+echo ""
+echo "  bash ~/legenddots/gentoo/niri"
+echo ""
+echo "If the display looks wrong or /dev/dri/renderD128 is missing, run:"
+echo ""
+echo "  doas bash ~/legenddots/gentoo/i915-fix"
