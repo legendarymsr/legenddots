@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LFS 12.4 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
+# LFS 12.4 + BLFS Desktop Setup — KVM/QEMU (x86_64, 2 vCPU, 4 GB RAM) / Niri + Wayland
 #
 # Phase 1 (from Gentoo host, as root):
 #   LFS_DISK=/dev/sdX bash ~/legenddots/blfs/setup
@@ -44,7 +44,7 @@ if [[ "$LFS_DONE" == false ]]; then
 
 LFS_DISK="${LFS_DISK:-}"
 LFS_TGT="x86_64-lfs-linux-gnu"
-MAKEFLAGS="${MAKEFLAGS:--j3}"
+MAKEFLAGS="${MAKEFLAGS:--j2}"
 
 if [[ -z "$LFS_DISK" ]]; then
   echo "Available block devices:"
@@ -1076,42 +1076,31 @@ fi
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
 if ! done kernel; then
-  echo "==> Kernel 6.16.1 (MacBook Air 6,2)"
+  echo "==> Kernel 6.16.1 (KVM/QEMU, x86_64)"
   bpkg "$SRC/linux-6.16.1.tar.xz" bash -c "
     make defconfig
-    ./scripts/config -e CONFIG_DRM_I915 -e CONFIG_SND_HDA_INTEL \
-      -e CONFIG_SND_HDA_CODEC_CIRRUS -e CONFIG_HID_APPLE \
-      -e CONFIG_APPLE_PROPERTIES -e CONFIG_SATA_AHCI \
-      -e CONFIG_USB_XHCI_HCD -e CONFIG_USB_EHCI_HCD \
+    ./scripts/config \
+      -e CONFIG_VIRTIO_PCI -e CONFIG_VIRTIO_BLK -e CONFIG_VIRTIO_NET \
+      -e CONFIG_VIRTIO_MMIO -e CONFIG_DRM_VIRTIO_GPU \
+      -e CONFIG_HW_RANDOM_VIRTIO -e CONFIG_VIRTIO_BALLOON \
+      -e CONFIG_VIRTIO_INPUT -e CONFIG_VIRTIO_CONSOLE \
+      -e CONFIG_9P_FS -e CONFIG_9P_FS_POSIX_ACL \
+      -e CONFIG_NET_9P -e CONFIG_NET_9P_VIRTIO \
       -e CONFIG_USB_NET_CDC_ETHER -e CONFIG_USB_NET_RNDIS_HOST \
-      -e CONFIG_BT_HCIBTUSB -e CONFIG_THUNDERBOLT \
-      -e CONFIG_X86_INTEL_PSTATE -e CONFIG_ACPI_BATTERY \
-      -e CONFIG_ACPI_VIDEO -e CONFIG_BACKLIGHT_APPLE \
-      -e CONFIG_MAGIC_SYSRQ -e CONFIG_TMPFS -e CONFIG_EXT4_FS \
-      -e CONFIG_VFAT_FS -e CONFIG_NLS_UTF8 \
-      -e CONFIG_DRM -e CONFIG_DRM_KMS_HELPER -e CONFIG_FB_EFI \
-      -d CONFIG_BRCMSMAC -d CONFIG_BRCMFMAC -d CONFIG_B43 \
-      -d CONFIG_SSB -d CONFIG_INTEL_MEI -d CONFIG_INTEL_MEI_ME \
+      -e CONFIG_EXT4_FS -e CONFIG_VFAT_FS -e CONFIG_NLS_UTF8 \
+      -e CONFIG_TMPFS -e CONFIG_DRM -e CONFIG_DRM_KMS_HELPER \
+      -e CONFIG_FB_EFI -e CONFIG_ACPI -e CONFIG_MAGIC_SYSRQ \
       -e CONFIG_RANDOMIZE_BASE -e CONFIG_RANDOMIZE_MEMORY \
       -e CONFIG_PAGE_TABLE_ISOLATION -e CONFIG_RETPOLINE \
       -e CONFIG_STRICT_KERNEL_RWX -e CONFIG_STRICT_MODULE_RWX \
-      -e CONFIG_ZSWAP -e CONFIG_ZSWAP_DEFAULT_ON
+      -e CONFIG_ZSWAP -e CONFIG_ZSWAP_DEFAULT_ON \
+      -d CONFIG_INTEL_MEI -d CONFIG_INTEL_MEI_ME
     make olddefconfig
-    make CFLAGS='-march=haswell -O2 -pipe' -j3
+    make -j2
     make modules_install
     cp -v arch/x86/boot/bzImage /boot/vmlinuz-6.16.1-lfs
     cp -v System.map /boot/System.map-6.16.1
     cp -v .config /boot/config-6.16.1
-    install -m755 -d /etc/modprobe.d
-    cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF2'
-blacklist brcmfmac
-blacklist brcmsmac
-blacklist b43
-blacklist b43legacy
-blacklist ssb
-blacklist bcma
-EOF2
-    echo 'options hid_apple fnmode=2' > /etc/modprobe.d/hid_apple.conf
   "
   mark kernel
 fi
@@ -1195,13 +1184,13 @@ mkdir -p "$SOURCES"
 
 export CC="gcc"
 export CXX="g++"
-export CFLAGS="-march=haswell -O2 -pipe"
-export CXXFLAGS="-march=haswell -O2 -pipe"
-export MAKEFLAGS="-j3"
+export CFLAGS="-march=x86-64 -O2 -pipe"
+export CXXFLAGS="-march=x86-64 -O2 -pipe"
+export MAKEFLAGS="-j2"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig"
 export PATH="/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin"
 
-NPROC=3
+NPROC=2
 
 PCRE2_VER="10.44"
 LIBFFI_VER="3.4.6"
@@ -1604,10 +1593,10 @@ if ! step_done mesa; then
   bpkg "$a" bash -c "
     mkdir build && cd build
     meson setup --prefix=/usr --buildtype=release \
-      -D platforms=wayland -D gallium-drivers=iris,crocus,swrast \
-      -D vulkan-drivers=intel -D glx=disabled -D egl=enabled \
+      -D platforms=wayland -D gallium-drivers=virgl,swrast \
+      -D vulkan-drivers= -D glx=disabled -D egl=enabled \
       -D gles1=disabled -D gles2=enabled -D llvm=enabled \
-      -D shared-llvm=enabled -D video-codecs=all -D intel-clc=auto ..
+      -D shared-llvm=enabled -D video-codecs=all ..
     ninja -j${NPROC} && ninja install
   "
   mark_step mesa
@@ -1852,11 +1841,6 @@ if ! step_done brightnessctl; then
   header "brightnessctl ${BRIGHTNESSCTL_VER}"
   a=$(fetch "https://github.com/Hummer12007/brightnessctl/archive/refs/tags/${BRIGHTNESSCTL_VER}.tar.gz")
   bpkg "$a" bash -c "make -j${NPROC}; make install PREFIX=/usr"
-  cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
-ACTION=="add", SUBSYSTEM=="backlight", \
-  RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
-  RUN+="/bin/chmod g+w   /sys/class/backlight/%k/brightness"
-EOF
   mark_step brightnessctl
 fi
 
@@ -1921,26 +1905,18 @@ if ! step_done user_setup; then
 fi
 
 # =============================================================================
-# 47. MacBook Air 6,2 hardware quirks
+# 47. KVM/QEMU hardware setup
 # =============================================================================
-if ! step_done macbook_hw; then
-  header "MacBook Air 6,2 hardware config"
-  echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
-  warn "WiFi: BCM4360 requires broadcom-sta. Build the wl.ko module manually:"
-  warn "  https://www.lwfinger.com/downloads/hybrid-v35_64-nodebug-pcoem-6_30_223_271.tar.gz"
-  warn "  make -C /lib/modules/\$(uname -r)/build M=\$(pwd) modules"
-  warn "  install -m644 wl.ko /lib/modules/\$(uname -r)/updates/ && depmod -a"
-  cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
-blacklist brcmfmac
-blacklist brcmsmac
-blacklist b43
-blacklist b43legacy
-blacklist ssb
-blacklist bcma
+if ! step_done kvm_hw; then
+  header "KVM/QEMU hardware config"
+  mkdir -p /etc/udev/rules.d
+  cat > /etc/udev/rules.d/99-virtio-gpu.rules << 'EOF'
+SUBSYSTEM=="drm", KERNEL=="card*", GROUP="video", MODE="0660"
+SUBSYSTEM=="drm", KERNEL=="renderD*", GROUP="render", MODE="0660"
 EOF
-  mark_step macbook_hw
+  mark_step kvm_hw
 fi
 
 echo -e "\n${GREEN}Setup complete.${NC}"
-echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 12–20 hours (LLVM is the bottleneck).${NC}"
+echo -e "${CYAN}Estimated build time on KVM (2 vCPU, 4 GB): 20–30 hours (LLVM is the bottleneck).${NC}"
 echo -e "${CYAN}Reboot and start a niri session as 'legend'.${NC}"
