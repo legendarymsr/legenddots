@@ -215,9 +215,9 @@ if ! step_done desktop; then
   emerge \
     gui-wm/niri gui-apps/waybar gui-apps/fuzzel gui-apps/swaylock \
     gui-apps/swaybg gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
-    x11-misc/dunst gui-libs/xdg-desktop-portal-wlr gnome-extra/polkit-gnome \
+    x11-misc/dunst gui-libs/xdg-desktop-portal-gtk gnome-extra/polkit-gnome \
     media-sound/pavucontrol x11-misc/xdg-utils x11-misc/xdg-user-dirs \
-    media-fonts/nerdfonts www-client/brave-browser-nightly
+    media-fonts/nerdfonts sys-apps/brightnessctl www-client/brave-browser-nightly
   mark_step desktop
 fi
 
@@ -252,9 +252,10 @@ if ! step_done localization_user; then
     git clone https://github.com/legendarymsr/legenddots ~/legenddots || \
       (cd ~/legenddots && git pull --ff-only)
     mkdir -p ~/Pictures/Screenshots
-    mkdir -p ~/.config/alacritty ~/.config/niri
+    mkdir -p ~/.config/alacritty ~/.config/niri ~/.config/nvim
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+    ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
@@ -358,9 +359,10 @@ su - legend -c "
   else
     git clone https://github.com/legendarymsr/legenddots ~/legenddots
   fi
-  mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri
+  mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim
   ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
   ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+  ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
   ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
   ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
   ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
