@@ -79,6 +79,7 @@ link "$REPO_DIR/fuzzel"              "$HOME/.config/fuzzel"
 link "$REPO_DIR/dunst"               "$HOME/.config/dunst"
 link "$REPO_DIR/swaylock"            "$HOME/.config/swaylock"
 link "$REPO_DIR/../alacritty.toml"   "$HOME/.config/alacritty/alacritty.toml"
+link "$REPO_DIR/../wallpapers"       "$HOME/.config/wallpapers"
 
 # ── systemd user services ─────────────────────────────────────────────────────
 info "Enabling systemd user services..."
