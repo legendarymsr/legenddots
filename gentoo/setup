@@ -97,6 +97,7 @@ if ! step_done package_use; then
   echo "sys-auth/elogind pam"                           > /etc/portage/package.use/elogind
   echo "gui-apps/waybar tray"                           > /etc/portage/package.use/waybar
   echo "gui-apps/swaybg gdk-pixbuf"                    > /etc/portage/package.use/swaybg
+  echo "x11-libs/gdk-pixbuf jpeg"                      > /etc/portage/package.use/gdk-pixbuf
   echo "media-fonts/nerdfonts jetbrainsmono"            > /etc/portage/package.use/nerdfonts
   echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
   echo "media-libs/mesa -llvm"                          > /etc/portage/package.use/mesa
