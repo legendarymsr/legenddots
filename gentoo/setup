@@ -289,6 +289,10 @@ EOF
   # Apple keyboard fn-mode (fn keys act as standard F1-F12 by default)
   echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
 
+  # Cirrus Logic CS4208 (MacBook Air 6,2) — without model=mba6 the codec
+  # doesn't initialize the speaker amp and audio is silent
+  echo "options snd_hda_intel model=mba6" > /etc/modprobe.d/audio-mba.conf
+
   # Backlight permissions
   mkdir -p /etc/udev/rules.d
   cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
