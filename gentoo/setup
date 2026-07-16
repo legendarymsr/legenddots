@@ -96,6 +96,7 @@ if ! step_done package_use; then
   echo "net-misc/networkmanager tools"                  > /etc/portage/package.use/networkmanager
   echo "sys-auth/elogind pam"                           > /etc/portage/package.use/elogind
   echo "gui-apps/waybar tray"                           > /etc/portage/package.use/waybar
+  echo "gui-apps/swaybg gdk-pixbuf"                    > /etc/portage/package.use/swaybg
   echo "media-fonts/nerdfonts jetbrainsmono"            > /etc/portage/package.use/nerdfonts
   echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
   echo "media-libs/mesa -llvm"                          > /etc/portage/package.use/mesa
