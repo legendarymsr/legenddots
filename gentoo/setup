@@ -250,7 +250,7 @@ if ! step_done localization_user; then
 
   su - legend -c "
     git clone https://github.com/legendarymsr/legenddots ~/legenddots || \
-      (cd ~/legenddots && git pull)
+      (cd ~/legenddots && git pull --ff-only)
     mkdir -p ~/Pictures/Screenshots
     mkdir -p ~/.config/alacritty ~/.config/niri
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
@@ -260,6 +260,7 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
     ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
     ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
+    ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
   "
   xdg-user-dirs-update || true
   mark_step localization_user
@@ -348,5 +349,24 @@ if ! step_done bcm5974; then
     echo "Install with: emerge sys-kernel/gentoo-sources && eselect kernel set 1"
   fi
 fi
+
+# ── DOTFILES (always runs — safe to re-run on existing installs) ──────────────
+header "Updating dotfiles..."
+su - legend -c "
+  if [[ -d ~/legenddots ]]; then
+    cd ~/legenddots && git pull --ff-only 2>/dev/null || true
+  else
+    git clone https://github.com/legendarymsr/legenddots ~/legenddots
+  fi
+  mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri
+  ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
+  ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+  ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
+  ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
+  ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
+  ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
+  ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
+  ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
+"
 
 echo -e "\n${GREEN}Setup complete. Reboot for all changes to take effect.${NC}"
