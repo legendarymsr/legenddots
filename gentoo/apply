@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Apply legenddots to the running niri session.
+# Run as yourself (not root) from inside niri.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd "$REPO" && git pull
+
+mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim
+ln -sfn "$REPO/alacritty.toml"  ~/.config/alacritty/alacritty.toml
+ln -sfn "$REPO/.zshrc"          ~/.zshrc
+ln -sfn "$REPO/init.lua"        ~/.config/nvim/init.lua
+ln -sfn "$REPO/niri/config.kdl" ~/.config/niri/config.kdl
+ln -sfn "$REPO/niri/waybar"     ~/.config/waybar
+ln -sfn "$REPO/niri/fuzzel"     ~/.config/fuzzel
+ln -sfn "$REPO/niri/dunst"      ~/.config/dunst
+ln -sfn "$REPO/niri/swaylock"   ~/.config/swaylock
+ln -sfn "$REPO/wallpapers"      ~/.config/wallpapers
+
+pkill swaybg 2>/dev/null || true
+sleep 0.3
+swaybg -m fill -i ~/.config/wallpapers/6orjlq.jpg &
+
+pgrep -u "$(id -u)" pipewire    >/dev/null || pipewire    &
+pgrep -u "$(id -u)" wireplumber >/dev/null || wireplumber &
+
+echo "Done."
