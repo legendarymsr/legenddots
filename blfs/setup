@@ -1919,5 +1919,5 @@ EOF
 fi
 
 echo -e "\n${GREEN}Setup complete.${NC}"
-echo -e "${CYAN}Estimated build time on KVM (2 vCPU, 4 GB): 20–30 hours (LLVM is the bottleneck).${NC}"
+echo -e "${CYAN}Estimated build time on KVM (2 vCPU, 4 GB): 50–70 hours (LLVM is the bottleneck).${NC}"
 echo -e "${CYAN}Reboot and start a niri session as 'legend'.${NC}"
