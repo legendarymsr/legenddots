@@ -1926,22 +1926,13 @@ fi
 # =============================================================================
 if ! step_done macbook_hw; then
   header "MacBook Air 6,2 hardware config"
-  echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
   warn "WiFi: BCM4360 requires broadcom-sta. Build the wl.ko module manually:"
   warn "  https://www.lwfinger.com/downloads/hybrid-v35_64-nodebug-pcoem-6_30_223_271.tar.gz"
   warn "  make -C /lib/modules/\$(uname -r)/build M=\$(pwd) modules"
   warn "  install -m644 wl.ko /lib/modules/\$(uname -r)/updates/ && depmod -a"
-  cat > /etc/modprobe.d/broadcom-sta.conf << 'EOF'
-blacklist brcmfmac
-blacklist brcmsmac
-blacklist b43
-blacklist b43legacy
-blacklist ssb
-blacklist bcma
-EOF
   mark_step macbook_hw
 fi
 
 echo -e "\n${GREEN}Setup complete.${NC}"
-echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 12–20 hours (LLVM is the bottleneck).${NC}"
+echo -e "${CYAN}Estimated build time on MacBook Air 6,2: 30–40 hours (LLVM is the bottleneck).${NC}"
 echo -e "${CYAN}Reboot and start a niri session as 'legend'.${NC}"
