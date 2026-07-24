@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Collect audio diagnostics. Read-only — changes nothing.
+# Run as yourself: bash ~/legenddots/gentoo/audio-debug
+
+sec() { echo; echo "=== $* ==="; }
+
+sec "kernel sound cards (aplay -l)"
+aplay -l 2>&1 || echo "aplay not found — emerge media-sound/alsa-utils"
+
+sec "PCI audio device"
+lspci -nn 2>/dev/null | grep -i audio || echo "none found"
+
+sec "loaded sound modules"
+lsmod 2>/dev/null | grep '^snd' || echo "no snd modules loaded"
+
+sec "sound device nodes"
+ls -l /dev/snd/ 2>&1 || echo "/dev/snd missing"
+
+sec "group membership (need 'audio')"
+id -nG
+
+sec "ALSA mixer state (muted shows [off])"
+amixer -c 0 scontents 2>&1 | grep -A1 -iE 'master|speaker|headphone|pcm' || echo "amixer failed"
+
+sec "running audio processes"
+for p in pipewire pipewire-pulse wireplumber pulseaudio; do
+    pgrep -u "$(id -u)" -x "$p" >/dev/null && echo "$p: running" || echo "$p: NOT running"
+done
+
+sec "pipewire sinks (wpctl status)"
+wpctl status 2>&1 || echo "wpctl failed"
+
+sec "kernel audio messages"
+dmesg 2>/dev/null | grep -iE 'snd|hda|cirrus|cs42' | tail -20 || echo "dmesg needs root — try: doas dmesg | grep -i snd"
+
+echo
+echo "=== end — paste everything above ==="
