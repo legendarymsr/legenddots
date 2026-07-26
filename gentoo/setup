@@ -195,7 +195,7 @@ if ! step_done base_system; then
     "$PRIV_PKG" sys-apps/dbus sys-auth/polkit \
     sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
     net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim \
-    media-video/pipewire media-video/wireplumber \
+    media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     x11-terms/alacritty llvm-core/llvm llvm-core/clang
   mark_step base_system
 fi
@@ -322,6 +322,19 @@ EOF
   rc-update add elogind        default
   rc-update add acpid          default
   rc-update add tlp            default
+
+  # Audio (Cirrus CS4208): the codec boots with Master/Speaker MUTED. Unmute
+  # once, then let the alsasound init script restore the state on every boot.
+  # Card index for the analog codec is usually 1 (card 0 is HDMI on Haswell).
+  ACARD=$(aplay -l 2>/dev/null | sed -n 's/^card \([0-9]\+\): .*\(CS42\|PCH\|Analog\).*/\1/p' | head -1)
+  ACARD="${ACARD:-1}"
+  for ctl in Master Speaker Headphone "Auto-Mute Mode"; do
+    amixer -c "$ACARD" sset "$ctl" unmute 2>/dev/null || true
+  done
+  amixer -c "$ACARD" sset Master 85% 2>/dev/null || true
+  amixer -c "$ACARD" sset Speaker 85% 2>/dev/null || true
+  alsactl store 2>/dev/null || true
+  rc-update add alsasound boot 2>/dev/null || true
 
   depmod -a "$(uname -r)"
   mark_step sysconfig
