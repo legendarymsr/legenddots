@@ -72,6 +72,7 @@ binds {
     Mod+Return { spawn "alacritty"; }
     Mod+d { spawn "fuzzel"; }
     Mod+b { spawn "brave-browser-nightly" "--ozone-platform=wayland"; }
+    Mod+Shift+b { spawn "sh" "-c" "pkill waybar; sleep 0.3; waybar"; }
     Mod+Shift+q { close-window; }
     Mod+Shift+e { quit; }
     Mod+Tab { focus-column-right; }
