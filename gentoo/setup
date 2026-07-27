@@ -23,8 +23,20 @@ if [[ -z "${PRIV_ESC:-}" ]]; then
   read -t 10 -r PRIV_ANSWER || true; echo
   case "${PRIV_ANSWER,,}" in sudo) PRIV_ESC="sudo" ;; *) PRIV_ESC="doas" ;; esac
 fi
+if [[ -z "${REBUILD_WORLD:-}" ]]; then
+  echo -e "${CYAN}Rebuild @world with updated USE flags after setup? Long (hours). [y/N] (10s, default: N)${NC}"
+  read -t 10 -r RW_ANSWER || true; echo
+  case "${RW_ANSWER,,}" in y|yes) REBUILD_WORLD="true" ;; *) REBUILD_WORLD="false" ;; esac
+fi
+if [[ -z "${REBUILD_KERNEL:-}" ]]; then
+  echo -e "${CYAN}Rebuild the kernel with hardened .config after setup? ~45 min. [y/N] (10s, default: N)${NC}"
+  read -t 10 -r RK_ANSWER || true; echo
+  case "${RK_ANSWER,,}" in y|yes) REBUILD_KERNEL="true" ;; *) REBUILD_KERNEL="false" ;; esac
+fi
 ENABLE_WD40="${ENABLE_WD40:-true}"
 PRIV_ESC="${PRIV_ESC:-doas}"
+REBUILD_WORLD="${REBUILD_WORLD:-false}"
+REBUILD_KERNEL="${REBUILD_KERNEL:-false}"
 
 # ── Checkpointing ─────────────────────────────────────────────────────────────
 STATE_FILE=/etc/gentoo-setup.state
@@ -413,6 +425,45 @@ if ! step_done bcm5974; then
     echo "Kernel source not found at $KSRC — skipping"
     echo "Install with: emerge sys-kernel/gentoo-sources && eselect kernel set 1"
   fi
+fi
+
+# 13. REBUILD KERNEL (opt-in) — apply hardened .config (INIT_STACK_ALL_ZERO etc.)
+# Gated on the flag, not a checkpoint, so it can be re-triggered on demand.
+if [[ "$REBUILD_KERNEL" == "true" ]]; then
+  header "Rebuilding kernel with hardened config..."
+  KSRC=/usr/src/linux
+  if [[ -f "$KSRC/Makefile" ]]; then
+    cd "$KSRC"
+    # Ensure the hardening options are set even if the hardening step was skipped.
+    ./scripts/config -e CONFIG_INIT_STACK_ALL_ZERO \
+                     -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \
+                     -e CONFIG_INIT_ON_FREE_DEFAULT_ON \
+                     -m CONFIG_MOUSE_BCM5974
+    make olddefconfig
+    # Same install path as gentoo/install.sh: make install copies vmlinuz to
+    # /boot (rEFInd auto-detects it); genkernel regenerates the initramfs.
+    make -j3 && make modules_install && make install
+    if command -v genkernel >/dev/null 2>&1; then
+      genkernel --no-clean --no-mrproper --kernel-config="$KSRC/.config" initramfs
+    else
+      echo "  ! genkernel not found — initramfs NOT regenerated; emerge sys-kernel/genkernel and rerun if your boot needs one"
+    fi
+    # Out-of-tree modules (broadcom-sta wl.ko) must be recompiled against the
+    # new kernel or WiFi breaks after reboot.
+    emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
+    depmod -a "$(make -s kernelrelease)"
+    echo -e "${GREEN}Kernel rebuilt. Reboot to run the hardened kernel.${NC}"
+  else
+    echo "  ! Kernel source not found at $KSRC — skipping kernel rebuild"
+  fi
+fi
+
+# 14. REBUILD @WORLD (opt-in) — recompile packages picking up the seccomp USE flag
+if [[ "$REBUILD_WORLD" == "true" ]]; then
+  header "Rebuilding @world with updated USE flags (this takes hours)..."
+  emerge --changed-use --deep --with-bdeps=y @world || \
+    echo "  ! @world rebuild hit errors — resolve and rerun: emerge --changed-use --deep @world"
+  emerge --depclean 2>/dev/null || true
 fi
 
 # ── DOTFILES (always runs — safe to re-run on existing installs) ──────────────
