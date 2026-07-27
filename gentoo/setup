@@ -67,7 +67,7 @@ CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2
 VIDEO_CARDS="intel iris"
 ABI_X86="64"
 LLVM_TARGETS="X86"
-USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
+USE="udev elogind dbus wayland alsa seccomp -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
 PYTHON_TARGETS="python3_13"
 PYTHON_SINGLE_TARGET="python3_13"
 FEATURES="ccache parallel-fetch buildpkg"
@@ -338,6 +338,51 @@ EOF
 
   depmod -a "$(uname -r)"
   mark_step sysconfig
+fi
+
+# 11b. SECURITY HARDENING
+if ! step_done hardening; then
+  header "Applying security hardening..."
+
+  # (1) Kernel cmdline: zero heap on alloc/free — neutralizes most kernel
+  #     memory-disclosure bugs. No rebuild needed; effective next boot.
+  RL=/boot/refind_linux.conf
+  if [[ -f "$RL" ]] && ! grep -q 'init_on_alloc' "$RL"; then
+    sed -i '/root=/ s/"[[:space:]]*$/ init_on_alloc=1 init_on_free=1"/' "$RL" || true
+    echo "  → added init_on_alloc/init_on_free to $RL"
+  else
+    echo "  ! $RL missing or already hardened — add 'init_on_alloc=1 init_on_free=1' to your kernel cmdline manually"
+  fi
+
+  # (2) sysctl: restrict kernel pointer + dmesg exposure (closes the
+  #     kernel-pointer-leak class), plus ptrace scoping.
+  cat > /etc/sysctl.d/99-hardening.conf << 'EOF'
+kernel.kptr_restrict = 2
+kernel.dmesg_restrict = 1
+kernel.yama.ptrace_scope = 1
+EOF
+  sysctl --system >/dev/null 2>&1 || true
+
+  # (3) seccomp USE flag — syscall filtering; Brave's sandbox needs it.
+  #     Idempotently append to make.conf for already-provisioned systems.
+  if ! grep -q 'seccomp' /etc/portage/make.conf; then
+    echo 'USE="${USE} seccomp"' >> /etc/portage/make.conf
+    echo "  → added seccomp to USE; applied on next @world rebuild"
+  fi
+
+  # (4) Kernel .config: zero-on-alloc/free + zero stack variables. Compile-time;
+  #     applies the next time the kernel is rebuilt (INIT_STACK_ALL_ZERO has no
+  #     cmdline equivalent, so this is the only way to get stack zeroing).
+  KSRC=/usr/src/linux
+  if [[ -f "$KSRC/Makefile" ]]; then
+    "$KSRC"/scripts/config --file "$KSRC/.config" \
+      -e CONFIG_INIT_STACK_ALL_ZERO \
+      -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \
+      -e CONFIG_INIT_ON_FREE_DEFAULT_ON 2>/dev/null \
+      && echo "  → set INIT_STACK_ALL_ZERO / INIT_ON_ALLOC/FREE (applies on next kernel rebuild)" || true
+  fi
+
+  mark_step hardening
 fi
 
 # 12. BCM5974 TRACKPAD MODULE
