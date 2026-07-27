@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Pre-reboot sanity check after a kernel rebuild. Read-only — changes nothing.
+# Run it BEFORE rebooting into a freshly built kernel:
+#   bash ~/legenddots/gentoo/verify-boot
+#
+# It confirms the three things that brick a boot when they drift apart:
+#   1. A new vmlinuz exists in /boot
+#   2. rEFInd's initrd= points to an initramfs that actually exists for it
+#   3. the out-of-tree WiFi module (wl.ko) is built for the new kernel version
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+ok()   { echo -e "${GREEN}  ✓ $*${NC}"; }
+warn() { echo -e "${YELLOW}  ! $*${NC}"; }
+bad()  { echo -e "${RED}  ✗ $*${NC}"; }
+info() { echo -e "${CYAN}$*${NC}"; }
+
+FAIL=0
+
+info "── Kernel images in /boot ─────────────────────────────────────────"
+RUNNING=$(uname -r)
+echo "  running now:  $RUNNING"
+
+NEWVM=$(ls -t /boot/vmlinuz-* 2>/dev/null | head -1)
+if [[ -z "$NEWVM" ]]; then
+  bad "no /boot/vmlinuz-* found — kernel was never installed"
+  exit 1
+fi
+NK=$(basename "$NEWVM" | sed 's/^vmlinuz-//')
+echo "  newest built: $NK"
+[[ "$NK" == "$RUNNING" ]] && warn "newest built == running kernel (nothing new to boot into?)"
+
+info "\n── initramfs / rEFInd alignment ───────────────────────────────────"
+RL=/boot/refind_linux.conf
+if [[ ! -f "$RL" ]]; then
+  warn "$RL not found — rEFInd may be auto-detecting; verify your boot entry manually"
+else
+  INITRD_REF=$(grep -o 'initrd=/boot/[^ "]*' "$RL" | head -1 | sed 's|initrd=/boot/||')
+  if [[ -z "$INITRD_REF" ]]; then
+    warn "no initrd= line in $RL — OK only if your kernel mounts root without an initramfs"
+  else
+    echo "  refind wants: $INITRD_REF"
+    if [[ -f "/boot/$INITRD_REF" ]]; then
+      ok "that initramfs exists"
+      if [[ "$INITRD_REF" == *"$NK"* ]]; then
+        ok "initramfs version matches the newest kernel ($NK)"
+      else
+        bad "initramfs '$INITRD_REF' does NOT match newest kernel '$NK' — rEFInd will boot the wrong/old initramfs"
+        FAIL=1
+      fi
+    else
+      bad "refind_linux.conf points to /boot/$INITRD_REF which does NOT exist — boot will fail"
+      FAIL=1
+    fi
+  fi
+  # Is there an initramfs for the new kernel at all?
+  if ls /boot/initramfs-*"$NK"* >/dev/null 2>&1; then
+    ok "an initramfs for $NK is present: $(ls -t /boot/initramfs-*"$NK"* | head -1 | sed 's|/boot/||')"
+  else
+    warn "no initramfs matching $NK in /boot — regenerate with: genkernel --kernel-config=/usr/src/linux/.config initramfs"
+  fi
+fi
+
+info "\n── Broadcom WiFi module (wl.ko) for the new kernel ────────────────"
+if [[ ! -d "/lib/modules/$NK" ]]; then
+  bad "/lib/modules/$NK missing — 'make modules_install' didn't run for this kernel"
+  FAIL=1
+elif modinfo -k "$NK" wl >/dev/null 2>&1; then
+  ok "wl.ko is built for $NK — WiFi will work"
+else
+  bad "wl.ko MISSING for $NK — WiFi will break after reboot"
+  warn "  fix before reboot: emerge @module-rebuild && depmod -a $NK"
+  FAIL=1
+fi
+
+info "\n── Hardening cmdline (informational) ──────────────────────────────"
+if grep -q 'init_on_alloc' "$RL" 2>/dev/null; then
+  ok "init_on_alloc/init_on_free present on the kernel cmdline"
+else
+  warn "init_on_alloc not on cmdline in $RL (harmless if built into the kernel .config)"
+fi
+
+echo
+if [[ "$FAIL" -eq 0 ]]; then
+  echo -e "${GREEN}All critical checks passed — safe to reboot into $NK.${NC}"
+else
+  echo -e "${RED}One or more critical checks FAILED — do NOT reboot until fixed (see ✗ lines above).${NC}"
+  exit 1
+fi
