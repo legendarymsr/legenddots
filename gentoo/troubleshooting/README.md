@@ -1,52 +1,25 @@
 # Gentoo Troubleshooting & Maintenance Scripts
 
-Utility scripts for provisioning, diagnosing, and repairing the niri/Wayland
-Gentoo setup on the MacBook Air 6,2. The core install lives one level up
-(`../install.sh`, `../resume.sh`, `../niri`); everything here is run *after*
-a system is installed and booted.
+Diagnostic and repair scripts for the niri/Wayland Gentoo setup on the MacBook
+Air 6,2, run *after* a system is installed and booted. The core scripts live one
+level up: `../install.sh` (installer), `../resume.sh` (installer recovery),
+`../niri` (session launcher), and `../setup` (post-install provisioning).
 
-All scripts are self-contained — copy the one-line invocation and run it. Most
-are read-only diagnostics; the ones that change state say so below.
+All scripts here are self-contained — copy the one-line invocation and run it.
+Most are read-only diagnostics; the ones that change state say so below.
 
 | Script | Root? | Changes the system? | Use it when |
 |--------|-------|---------------------|-------------|
-| `setup` | yes (`doas`) | yes | Provisioning / re-applying config on an installed system |
 | `apply` | no (you) | yes (session only) | Pushing dotfile + wallpaper/audio changes into a running niri session |
 | `audio-debug` | no (you) | no (read-only) | Sound isn't working and you need to see what the hardware/pipewire state is |
 | `verify-boot` | no (you) | no (read-only) | About to reboot after a kernel rebuild — confirm it won't brick |
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 
+> `setup` (post-install provisioning) lives at `../setup`, not here — it's a core
+> script alongside install/resume/niri, not a troubleshooting tool.
+
 ---
-
-## `setup` — system provisioning
-
-```sh
-doas bash ~/legenddots/gentoo/troubleshooting/setup
-```
-
-The main post-install script: Portage config (make.conf, USE flags, overlays,
-WD-40), package installs (base system + niri desktop), localization, the
-`legend` user, system services, security hardening, and dotfile symlinks. It is
-**checkpointed** to `/etc/gentoo-setup.state`, so re-running skips completed
-steps and only does what's left. The dotfiles block at the end runs every time,
-so this doubles as "pull latest config and re-link."
-
-Opt-in prompts (default No, 10s timeout):
-- **Rebuild @world** with updated USE flags (hours)
-- **Rebuild the kernel** with the hardened `.config` (~45 min, rebuilds `wl.ko` too)
-
-Non-interactive:
-
-```sh
-REBUILD_KERNEL=true REBUILD_WORLD=true doas -E bash ~/legenddots/gentoo/troubleshooting/setup
-```
-
-Reset a single step to force it to rerun:
-
-```sh
-doas sed -i '/^desktop$/d' /etc/gentoo-setup.state
-```
 
 ## `apply` — push config into a running session
 
