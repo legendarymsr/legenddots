@@ -110,6 +110,9 @@ if ! step_done package_use; then
   echo "gui-apps/waybar tray wireplumber"               > /etc/portage/package.use/waybar
   echo "gui-apps/swaybg gdk-pixbuf"                    > /etc/portage/package.use/swaybg
   echo "x11-libs/gdk-pixbuf jpeg"                      > /etc/portage/package.use/gdk-pixbuf
+  # No 32-bit multilib toolchain — halves gcc build time. Safe on a pure-64-bit
+  # box (ABI_X86="64"); remove this if you ever need Wine or 32-bit binaries.
+  echo "sys-devel/gcc -multilib"                       > /etc/portage/package.use/gcc
   echo "media-fonts/nerdfonts jetbrainsmono"            > /etc/portage/package.use/nerdfonts
   echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
   echo "media-libs/mesa -llvm"                          > /etc/portage/package.use/mesa
