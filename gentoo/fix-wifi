@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# One-shot WiFi recovery for the Broadcom wl driver on this MacBook Air.
+# Run: doas bash ~/legenddots/gentoo/fix-wifi
+# Loads wl (evicting any competing driver), restarts NetworkManager, reports.
+set -u
+
+[[ $EUID -eq 0 ]] || { echo "run with doas: doas bash gentoo/fix-wifi"; exit 1; }
+
+echo "== evicting competing broadcom drivers (if any) =="
+rmmod brcmfmac brcmsmac b43 bcma ssb 2>/dev/null || true
+
+echo "== loading wl =="
+if modprobe wl 2>&1; then
+  echo ">>> wl loaded"
+else
+  echo ">>> wl FAILED to load — likely a symbol/vermagic mismatch after a kernel"
+  echo "    rebuild. Boot vmlinuz.old at rEFInd (WiFi works there), then run:"
+  echo "      doas emerge @module-rebuild && doas depmod -a"
+  echo "    and reboot into the new kernel."
+  exit 1
+fi
+
+echo "== wifi interface =="
+ip link show | grep -iE 'wl|wlan' || echo "  (no wl* interface yet — check dmesg)"
+
+echo "== restarting NetworkManager =="
+rc-service NetworkManager restart
+sleep 2
+nmcli device status 2>/dev/null || echo "nmcli unavailable"
+
+echo
+echo "If a wifi device shows above, connect with:"
+echo "  nmcli device wifi list"
+echo "  doas nmcli device wifi connect \"SSID\" password \"PASS\""
