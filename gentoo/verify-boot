@@ -3,10 +3,13 @@
 # Run it BEFORE rebooting into a freshly built kernel:
 #   bash ~/legenddots/gentoo/verify-boot
 #
-# It confirms the three things that brick a boot when they drift apart:
-#   1. A new vmlinuz exists in /boot
+# It confirms the things that brick a boot when they drift apart:
+#   1. A kernel image exists in /boot and was recently built
 #   2. rEFInd's initrd= points to an initramfs that actually exists for it
-#   3. the out-of-tree WiFi module (wl.ko) is built for the new kernel version
+#   3. the out-of-tree WiFi module (wl.ko) is built for that kernel version
+#
+# This layout uses an UNVERSIONED /boot/vmlinuz (genkernel + make install), so
+# the kernel version is read from the image itself with file(1), not the name.
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}  ✓ $*${NC}"; }
@@ -16,47 +19,51 @@ info() { echo -e "${CYAN}$*${NC}"; }
 
 FAIL=0
 
-info "── Kernel images in /boot ─────────────────────────────────────────"
-RUNNING=$(uname -r)
-echo "  running now:  $RUNNING"
+info "── Kernel image in /boot ──────────────────────────────────────────"
+echo "  running now:  $(uname -r)"
 
-NEWVM=$(ls -t /boot/vmlinuz-* 2>/dev/null | head -1)
-if [[ -z "$NEWVM" ]]; then
-  bad "no /boot/vmlinuz-* found — kernel was never installed"
+# Kernel image: prefer the unversioned /boot/vmlinuz; fall back to versioned.
+VM=""
+for cand in /boot/vmlinuz /boot/vmlinuz-* /boot/kernel-* /boot/bzImage*; do
+  [[ -f "$cand" && "$cand" != *.old ]] && { VM="$cand"; break; }
+done
+if [[ -z "$VM" ]]; then
+  bad "no kernel image found in /boot — nothing to boot into"
   exit 1
 fi
-NK=$(basename "$NEWVM" | sed 's/^vmlinuz-//')
-echo "  newest built: $NK"
-[[ "$NK" == "$RUNNING" ]] && warn "newest built == running kernel (nothing new to boot into?)"
+echo "  image:        $VM  ($(date -r "$VM" '+%Y-%m-%d %H:%M'))"
+
+# Read the real version string out of the image (filename is unversioned).
+NK=$(file "$VM" 2>/dev/null | grep -oE 'version [^ ,]+' | awk '{print $2}')
+if [[ -z "$NK" ]]; then
+  warn "couldn't parse kernel version from image; falling back to running kernel"
+  NK=$(uname -r)
+fi
+echo "  image version: $NK"
+[[ "$NK" == "$(uname -r)" ]] && warn "image version == running kernel (a rebuild of the same version — modules must still match the new build)"
 
 info "\n── initramfs / rEFInd alignment ───────────────────────────────────"
 RL=/boot/refind_linux.conf
 if [[ ! -f "$RL" ]]; then
-  warn "$RL not found — rEFInd may be auto-detecting; verify your boot entry manually"
+  warn "$RL not found — verify your rEFInd boot entry manually"
 else
   INITRD_REF=$(grep -o 'initrd=/boot/[^ "]*' "$RL" | head -1 | sed 's|initrd=/boot/||')
   if [[ -z "$INITRD_REF" ]]; then
-    warn "no initrd= line in $RL — OK only if your kernel mounts root without an initramfs"
+    warn "no initrd= line in $RL — OK only if the kernel mounts root without an initramfs"
   else
     echo "  refind wants: $INITRD_REF"
     if [[ -f "/boot/$INITRD_REF" ]]; then
-      ok "that initramfs exists"
+      ok "that initramfs exists ($(date -r "/boot/$INITRD_REF" '+%Y-%m-%d %H:%M'))"
       if [[ "$INITRD_REF" == *"$NK"* ]]; then
-        ok "initramfs version matches the newest kernel ($NK)"
+        ok "initramfs version matches the kernel image ($NK)"
       else
-        bad "initramfs '$INITRD_REF' does NOT match newest kernel '$NK' — rEFInd will boot the wrong/old initramfs"
+        bad "initramfs '$INITRD_REF' does NOT contain kernel version '$NK' — rEFInd may load a mismatched initramfs"
         FAIL=1
       fi
     else
       bad "refind_linux.conf points to /boot/$INITRD_REF which does NOT exist — boot will fail"
       FAIL=1
     fi
-  fi
-  # Is there an initramfs for the new kernel at all?
-  if ls /boot/initramfs-*"$NK"* >/dev/null 2>&1; then
-    ok "an initramfs for $NK is present: $(ls -t /boot/initramfs-*"$NK"* | head -1 | sed 's|/boot/||')"
-  else
-    warn "no initramfs matching $NK in /boot — regenerate with: genkernel --kernel-config=/usr/src/linux/.config initramfs"
   fi
 fi
 
@@ -77,6 +84,13 @@ if grep -q 'init_on_alloc' "$RL" 2>/dev/null; then
   ok "init_on_alloc/init_on_free present on the kernel cmdline"
 else
   warn "init_on_alloc not on cmdline in $RL (harmless if built into the kernel .config)"
+fi
+
+info "\n── Fallback kernel ────────────────────────────────────────────────"
+if [[ -f /boot/vmlinuz.old ]]; then
+  ok "vmlinuz.old present — you can boot the previous kernel if the new one fails"
+else
+  warn "no vmlinuz.old — no automatic fallback to the previous kernel"
 fi
 
 echo
