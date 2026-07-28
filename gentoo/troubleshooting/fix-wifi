@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # One-shot WiFi recovery for the Broadcom wl driver on this MacBook Air.
-# Run: doas bash ~/legenddots/gentoo/fix-wifi
+# Run: doas bash ~/legenddots/gentoo/troubleshooting/fix-wifi
 # Loads wl (evicting any competing driver), restarts NetworkManager, reports.
 set -u
 
-[[ $EUID -eq 0 ]] || { echo "run with doas: doas bash gentoo/fix-wifi"; exit 1; }
+[[ $EUID -eq 0 ]] || { echo "run with doas: doas bash gentoo/troubleshooting/fix-wifi"; exit 1; }
 
 echo "== evicting competing broadcom drivers (if any) =="
 rmmod brcmfmac brcmsmac b43 bcma ssb 2>/dev/null || true

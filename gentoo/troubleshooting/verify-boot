@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-reboot sanity check after a kernel rebuild. Read-only — changes nothing.
 # Run it BEFORE rebooting into a freshly built kernel:
-#   bash ~/legenddots/gentoo/verify-boot
+#   bash ~/legenddots/gentoo/troubleshooting/verify-boot
 #
 # It confirms the things that brick a boot when they drift apart:
 #   1. A kernel image exists in /boot and was recently built

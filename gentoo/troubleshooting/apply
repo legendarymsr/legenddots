@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Apply legenddots to the running niri session.
-# Run as yourself (not root) from inside niri.
+# Run as yourself (not root) from inside niri:
+#   bash ~/legenddots/gentoo/troubleshooting/apply
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 cd "$REPO" && git pull
 

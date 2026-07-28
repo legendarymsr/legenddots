@@ -7,7 +7,7 @@
 # =============================================================================
 set -euo pipefail
 
-[[ $EUID -eq 0 ]] || { echo "Run as root: doas bash gentoo/setup"; exit 1; }
+[[ $EUID -eq 0 ]] || { echo "Run as root: doas bash gentoo/troubleshooting/setup"; exit 1; }
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
@@ -493,7 +493,7 @@ echo -e "\n${GREEN}Done.${NC}"
 echo ""
 echo "To apply wallpaper and audio to your running session, open a terminal in niri and run:"
 echo ""
-echo "  bash ~/legenddots/gentoo/apply"
+echo "  bash ~/legenddots/gentoo/troubleshooting/apply"
 echo ""
 echo "If this is a fresh install, reboot first, then start niri with:"
 echo ""
