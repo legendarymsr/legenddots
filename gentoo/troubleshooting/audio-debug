@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Collect audio diagnostics. Read-only — changes nothing.
-# Run as yourself: bash ~/legenddots/gentoo/audio-debug
+# Run as yourself: bash ~/legenddots/gentoo/troubleshooting/audio-debug
 
 sec() { echo; echo "=== $* ==="; }
 
