@@ -49,6 +49,43 @@ No prompts. No binary packages. No Microsoft. No Apple. No compromises.
 
 ---
 
+## Repository Layout
+
+```
+gentoo/
+├── install.sh              full from-scratch installer (documented in this README)
+├── resume.sh               resume an interrupted install after a crash/reboot
+├── niri                    launch a niri session on OpenRC (no systemd/dinit)
+├── setup                   post-install provisioning / re-apply config on a booted system
+├── README.md               this file
+└── troubleshooting/        diagnostic & repair scripts (see troubleshooting/README.md)
+    ├── apply               push dotfile/wallpaper/audio changes into a running niri session
+    ├── audio-debug         read-only sound diagnostics
+    ├── verify-boot         read-only pre-reboot check after a kernel rebuild
+    ├── fix-wifi            Broadcom `wl` module / WiFi recovery
+    └── i915-fix            display / KMS repair (strips stuck `nomodeset`)
+```
+
+**Core scripts (top level):**
+
+- **`install.sh`** — the full automated install, from partitioning `/dev/sda` to a
+  bootable niri desktop. This README documents it.
+- **`resume.sh`** — re-mounts and continues an install that was interrupted.
+- **`niri`** — starts a niri session under `dbus-run-session` with the seat/runtime
+  setup OpenRC doesn't do automatically. Use this to launch the desktop.
+- **`setup`** — run *after* the system is installed and booted. Applies Portage
+  config, installs packages, provisions the user, hardening, and dotfile symlinks;
+  checkpointed to `/etc/gentoo-setup.state`, and re-runnable to pull the latest
+  config. Has opt-in prompts to rebuild `@world` or the kernel. See the
+  "Post-install provisioning" note below.
+
+**Troubleshooting scripts** live in `troubleshooting/` — run them after the system
+is up when something breaks (no sound, WiFi dropped, display glitched, about to
+reboot into a rebuilt kernel). Each is self-contained; `troubleshooting/README.md`
+documents them with exact invocations.
+
+---
+
 ## Usage
 
 Boot the Gentoo minimal or LiveGUI ISO, tether your phone via USB for
@@ -251,6 +288,32 @@ package whose USE/version hasn't changed gets reused from that cache
 instead of recompiled — `--getbinpkg` stays off since Gentoo's official
 remote binhost only covers stock (non-hardened) profiles, so it wouldn't
 help with anything actually slow here (kernel, LLVM, clang, mesa).
+
+### Post-install provisioning (`setup`)
+
+`install.sh` builds a bootable base system; `setup` is the separate script that
+provisions the software and configuration on top of an already-installed, booted
+Gentoo. It does **not** touch disks, partitions, the bootloader, or the kernel
+image — it's safe to re-run.
+
+```sh
+doas bash ~/legenddots/gentoo/setup
+```
+
+It writes the Portage config (make.conf, USE flags, overlays, WD-40), installs the
+base + niri desktop packages, sets up localization and the `legend` user, enables
+services, applies the security hardening (sysctl, seccomp USE, kernel-cmdline
+`init_on_alloc`/`init_on_free`), and symlinks the dotfiles. Progress is
+checkpointed to `/etc/gentoo-setup.state`, so re-running skips completed steps;
+the dotfiles block at the end runs every time, so re-running also doubles as
+"pull the latest config and re-link."
+
+Two opt-in prompts (default No, 10-second timeout) can rebuild `@world` with
+updated USE flags or rebuild the kernel with the hardened `.config` (which also
+rebuilds the out-of-tree `wl.ko`). Run non-interactively with
+`REBUILD_KERNEL=true REBUILD_WORLD=true doas -E bash ~/legenddots/gentoo/setup`.
+
+After a kernel rebuild, run `troubleshooting/verify-boot` before rebooting.
 
 ---
 
