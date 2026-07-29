@@ -110,8 +110,8 @@ Next:
      github.com/termux/termux-x11 — the package above is only the launcher.
   2. Launch:  bash $DIR/start   (then open the Termux:X11 app)
 
-Keys (modifier = Alt): Alt+Return terminal · Alt+F1 cycle · Alt+Escape quit
-                       Alt + drag = move/resize
+Keys (modifier = Alt): Alt+Return terminal · Alt+D launcher (fuzzel) ·
+                       Alt+F1 cycle · Alt+Escape quit · Alt+drag move/resize
 EOF
 else
   warn "Build failed. If the errors are about wlr/* symbols, it's a wlroots"
@@ -119,3 +119,18 @@ else
   warn "Paste the first few compiler errors and I'll adapt the source."
   exit 1
 fi
+
+# ── 6. Optional: genuine GNU IceCat (heavy — kept opt-in) ─────────────────────
+# Deliberately NOT part of the core install: it's a proot + Guix stack that can
+# build IceCat from source for hours. Offer it, default No.
+if [[ "${ICECAT:-}" == "1" ]]; then
+  RUN_ICECAT=y
+else
+  echo ""
+  echo -e "Set up genuine GNU IceCat now? (proot + Guix — heavy/slow, optional) [y/N]"
+  read -t 15 -r RUN_ICECAT || true; echo
+fi
+case "${RUN_ICECAT,,}" in
+  y|yes) bash "$DIR/icecat.sh" ;;
+  *) echo ":: Skipping IceCat. Run it later with:  bash $DIR/icecat.sh" ;;
+esac
