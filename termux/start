@@ -6,10 +6,12 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ ! -x "$DIR/pocketwl" ]]; then
-  echo "pocketwl not built — run: bash $DIR/setup.sh" >&2
+if [[ ! -f "$DIR/pocketwl" ]]; then
+  echo "pocketwl binary not found at $DIR/pocketwl — run: bash $DIR/setup.sh" >&2
+  ls -l "$DIR" >&2
   exit 1
 fi
+chmod +x "$DIR/pocketwl" 2>/dev/null || true
 
 # Wayland/X need a runtime dir; Termux sets $TMPDIR to $PREFIX/tmp.
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-$PREFIX/tmp}}"
