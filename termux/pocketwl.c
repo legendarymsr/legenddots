@@ -252,6 +252,16 @@ static void server_new_keyboard(struct pocketwl_server *server, struct wlr_input
 
 	wlr_seat_set_keyboard(server->seat, keyboard->wlr_keyboard);
 	wl_list_insert(&server->keyboards, &keyboard->link);
+
+	// The X11 backend can create its keyboard AFTER a client has already
+	// mapped (e.g. foot). If a window is already focused, it was focused with
+	// no keyboard, so it never received keyboard focus — re-focus it now that a
+	// keyboard exists so typing actually reaches it.
+	if (!wl_list_empty(&server->toplevels)) {
+		struct pocketwl_toplevel *top =
+			wl_container_of(server->toplevels.next, top, link);
+		focus_toplevel(top, top->xdg_toplevel->base->surface);
+	}
 }
 
 static void server_new_pointer(struct pocketwl_server *server, struct wlr_input_device *device) {
