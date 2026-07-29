@@ -94,7 +94,7 @@ fi
 # ── 5. Build ──────────────────────────────────────────────────────────────────
 say "Building pocketwl..."
 make -C "$DIR" clean >/dev/null 2>&1 || true
-if make -C "$DIR"; then
+if make -C "$DIR" pocketwl; then
   cat <<EOF
 
 :: Success — built: $DIR/pocketwl
