@@ -26,6 +26,11 @@ CFLAGS  += -DWLR_USE_UNSTABLE -std=c11 -Wall -Wextra -Wno-unused-parameter -g -I
 CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS))
 
+# pocketwl is the default target — the xdg-shell-protocol.h rule appears first
+# below only because it's a prerequisite; without this line `make` would build
+# just the header and stop.
+.DEFAULT_GOAL := pocketwl
+
 xdg-shell-protocol.h:
 	@test -n "$(WAYLAND_SCANNER)" || { echo "ERROR: wayland-scanner not found (install 'wayland')" >&2; exit 1; }
 	@test -f "$(XDG_SHELL_XML)"   || { echo "ERROR: xdg-shell.xml not found at $(XDG_SHELL_XML)" >&2; \
