@@ -5,18 +5,25 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+echo ":: Enabling the Termux x11-repo (wlroots/wayland/foot live there)..."
+# GUI/Wayland packages are NOT in the default Termux repo — they're in x11-repo,
+# which must be enabled before any of them can be located.
+pkg install -y x11-repo
+
 echo ":: Updating Termux packages..."
 pkg update -y
 
 echo ":: Installing build + runtime dependencies..."
-# wlroots       — the compositor library pocketwl is built on
-# wayland*      — protocols/scanner/server
-# libxkbcommon  — keymap handling
+# wlroots            — the compositor library pocketwl is built on
+# wayland            — the Wayland server library (ships wayland-scanner too)
+# wayland-protocols  — protocol XML (build dep of the stack)
+# libxkbcommon       — keymap handling
 # clang, make, pkg-config — toolchain
 # termux-x11-nightly — the `termux-x11` launcher (the X server itself is the APK)
-# foot          — a Wayland terminal to launch from the compositor
+# foot               — a Wayland terminal to launch from the compositor
+# NOTE: 'wayland-scanner' is NOT a separate package — it comes with 'wayland'.
 pkg install -y \
-    wlroots wayland wayland-protocols wayland-scanner \
+    wlroots wayland wayland-protocols \
     libxkbcommon pkg-config clang make \
     termux-x11-nightly foot
 
