@@ -28,11 +28,17 @@ pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
 # A Wayland launcher for Alt+D. Which one is packaged varies across Termux
 # mirrors (fuzzel is often absent), so install the first that resolves.
 say "Installing a Wayland launcher (for Alt+D)..."
+GOTLAUNCHER=""
 for l in fuzzel wofi tofi bemenu; do
-  pkg install -y "$l" >/dev/null 2>&1 && { echo "   + $l"; break; }
+  pkg install -y "$l" >/dev/null 2>&1 && { echo "   + $l"; GOTLAUNCHER=1; break; }
 done
-command -v fuzzel wofi tofi bemenu-run >/dev/null 2>&1 \
-  || warn "   no launcher installed — Alt+D stays inert until you 'pkg install wofi'"
+# No Wayland GUI launcher in this mirror? Ensure fzf so the terminal fallback
+# launcher (termux/launcher) works — foot + fzf are always available in Termux.
+if [[ -z "$GOTLAUNCHER" ]]; then
+  say "   no GUI launcher packaged here — installing fzf for the terminal fallback"
+  pkg install -y fzf >/dev/null 2>&1 && echo "   + fzf (Alt+D → foot + fzf picker)" \
+    || warn "   fzf install failed — Alt+D will be inert"
+fi
 
 # X11 dev/protocol packages: wlroots is built with the X11 backend (needed to
 # nest inside Termux:X11), so its pkg-config graph Requires xproto/xcb/x11/etc.
