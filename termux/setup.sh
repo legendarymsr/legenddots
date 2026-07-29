@@ -14,18 +14,26 @@ echo ":: Updating Termux packages..."
 pkg update -y
 
 echo ":: Installing build + runtime dependencies..."
-# wlroots            — the compositor library pocketwl is built on
-# wayland            — the Wayland server library (ships wayland-scanner too)
-# wayland-protocols  — protocol XML (build dep of the stack)
+# wlroots            — the compositor library pocketwl is built on. It DEPENDS on
+#                      wayland, so installing it pulls the Wayland library (with
+#                      headers + wayland-scanner) in automatically. We do NOT list
+#                      'wayland'/'wayland-protocols' explicitly — their package
+#                      names vary across Termux mirrors and cause "unable to
+#                      locate"; letting wlroots pull them is the reliable path.
 # libxkbcommon       — keymap handling
 # clang, make, pkg-config — toolchain
 # termux-x11-nightly — the `termux-x11` launcher (the X server itself is the APK)
 # foot               — a Wayland terminal to launch from the compositor
-# NOTE: 'wayland-scanner' is NOT a separate package — it comes with 'wayland'.
 pkg install -y \
-    wlroots wayland wayland-protocols \
-    libxkbcommon pkg-config clang make \
+    wlroots libxkbcommon pkg-config clang make \
     termux-x11-nightly foot
+
+# Sanity check: confirm the Wayland dev files wlroots pulled are visible.
+if ! pkg-config --exists wayland-server; then
+  echo ":: 'wayland-server' pkg-config not found after installing wlroots." >&2
+  echo ":: Try a different mirror ('termux-change-repo'), then re-run this script." >&2
+  exit 1
+fi
 
 echo ":: Building pocketwl..."
 make -C "$DIR" clean
