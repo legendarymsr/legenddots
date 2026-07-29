@@ -73,12 +73,104 @@ opens automatically.
 | Key | Action |
 |-----|--------|
 | `Alt+Return` | spawn a terminal (`$POCKETWL_TERMINAL`, default `foot`) |
+| `Alt+D` | app launcher (`$POCKETWL_LAUNCHER`, default `fuzzel`) |
 | `Alt+F1` | cycle focus between windows |
 | `Alt+Escape` | quit the compositor |
 | `Alt + left-drag` | move a window |
 | `Alt + right-drag` | resize a window |
 
-Change the terminal with `POCKETWL_TERMINAL=st bash start`, or edit `start`.
+Change the terminal with `POCKETWL_TERMINAL=st bash start`, or the launcher with
+`POCKETWL_LAUNCHER=wofi`, or edit `start`.
+
+### Touch
+
+pocketwl maps **touch onto the pointer**: a tap warps the cursor and left-clicks,
+a drag moves it. That makes finger input work with pointer-only apps (foot,
+fuzzel) — the practical win on a phone. (Real multitouch would need
+`wlr_seat_touch_*`, but almost nothing on this stack uses it.)
+
+### Session identity
+
+The compositor exports `XDG_CURRENT_DESKTOP=pocketwl` and
+`XDG_SESSION_TYPE=wayland`, so apps that branch on the session (and fastfetch's
+WM/DE detection) can identify it — otherwise there's no Wayland protocol to ask
+"which compositor?".
+
+---
+
+## Genuine GNU IceCat via Guix (`icecat.sh`)
+
+A libre desktop browser running inside pocketwl. **Read this first — it's the
+honest situation, not a one-liner anyone can promise:**
+
+- **GNU IceCat has no aarch64 binary.** The FSF ships it x86_64-only; Debian,
+  Ubuntu, and Termux don't package it at all.
+- **GNU Guix does** package genuine IceCat and supports aarch64 — and Guix's
+  `icecat` is the same FSDG-libre browser regardless of the host distro. So the
+  genuine-libre browser comes from **Guix**, layered on a proot.
+- **Trisquel** would be the ideal fully-libre host, but proot-distro has no
+  built-in Trisquel and Trisquel publishes no official arm64 *proot rootfs*. So
+  `icecat.sh` defaults to a **Debian** proot as the Guix host (reliable) and lets
+  you swap in Trisquel (below). Guix's icecat is genuine libre either way.
+
+```sh
+bash ~/legenddots/termux/icecat.sh          # set up proot + Guix + install icecat
+# then, from a terminal INSIDE pocketwl:
+bash ~/legenddots/termux/icecat.sh launch    # run IceCat, displayed in pocketwl
+```
+
+### The honest caveats
+
+1. **Guix in a proot is fragile.** Guix's build daemon wants user namespaces /
+   root that proot only fakes. `icecat.sh` runs the standard steps (installer,
+   `guix-daemon --disable-chroot`, `guix pull`, `guix install icecat`) but can't
+   guarantee first-run success. If it fails, finish by hand inside the proot:
+   ```sh
+   proot-distro login debian
+   # start the daemon if it isn't running:
+   guix-daemon --build-users-group=guixbuild --disable-chroot &
+   guix pull
+   guix install icecat
+   ```
+2. **May build from source.** If Guix has no aarch64 *substitute* (prebuilt
+   binary) for icecat, it compiles it — a Firefox-class build, hours long. A
+   device with lots of RAM handles it; time is the cost. Check substitute
+   availability with `guix weather icecat` before committing.
+3. **Software rendering.** IceCat renders through pocketwl's llvmpipe path —
+   usable for reading, not smooth for video.
+
+### Using Trisquel as the host instead
+
+Guix's icecat is already FSDG-libre, but if you want the base distro libre too:
+register a Trisquel arm64 rootfs as a proot-distro plugin, then point the script
+at it.
+
+```sh
+# 1. Write a proot-distro plugin (needs a Trisquel arm64 rootfs tarball URL):
+cat > $PREFIX/etc/proot-distro/trisquel.sh <<'PLUGIN'
+DISTRO_NAME="Trisquel GNU/Linux-libre"
+TARBALL_URL['aarch64']="<url to a trisquel arm64 rootfs .tar.xz>"
+TARBALL_SHA256['aarch64']="<sha256>"
+PLUGIN
+# 2. Use it:
+ICECAT_DISTRO=trisquel bash ~/legenddots/termux/icecat.sh
+```
+
+Trisquel doesn't publish a ready proot tarball, so you supply one (e.g.
+debootstrap Trisquel "aramo" arm64, or repack a Trisquel arm64 image). The Guix +
+IceCat steps are identical on top.
+
+### If you just want a working libre browser today
+
+Guix-from-source-in-a-proot is the purist path and can be a yak-shave. The
+reliable free-software browser that works now is Debian's `firefox-esr` (DFSG-free,
+though not the IceCat brand):
+
+```sh
+proot-distro install debian
+proot-distro login debian -- apt-get install -y firefox-esr
+# launch it as a Wayland client the same way icecat.sh's `launch` does.
+```
 
 ---
 
@@ -114,6 +206,7 @@ dependency means a version bump can need a few lines of adjustment.
 | `Makefile` | builds against Termux's wlroots (auto-detects the pkg-config name) |
 | `setup.sh` | installs Termux deps + builds |
 | `start` | launches Termux:X11 and runs pocketwl nested in it |
+| `icecat.sh` | sets up a proot + GNU Guix and installs genuine GNU IceCat (`launch` subcommand runs it in pocketwl) |
 
 ---
 
