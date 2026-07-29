@@ -38,10 +38,12 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+#include <linux/input-event-codes.h>
 
 enum pocketwl_cursor_mode {
 	POCKETWL_CURSOR_PASSTHROUGH,
@@ -69,6 +71,9 @@ struct pocketwl_server {
 	struct wl_listener cursor_button;
 	struct wl_listener cursor_axis;
 	struct wl_listener cursor_frame;
+	struct wl_listener touch_down;
+	struct wl_listener touch_up;
+	struct wl_listener touch_motion;
 
 	struct wlr_seat *seat;
 	struct wl_listener new_input;
@@ -181,6 +186,11 @@ static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym) 
 		spawn(term ? term : "foot");
 		break;
 	}
+	case XKB_KEY_d: {
+		const char *launcher = getenv("POCKETWL_LAUNCHER");
+		spawn(launcher ? launcher : "fuzzel");
+		break;
+	}
 	case XKB_KEY_F1: {
 		if (wl_list_length(&server->toplevels) < 2) {
 			break;
@@ -277,6 +287,11 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 		break;
 	case WLR_INPUT_DEVICE_POINTER:
 		server_new_pointer(server, device);
+		break;
+	case WLR_INPUT_DEVICE_TOUCH:
+		// Route touch through the same wlr_cursor; its touch_* events drive
+		// the pointer-emulation handlers registered in main().
+		wlr_cursor_attach_input_device(server->cursor, device);
 		break;
 	default:
 		break;
@@ -426,6 +441,42 @@ static void server_cursor_axis(struct wl_listener *listener, void *data) {
 
 static void server_cursor_frame(struct wl_listener *listener, void *data) {
 	struct pocketwl_server *server = wl_container_of(listener, server, cursor_frame);
+	wlr_seat_pointer_notify_frame(server->seat);
+}
+
+// Touch is mapped onto the pointer: a tap warps the cursor to the touch point
+// and synthesizes a left-click; a drag moves the pointer. This makes finger
+// input work with pointer-only apps (foot, fuzzel) — the practical win on a
+// phone. (Apps that want *real* multitouch would need wlr_seat_touch_*, but
+// almost nothing on this stack does.)
+static void server_touch_down(struct wl_listener *listener, void *data) {
+	struct pocketwl_server *server = wl_container_of(listener, server, touch_down);
+	struct wlr_touch_down_event *event = data;
+	wlr_cursor_warp_absolute(server->cursor, &event->touch->base, event->x, event->y);
+	process_cursor_motion(server, event->time_msec);
+	double sx, sy;
+	struct wlr_surface *surface = NULL;
+	struct pocketwl_toplevel *toplevel =
+		desktop_toplevel_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+	focus_toplevel(toplevel, surface);
+	wlr_seat_pointer_notify_button(server->seat, event->time_msec, BTN_LEFT,
+		WL_POINTER_BUTTON_STATE_PRESSED);
+	wlr_seat_pointer_notify_frame(server->seat);
+}
+
+static void server_touch_up(struct wl_listener *listener, void *data) {
+	struct pocketwl_server *server = wl_container_of(listener, server, touch_up);
+	struct wlr_touch_up_event *event = data;
+	wlr_seat_pointer_notify_button(server->seat, event->time_msec, BTN_LEFT,
+		WL_POINTER_BUTTON_STATE_RELEASED);
+	wlr_seat_pointer_notify_frame(server->seat);
+}
+
+static void server_touch_motion(struct wl_listener *listener, void *data) {
+	struct pocketwl_server *server = wl_container_of(listener, server, touch_motion);
+	struct wlr_touch_motion_event *event = data;
+	wlr_cursor_warp_absolute(server->cursor, &event->touch->base, event->x, event->y);
+	process_cursor_motion(server, event->time_msec);
 	wlr_seat_pointer_notify_frame(server->seat);
 }
 
@@ -686,6 +737,12 @@ int main(int argc, char *argv[]) {
 	wl_signal_add(&server.cursor->events.axis, &server.cursor_axis);
 	server.cursor_frame.notify = server_cursor_frame;
 	wl_signal_add(&server.cursor->events.frame, &server.cursor_frame);
+	server.touch_down.notify = server_touch_down;
+	wl_signal_add(&server.cursor->events.touch_down, &server.touch_down);
+	server.touch_up.notify = server_touch_up;
+	wl_signal_add(&server.cursor->events.touch_up, &server.touch_up);
+	server.touch_motion.notify = server_touch_motion;
+	wl_signal_add(&server.cursor->events.touch_motion, &server.touch_motion);
 
 	wl_list_init(&server.keyboards);
 	server.new_input.notify = server_new_input;
@@ -708,6 +765,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+	// Advertise the session so clients (and fastfetch's WM/DE detection) can
+	// identify the compositor — Wayland has no protocol to ask "which WM?".
+	setenv("XDG_CURRENT_DESKTOP", "pocketwl", true);
+	setenv("XDG_SESSION_TYPE", "wayland", true);
 	wlr_log(WLR_INFO, "pocketwl running on WAYLAND_DISPLAY=%s", socket);
 	if (startup_cmd) {
 		spawn(startup_cmd);
