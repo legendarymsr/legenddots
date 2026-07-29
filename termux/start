@@ -7,9 +7,11 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! -f "$DIR/pocketwl" ]]; then
-  echo "pocketwl binary not found at $DIR/pocketwl — run: bash $DIR/setup.sh" >&2
-  ls -l "$DIR" >&2
-  exit 1
+  echo ":: pocketwl binary missing — building it..."
+  if ! make -C "$DIR"; then
+    echo "build failed — run the full setup: bash $DIR/setup.sh" >&2
+    exit 1
+  fi
 fi
 chmod +x "$DIR/pocketwl" 2>/dev/null || true
 
