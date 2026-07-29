@@ -55,6 +55,12 @@ bash ~/legenddots/termux/setup.sh     # installs deps, builds ./pocketwl
 bash ~/legenddots/termux/start        # starts Termux:X11 + pocketwl
 ```
 
+> **`E: Unable to locate package wlroots` / `wayland` / `foot`?** Those live in
+> Termux's **x11-repo**, not the default repo — `setup.sh` enables it for you
+> (`pkg install x11-repo && pkg update`). If you're installing by hand, run that
+> first. Also note `wayland-scanner` is *not* its own package — it ships inside
+> `wayland`.
+
 Then switch to the **Termux:X11 app** to see the compositor. A terminal (`foot`)
 opens automatically.
 
