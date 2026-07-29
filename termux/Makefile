@@ -1,11 +1,8 @@
 # pocketwl — build against Termux's native wlroots.
-# wlroots has no stable API; its pkg-config name is versioned (wlroots-0.18,
-# wlroots-0.19, ...). Auto-detect it, preferring the version pocketwl targets.
-
-WLROOTS := $(shell \
-	pkg-config --exists wlroots-0.18 && echo wlroots-0.18 || \
-	( pkg-config --exists wlroots-0.19 && echo wlroots-0.19 || \
-	( pkg-config --exists wlroots-0.17 && echo wlroots-0.17 || echo wlroots ) ) )
+# wlroots has no stable API and its pkg-config name is versioned (wlroots-0.17,
+# wlroots-0.18, wlroots-0.19, ...). Rather than guess the suffix, discover the
+# actual installed name from pkg-config's own registry.
+WLROOTS := $(shell pkg-config --list-all 2>/dev/null | awk '/^wlroots/{print $$1; exit}')
 
 PKGS = $(WLROOTS) wayland-server xkbcommon
 
@@ -14,6 +11,12 @@ CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS))
 
 pocketwl: pocketwl.c
+ifeq ($(WLROOTS),)
+	@echo "ERROR: no wlroots pkg-config file found. Is it installed?" >&2; \
+	 echo "  pkg install wlroots      # (needs x11-repo)" >&2; \
+	 echo "  pkg-config --list-all | grep -i wlroots   # to see the name" >&2; \
+	 exit 1
+endif
 	@echo "Building against: $(WLROOTS)"
 	$(CC) $(CFLAGS) -o $@ pocketwl.c $(LDLIBS)
 
