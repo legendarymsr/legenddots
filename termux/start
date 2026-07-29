@@ -39,15 +39,20 @@ export POCKETWL_TERMINAL="${POCKETWL_TERMINAL:-foot}"
 # Auto-pick an installed Wayland launcher for Alt+D (package availability varies
 # across Termux mirrors — fuzzel isn't always there, wofi/tofi/bemenu often are).
 if [[ -z "${POCKETWL_LAUNCHER:-}" ]]; then
-  for l in fuzzel wofi tofi bemenu-run; do
-    command -v "$l" >/dev/null 2>&1 && { export POCKETWL_LAUNCHER="$l"; break; }
-  done
-  # No Wayland GUI launcher? Fall back to the terminal fzf launcher (needs fzf).
-  if [[ -z "${POCKETWL_LAUNCHER:-}" && -f "$DIR/launcher" ]] && command -v fzf >/dev/null 2>&1; then
+  # Prefer a Wayland GUI launcher; then X11 ones (rofi/dmenu — they display on
+  # the Termux:X11 server, and the app you pick launches into pocketwl as a
+  # Wayland client since it inherits WAYLAND_DISPLAY); then the fzf fallback.
+  if   command -v fuzzel     >/dev/null 2>&1; then export POCKETWL_LAUNCHER="fuzzel"
+  elif command -v wofi       >/dev/null 2>&1; then export POCKETWL_LAUNCHER="wofi --show drun"
+  elif command -v tofi-drun  >/dev/null 2>&1; then export POCKETWL_LAUNCHER="tofi-drun"
+  elif command -v bemenu-run >/dev/null 2>&1; then export POCKETWL_LAUNCHER="bemenu-run"
+  elif command -v rofi       >/dev/null 2>&1; then export POCKETWL_LAUNCHER="rofi -show run"
+  elif command -v dmenu_run  >/dev/null 2>&1; then export POCKETWL_LAUNCHER="dmenu_run"
+  elif [[ -f "$DIR/launcher" ]] && command -v fzf >/dev/null 2>&1; then
     export POCKETWL_LAUNCHER="$POCKETWL_TERMINAL -e bash $DIR/launcher"
   fi
   [[ -n "${POCKETWL_LAUNCHER:-}" ]] && echo ":: Alt+D launcher: $POCKETWL_LAUNCHER" \
-    || echo ":: no launcher found (Alt+D inert) — pkg install fzf, or a Wayland launcher"
+    || echo ":: no launcher found (Alt+D inert) — pkg install rofi"
 fi
 
 echo ":: launching pocketwl (open the Termux:X11 app to see it) ..."
