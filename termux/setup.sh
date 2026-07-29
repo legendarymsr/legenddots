@@ -23,10 +23,14 @@ pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
 # nest inside Termux:X11), so its pkg-config graph Requires xproto/xcb/x11/etc.
 # Termux installs wlroots's *runtime* X libs but not these dev/proto .pc files,
 # and a single missing one makes `pkg-config --cflags wlroots` fail silently
-# (no -I paths → "wlr/backend.h not found"). Install them explicitly.
+# (no -I paths → "wlr/backend.h not found"). xorgproto (→ xproto.pc) is the key
+# one. Install them ONE AT A TIME so a single unavailable name doesn't abort the
+# whole batch (apt is all-or-nothing per command).
 say "Installing X11 dev/protocol packages (wlroots pkg-config deps)..."
-pkg install -y xorgproto pixman libdrm libxcb libx11 libxau libxdmcp \
-  || warn "some X11 dev packages failed — the build may still miss a .pc"
+for p in xorgproto libxcb libx11 libxau libxdmcp libdrm; do
+  pkg install -y "$p" >/dev/null 2>&1 && echo "   + $p" \
+    || warn "   (could not install $p — may be unavailable under that name)"
+done
 
 # ── 3. wlroots (pulls the correct Wayland lib transitively) ───────────────────
 say "Installing wlroots..."
