@@ -27,13 +27,14 @@ pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
 
 # A Wayland launcher for Alt+D. Which one is packaged varies across Termux
 # mirrors (fuzzel is often absent), so install the first that resolves.
-say "Installing a Wayland launcher (for Alt+D)..."
+say "Installing an app launcher (for Alt+D)..."
 GOTLAUNCHER=""
-for l in fuzzel wofi tofi bemenu; do
+# Prefer Wayland GUI launchers, then X11 ones (rofi/dmenu — they pop up on the
+# Termux:X11 server; the picked app still launches into pocketwl over Wayland).
+for l in fuzzel wofi tofi bemenu rofi dmenu; do
   pkg install -y "$l" >/dev/null 2>&1 && { echo "   + $l"; GOTLAUNCHER=1; break; }
 done
-# No Wayland GUI launcher in this mirror? Ensure fzf so the terminal fallback
-# launcher (termux/launcher) works — foot + fzf are always available in Termux.
+# Last resort: fzf terminal launcher (foot + fzf are always available in Termux).
 if [[ -z "$GOTLAUNCHER" ]]; then
   say "   no GUI launcher packaged here — installing fzf for the terminal fallback"
   pkg install -y fzf >/dev/null 2>&1 && echo "   + fzf (Alt+D → foot + fzf picker)" \
