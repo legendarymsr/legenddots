@@ -27,10 +27,17 @@ pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
 # one. Install them ONE AT A TIME so a single unavailable name doesn't abort the
 # whole batch (apt is all-or-nothing per command).
 say "Installing X11 dev/protocol packages (wlroots pkg-config deps)..."
-for p in xorgproto libxcb libx11 libxau libxdmcp libdrm; do
+# wayland-protocols provides xdg-shell.xml, which we scan into a header (wlroots'
+# own wlr_xdg_shell.h includes the generated "xdg-shell-protocol.h").
+for p in xorgproto libxcb libx11 libxau libxdmcp libdrm wayland-protocols; do
   pkg install -y "$p" >/dev/null 2>&1 && echo "   + $p" \
     || warn "   (could not install $p — may be unavailable under that name)"
 done
+
+# wayland-scanner ships with the 'wayland' package (pulled in by wlroots).
+if ! command -v wayland-scanner >/dev/null 2>&1; then
+  pkg install -y wayland >/dev/null 2>&1 || true
+fi
 
 # ── 3. wlroots (pulls the correct Wayland lib transitively) ───────────────────
 say "Installing wlroots..."
@@ -71,6 +78,16 @@ if ! pkg-config --cflags "$WLROOTS_PC" >/dev/null 2>&1; then
   pkg-config --cflags "$WLROOTS_PC" 2>&1 | grep -i "not found" >&2 || true
   warn "Install the package that provides the named .pc (e.g. xproto → xorgproto,"
   warn "xcb-* → libxcb, xrender → libxrender) and re-run."
+  exit 1
+fi
+
+# ── 4c. Confirm we can generate the xdg-shell protocol header ────────────────
+XML_DIR=$(pkg-config --variable=pkgdatadir wayland-protocols 2>/dev/null)
+XML_DIR="${XML_DIR:-$PREFIX/share/wayland-protocols}"
+if [[ ! -f "$XML_DIR/stable/xdg-shell/xdg-shell.xml" ]]; then
+  warn "xdg-shell.xml not found under $XML_DIR — install 'wayland-protocols':"
+  warn "    pkg install wayland-protocols"
+  warn "(wlroots' wlr_xdg_shell.h needs the generated xdg-shell-protocol.h.)"
   exit 1
 fi
 

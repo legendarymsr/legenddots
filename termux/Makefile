@@ -1,26 +1,45 @@
 # pocketwl — build against Termux's native wlroots.
-# wlroots has no stable API and its pkg-config name is versioned (wlroots-0.17,
-# wlroots-0.18, wlroots-0.19, ...). Rather than guess the suffix, discover the
-# actual installed name from pkg-config's own registry.
+#
+# wlroots' own <wlr/types/wlr_xdg_shell.h> does #include "xdg-shell-protocol.h",
+# a header that is NOT shipped — every downstream compositor must generate it
+# from the xdg-shell protocol XML with wayland-scanner. So we do that here and
+# put it on the include path (-I.), exactly like upstream tinywl's Makefile.
+#
+# wlroots has no stable API and a versioned pkg-config name (wlroots-0.18, ...);
+# discover the actual installed name rather than guessing the suffix.
 WLROOTS := $(shell pkg-config --list-all 2>/dev/null | awk '/^wlroots/{print $$1; exit}')
-
 PKGS = $(WLROOTS) wayland-server xkbcommon
 
-CFLAGS  += -DWLR_USE_UNSTABLE -std=c11 -Wall -Wextra -Wno-unused-parameter -g
+# wayland-scanner: prefer the pkg-config variable, fall back to $PATH.
+WAYLAND_SCANNER := $(shell pkg-config --variable=wayland_scanner wayland-scanner 2>/dev/null)
+ifeq ($(WAYLAND_SCANNER),)
+WAYLAND_SCANNER := $(shell command -v wayland-scanner)
+endif
+# Protocol XML dir: pkg-config var, else Termux's default share path.
+WAYLAND_PROTOCOLS := $(shell pkg-config --variable=pkgdatadir wayland-protocols 2>/dev/null)
+ifeq ($(WAYLAND_PROTOCOLS),)
+WAYLAND_PROTOCOLS := $(PREFIX)/share/wayland-protocols
+endif
+XDG_SHELL_XML := $(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml
+
+CFLAGS  += -DWLR_USE_UNSTABLE -std=c11 -Wall -Wextra -Wno-unused-parameter -g -I.
 CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS))
 
-pocketwl: pocketwl.c
+xdg-shell-protocol.h:
+	@test -n "$(WAYLAND_SCANNER)" || { echo "ERROR: wayland-scanner not found (install 'wayland')" >&2; exit 1; }
+	@test -f "$(XDG_SHELL_XML)"   || { echo "ERROR: xdg-shell.xml not found at $(XDG_SHELL_XML)" >&2; \
+	                                   echo "       install 'wayland-protocols'." >&2; exit 1; }
+	$(WAYLAND_SCANNER) server-header $(XDG_SHELL_XML) $@
+
+pocketwl: xdg-shell-protocol.h pocketwl.c
 ifeq ($(WLROOTS),)
-	@echo "ERROR: no wlroots pkg-config file found. Is it installed?" >&2; \
-	 echo "  pkg install wlroots      # (needs x11-repo)" >&2; \
-	 echo "  pkg-config --list-all | grep -i wlroots   # to see the name" >&2; \
-	 exit 1
+	@echo "ERROR: no wlroots pkg-config file found. 'pkg install wlroots' (needs x11-repo)." >&2; exit 1
 endif
 	@echo "Building against: $(WLROOTS)"
 	$(CC) $(CFLAGS) -o $@ pocketwl.c $(LDLIBS)
 
 clean:
-	rm -f pocketwl
+	rm -f pocketwl xdg-shell-protocol.h
 
 .PHONY: clean
