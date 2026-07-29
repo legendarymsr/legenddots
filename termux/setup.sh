@@ -14,6 +14,12 @@ pkg install -y x11-repo >/dev/null 2>&1 || true
 say "Refreshing package lists..."
 pkg update -y >/dev/null 2>&1 || true
 
+# Upgrade everything to matching versions. Termux packages share ABIs (protobuf
+# ↔ abseil, etc.); installing new packages against a half-upgraded system causes
+# runtime "cannot locate symbol" linker errors. Keeping the set in sync avoids it.
+say "Upgrading installed packages to matching versions (avoids ABI mismatches)..."
+pkg upgrade -y >/dev/null 2>&1 || true
+
 # ── 2. Toolchain + terminal + launcher (never blocks on Wayland lib names) ────
 say "Installing toolchain + terminal + Termux:X11 launcher..."
 pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
