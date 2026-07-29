@@ -42,8 +42,12 @@ if [[ -z "${POCKETWL_LAUNCHER:-}" ]]; then
   for l in fuzzel wofi tofi bemenu-run; do
     command -v "$l" >/dev/null 2>&1 && { export POCKETWL_LAUNCHER="$l"; break; }
   done
+  # No Wayland GUI launcher? Fall back to the terminal fzf launcher (needs fzf).
+  if [[ -z "${POCKETWL_LAUNCHER:-}" && -f "$DIR/launcher" ]] && command -v fzf >/dev/null 2>&1; then
+    export POCKETWL_LAUNCHER="$POCKETWL_TERMINAL -e bash $DIR/launcher"
+  fi
   [[ -n "${POCKETWL_LAUNCHER:-}" ]] && echo ":: Alt+D launcher: $POCKETWL_LAUNCHER" \
-    || echo ":: no launcher found (Alt+D will do nothing) — pkg install wofi"
+    || echo ":: no launcher found (Alt+D inert) — pkg install fzf, or a Wayland launcher"
 fi
 
 echo ":: launching pocketwl (open the Termux:X11 app to see it) ..."

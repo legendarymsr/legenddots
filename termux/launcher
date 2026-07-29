@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# pocketwl fallback app launcher — for when Termux has no Wayland GUI launcher
+# (fuzzel/wofi/tofi/bemenu). Uses tools Termux always has: foot + fzf.
+#
+# It is meant to be run INSIDE a terminal: `foot -e bash .../launcher`. It lists
+# every executable on PATH, lets you fuzzy-pick one, launches it detached (so it
+# becomes its own pocketwl window), and closes the terminal.
+set -u
+
+if ! command -v fzf >/dev/null 2>&1; then
+  echo "fzf not installed — pkg install fzf"; sleep 2; exit 1
+fi
+
+# All executables across PATH, de-duplicated and sorted.
+CMD=$(
+  IFS=:; for d in $PATH; do
+    [ -d "$d" ] && ls -1 "$d" 2>/dev/null
+  done | sort -u | fzf --prompt="run > " --height=100% --layout=reverse
+) || exit 0
+
+[ -n "$CMD" ] && setsid "$CMD" >/dev/null 2>&1 &
