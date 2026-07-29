@@ -19,6 +19,15 @@ say "Installing toolchain + terminal + Termux:X11 launcher..."
 pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
   || warn "some of these failed — continuing; wlroots is the critical one below"
 
+# X11 dev/protocol packages: wlroots is built with the X11 backend (needed to
+# nest inside Termux:X11), so its pkg-config graph Requires xproto/xcb/x11/etc.
+# Termux installs wlroots's *runtime* X libs but not these dev/proto .pc files,
+# and a single missing one makes `pkg-config --cflags wlroots` fail silently
+# (no -I paths → "wlr/backend.h not found"). Install them explicitly.
+say "Installing X11 dev/protocol packages (wlroots pkg-config deps)..."
+pkg install -y xorgproto pixman libdrm libxcb libx11 libxau libxdmcp \
+  || warn "some X11 dev packages failed — the build may still miss a .pc"
+
 # ── 3. wlroots (pulls the correct Wayland lib transitively) ───────────────────
 say "Installing wlroots..."
 if ! pkg install -y wlroots; then
@@ -51,6 +60,15 @@ case "$WLROOTS_VER" in
      warn "If it errors, diff pocketwl.c against upstream tinywl for $WLROOTS_VER"
      warn "  (gitlab.freedesktop.org/wlroots/wlroots, matching tag). See README." ;;
 esac
+
+# ── 4b. Confirm wlroots's full pkg-config graph resolves ─────────────────────
+if ! pkg-config --cflags "$WLROOTS_PC" >/dev/null 2>&1; then
+  warn "pkg-config can't resolve $WLROOTS_PC's dependency graph. Missing .pc:"
+  pkg-config --cflags "$WLROOTS_PC" 2>&1 | grep -i "not found" >&2 || true
+  warn "Install the package that provides the named .pc (e.g. xproto → xorgproto,"
+  warn "xcb-* → libxcb, xrender → libxrender) and re-run."
+  exit 1
+fi
 
 # ── 5. Build ──────────────────────────────────────────────────────────────────
 say "Building pocketwl..."
