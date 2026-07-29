@@ -22,8 +22,17 @@ pkg upgrade -y >/dev/null 2>&1 || true
 
 # ── 2. Toolchain + terminal + launcher (never blocks on Wayland lib names) ────
 say "Installing toolchain + terminal + Termux:X11 launcher..."
-pkg install -y clang make pkg-config libxkbcommon foot fuzzel termux-x11-nightly \
+pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
   || warn "some of these failed — continuing; wlroots is the critical one below"
+
+# A Wayland launcher for Alt+D. Which one is packaged varies across Termux
+# mirrors (fuzzel is often absent), so install the first that resolves.
+say "Installing a Wayland launcher (for Alt+D)..."
+for l in fuzzel wofi tofi bemenu; do
+  pkg install -y "$l" >/dev/null 2>&1 && { echo "   + $l"; break; }
+done
+command -v fuzzel wofi tofi bemenu-run >/dev/null 2>&1 \
+  || warn "   no launcher installed — Alt+D stays inert until you 'pkg install wofi'"
 
 # X11 dev/protocol packages: wlroots is built with the X11 backend (needed to
 # nest inside Termux:X11), so its pkg-config graph Requires xproto/xcb/x11/etc.

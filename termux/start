@@ -36,6 +36,16 @@ fi
 export DISPLAY="$DISPLAY_NUM"
 export POCKETWL_TERMINAL="${POCKETWL_TERMINAL:-foot}"
 
+# Auto-pick an installed Wayland launcher for Alt+D (package availability varies
+# across Termux mirrors — fuzzel isn't always there, wofi/tofi/bemenu often are).
+if [[ -z "${POCKETWL_LAUNCHER:-}" ]]; then
+  for l in fuzzel wofi tofi bemenu-run; do
+    command -v "$l" >/dev/null 2>&1 && { export POCKETWL_LAUNCHER="$l"; break; }
+  done
+  [[ -n "${POCKETWL_LAUNCHER:-}" ]] && echo ":: Alt+D launcher: $POCKETWL_LAUNCHER" \
+    || echo ":: no launcher found (Alt+D will do nothing) — pkg install wofi"
+fi
+
 echo ":: launching pocketwl (open the Termux:X11 app to see it) ..."
 # wlroots autodetects the X11 backend from DISPLAY. -s spawns a first terminal.
 exec "$DIR/pocketwl" -s "$POCKETWL_TERMINAL"
