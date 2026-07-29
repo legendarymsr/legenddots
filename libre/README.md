@@ -82,26 +82,45 @@ Phase 1 is a standard LFS-style base build (cross-toolchain → temp tools →
 chroot base), identical to `../blfs` except: **Linux-libre** instead of Linux,
 and **Guile+Shepherd** instead of SysVinit.
 
-Phase 2 (the desktop) is the long pole. Rough order and the heavy hitters on a
-2 vCPU VM:
+Phase 2 (the desktop) is the long pole. All estimates below assume a **2 vCPU
+VM** (`MAKEFLAGS=-j2`). The two RAM columns matter because the heavy links
+(LLVM, Mesa, Emacs, IceCat) swap on 4 GB and don't on 8 GB — swapping to a
+virtio disk is what stretches the 4 GB times.
 
-| Group | Notable time sinks |
-|-------|--------------------|
-| Foundation (expat, image libs, freetype, fontconfig, harfbuzz) | ~40 min |
-| Xorg proto + ~30 X libraries (built in a loop) | ~45 min |
-| Keyboard + input (libxkbcommon, libinput) | ~15 min |
-| **LLVM 18** | **~10–16 h** (the single worst package) |
-| Mesa (virgl + swrast) | ~1 h |
-| xorg-server + xinit + drivers | ~30 min |
-| Fonts | ~5 min |
-| xterm, **ratpoison**, GnuTLS | ~20 min |
-| **GNU Emacs** | ~30–45 min |
-| ALSA | ~10 min |
-| **GNU IceCat** | **hours — and needs ~8 GB RAM** (see below) |
-| xdm, user + dotfiles | ~15 min |
+### Per-group estimates
 
-Checkpointed to `/etc/libre-setup.state`; re-running resumes where it stopped.
-Force one step to rerun with `sed -i '/^emacs$/d' /etc/libre-setup.state`.
+| Group | 4 GB RAM | 8 GB RAM |
+|-------|---------:|---------:|
+| **Phase 1** — LFS base (toolchain, temp tools, chroot, Linux-libre, Shepherd) | ~14–20 h | ~12–16 h |
+| Foundation (expat, image libs, freetype, fontconfig, harfbuzz) | ~45 min | ~40 min |
+| Xorg proto + ~30 X libraries (built in a loop) | ~50 min | ~45 min |
+| Keyboard + input (libxkbcommon, libinput) | ~15 min | ~15 min |
+| **LLVM 18** (the single worst package) | **~13–18 h** (swaps) | **~10–14 h** |
+| Mesa (virgl + swrast) | ~75 min | ~55 min |
+| xorg-server + xinit + drivers | ~35 min | ~30 min |
+| Fonts | ~5 min | ~5 min |
+| xterm, **ratpoison**, GnuTLS | ~20 min | ~20 min |
+| **GNU Emacs** | ~45–60 min | ~30–45 min |
+| ALSA | ~10 min | ~10 min |
+| **GNU IceCat** | **skipped** (needs ~8 GB — see below) | **~4–7 h** |
+| xdm, user + dotfiles | ~15 min | ~15 min |
+
+### Totals
+
+| Configuration | Total wall-clock | Browser? |
+|---------------|-----------------:|----------|
+| **4 GB VM** | **~32–44 h** | IceCat auto-skipped; use Emacs `eww` |
+| **8 GB VM** (no IceCat) | **~26–36 h** | IceCat auto-skipped only if you have <7 GB |
+| **8 GB VM** (with IceCat) | **~30–43 h** | full GNU IceCat |
+
+LLVM alone is roughly a third to a half of the whole build; if you only have one
+long unattended window, that's the step to expect to sit through. The 8 GB
+figures are lower *despite* also building IceCat because nothing swaps — on
+4 GB, LLVM/Mesa/Emacs each lose time paging to the virtio disk.
+
+Checkpointed to `/etc/libre-setup.state`; re-running resumes where it stopped, so
+you can build across several sessions. Force one step to rerun with
+`sed -i '/^emacs$/d' /etc/libre-setup.state`.
 
 ---
 
