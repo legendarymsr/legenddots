@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# pocketwl — start Termux:X11 and run the compositor nested inside it.
+# Unrooted Android has no DRM/KMS, so wlroots uses its X11 backend: because
+# DISPLAY points at the Termux:X11 server, pocketwl renders into an X11 window.
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ ! -x "$DIR/pocketwl" ]]; then
+  echo "pocketwl not built — run: bash $DIR/setup.sh" >&2
+  exit 1
+fi
+
+# Wayland/X need a runtime dir; Termux sets $TMPDIR to $PREFIX/tmp.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-$PREFIX/tmp}}"
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+
+DISPLAY_NUM=":1"
+
+# Start the Termux:X11 server (requires the Termux:X11 APK to be installed).
+if ! pgrep -f "termux-x11 $DISPLAY_NUM" >/dev/null 2>&1; then
+  echo ":: starting Termux:X11 on $DISPLAY_NUM ..."
+  termux-x11 "$DISPLAY_NUM" >/dev/null 2>&1 &
+  # give the X server a moment to come up
+  for _ in $(seq 1 20); do
+    [[ -e "$XDG_RUNTIME_DIR/../.X11-unix/X${DISPLAY_NUM#:}" ]] && break
+    sleep 0.3
+  done
+  sleep 1
+fi
+
+export DISPLAY="$DISPLAY_NUM"
+export POCKETWL_TERMINAL="${POCKETWL_TERMINAL:-foot}"
+
+echo ":: launching pocketwl (open the Termux:X11 app to see it) ..."
+# wlroots autodetects the X11 backend from DISPLAY. -s spawns a first terminal.
+exec "$DIR/pocketwl" -s "$POCKETWL_TERMINAL"
