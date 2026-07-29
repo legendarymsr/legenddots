@@ -6,12 +6,11 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ ! -f "$DIR/pocketwl" ]]; then
-  echo ":: pocketwl binary missing — building it..."
-  if ! make -C "$DIR" pocketwl; then
-    echo "build failed — run the full setup: bash $DIR/setup.sh" >&2
-    exit 1
-  fi
+# Build (make is a no-op if pocketwl is already up to date, and rebuilds
+# automatically when pocketwl.c changed — e.g. after a git pull).
+if ! make -C "$DIR" pocketwl; then
+  echo "build failed — run the full setup: bash $DIR/setup.sh" >&2
+  exit 1
 fi
 chmod +x "$DIR/pocketwl" 2>/dev/null || true
 
