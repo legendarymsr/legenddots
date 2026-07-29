@@ -1,56 +1,76 @@
 #!/usr/bin/env bash
 # pocketwl — install native Termux dependencies and build the compositor.
 # Run inside Termux (not proot):  bash ~/legenddots/termux/setup.sh
-set -e
+set -u
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+say()  { echo ":: $*"; }
+warn() { echo "!! $*" >&2; }
 
-echo ":: Enabling the Termux x11-repo (wlroots/wayland/foot live there)..."
-# GUI/Wayland packages are NOT in the default Termux repo — they're in x11-repo,
-# which must be enabled before any of them can be located.
-pkg install -y x11-repo
+# ── 1. Repos ──────────────────────────────────────────────────────────────────
+# GUI/Wayland packages live in x11-repo, not the default Termux repo.
+say "Enabling x11-repo (wlroots/foot live there)..."
+pkg install -y x11-repo >/dev/null 2>&1 || true
+say "Refreshing package lists..."
+pkg update -y >/dev/null 2>&1 || true
 
-echo ":: Updating Termux packages..."
-pkg update -y
+# ── 2. Toolchain + terminal + launcher (never blocks on Wayland lib names) ────
+say "Installing toolchain + terminal + Termux:X11 launcher..."
+pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
+  || warn "some of these failed — continuing; wlroots is the critical one below"
 
-echo ":: Installing build + runtime dependencies..."
-# wlroots            — the compositor library pocketwl is built on. It DEPENDS on
-#                      wayland, so installing it pulls the Wayland library (with
-#                      headers + wayland-scanner) in automatically. We do NOT list
-#                      'wayland'/'wayland-protocols' explicitly — their package
-#                      names vary across Termux mirrors and cause "unable to
-#                      locate"; letting wlroots pull them is the reliable path.
-# libxkbcommon       — keymap handling
-# clang, make, pkg-config — toolchain
-# termux-x11-nightly — the `termux-x11` launcher (the X server itself is the APK)
-# foot               — a Wayland terminal to launch from the compositor
-pkg install -y \
-    wlroots libxkbcommon pkg-config clang make \
-    termux-x11-nightly foot
-
-# Sanity check: confirm the Wayland dev files wlroots pulled are visible.
-if ! pkg-config --exists wayland-server; then
-  echo ":: 'wayland-server' pkg-config not found after installing wlroots." >&2
-  echo ":: Try a different mirror ('termux-change-repo'), then re-run this script." >&2
+# ── 3. wlroots (pulls the correct Wayland lib transitively) ───────────────────
+say "Installing wlroots..."
+if ! pkg install -y wlroots; then
+  warn "Could not install wlroots. Your mirror may be stale."
+  warn "Fix: run 'termux-change-repo', pick a different mirror, then re-run this."
   exit 1
 fi
 
-echo ":: Building pocketwl..."
-make -C "$DIR" clean
-make -C "$DIR"
+# ── 4. Verify the dev files are actually present ──────────────────────────────
+WLROOTS_PC=$(pkg-config --list-all 2>/dev/null | awk '/^wlroots/{print $1; exit}')
+if [[ -z "$WLROOTS_PC" ]]; then
+  warn "wlroots installed but no wlroots*.pc found in pkg-config's path."
+  warn "Contents of \$PREFIX/lib/pkgconfig:"
+  ls "$PREFIX/lib/pkgconfig" | grep -i wl >&2 || true
+  warn "Try: termux-change-repo → fresh mirror → re-run."
+  exit 1
+fi
+if ! pkg-config --exists wayland-server; then
+  warn "wayland-server pkg-config missing (should have come in with wlroots)."
+  warn "Try: termux-change-repo → fresh mirror → re-run."
+  exit 1
+fi
 
-cat <<EOF
+WLROOTS_VER=$(pkg-config --modversion "$WLROOTS_PC" 2>/dev/null || echo "?")
+say "Found $WLROOTS_PC (version $WLROOTS_VER)"
+case "$WLROOTS_VER" in
+  0.18*) : ;;  # exactly what pocketwl.c targets
+  *) warn "pocketwl.c targets the wlroots 0.18 API; you have $WLROOTS_VER."
+     warn "It may still build, or the compiler may flag a few renamed symbols."
+     warn "If it errors, diff pocketwl.c against upstream tinywl for $WLROOTS_VER"
+     warn "  (gitlab.freedesktop.org/wlroots/wlroots, matching tag). See README." ;;
+esac
 
-:: Done. Built: $DIR/pocketwl
+# ── 5. Build ──────────────────────────────────────────────────────────────────
+say "Building pocketwl..."
+make -C "$DIR" clean >/dev/null 2>&1 || true
+if make -C "$DIR"; then
+  cat <<EOF
+
+:: Success — built: $DIR/pocketwl
 
 Next:
   1. Install the *Termux:X11* app (the X server) from F-Droid or
-     github.com/termux/termux-x11 — the 'termux-x11-nightly' package above only
-     provides the launcher command, not the display server.
-  2. Launch the desktop:
-        bash $DIR/start
+     github.com/termux/termux-x11 — the package above is only the launcher.
+  2. Launch:  bash $DIR/start   (then open the Termux:X11 app)
 
-Keys inside pocketwl (modifier = Alt):
-  Alt+Return  terminal      Alt+F1  cycle windows      Alt+Escape  quit
-  Alt + drag  move/resize windows
+Keys (modifier = Alt): Alt+Return terminal · Alt+F1 cycle · Alt+Escape quit
+                       Alt + drag = move/resize
 EOF
+else
+  warn "Build failed. If the errors are about wlr/* symbols, it's a wlroots"
+  warn "version mismatch ($WLROOTS_VER vs the 0.18 pocketwl.c targets)."
+  warn "Paste the first few compiler errors and I'll adapt the source."
+  exit 1
+fi
