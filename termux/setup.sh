@@ -22,7 +22,7 @@ pkg upgrade -y >/dev/null 2>&1 || true
 
 # ── 2. Toolchain + terminal + launcher (never blocks on Wayland lib names) ────
 say "Installing toolchain + terminal + Termux:X11 launcher..."
-pkg install -y clang make pkg-config libxkbcommon foot termux-x11-nightly \
+pkg install -y clang make pkg-config libxkbcommon foot fuzzel termux-x11-nightly \
   || warn "some of these failed — continuing; wlroots is the critical one below"
 
 # X11 dev/protocol packages: wlroots is built with the X11 backend (needed to
