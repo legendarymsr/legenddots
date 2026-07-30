@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Run pocketwl on the wlroots DRM backend — TRUE Wayland, no Termux:X11.
+# REQUIRES ROOT.
+#
+# On Android the display + GPU are owned by SurfaceFlinger, which holds DRM
+# master. To drive the screen directly we stop the Android UI, run pocketwl on
+# /dev/dri as root (WLR_BACKENDS=drm, WLR_SESSION=direct — no logind/seatd), and
+# restart the UI on exit.
+#
+# ⚠ BIG CAVEATS — read before running:
+#   * Many Android SoCs do NOT expose usable DRM/KMS to userspace (the panel is
+#     driven by HWComposer, not atomic KMS). If wlroots reports "no outputs",
+#     your device is one of those and DRM Wayland simply isn't possible — use
+#     `bash start` (Termux:X11) instead.
+#   * Stopping the Android UI blanks the screen. If pocketwl fails to take over,
+#     you may see a black screen until you reboot. Be ready to hold power to
+#     reboot. Do NOT run this if you can't afford that.
+#   * Input needs /dev/input access (root has it) via libinput.
+set -u
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+command -v su >/dev/null 2>&1 || { echo "no 'su' in PATH — this needs a rooted device (install tsu: pkg install tsu)"; exit 1; }
+if [[ ! -e /dev/dri/card0 && ! -e /dev/dri/card1 ]]; then
+  echo "no /dev/dri/card* — no DRM node exposed; DRM backend can't work here." >&2
+  exit 1
+fi
+if [[ ! -x "$DIR/pocketwl" ]]; then
+  make -C "$DIR" pocketwl || { echo "build failed — run bash $DIR/setup.sh" >&2; exit 1; }
+fi
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-$PREFIX/tmp}}"
+mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+
+echo ":: probing DRM outputs first (safe, doesn't touch the display)..."
+su -c "ls -l /dev/dri/ 2>&1"
+
+echo ":: stopping SurfaceFlinger to free DRM master (screen WILL blank) ..."
+su -c 'setprop ctl.stop surfaceflinger' 2>/dev/null || su -c 'stop' 2>/dev/null || true
+sleep 1
+
+echo ":: launching pocketwl on DRM (as root)..."
+# env -u strips DISPLAY/WAYLAND_DISPLAY so wlroots autoselects the DRM backend.
+su -c "env -u DISPLAY -u WAYLAND_DISPLAY \
+  WLR_BACKENDS=drm WLR_SESSION=direct WLR_NO_HARDWARE_CURSORS=1 \
+  XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR' \
+  '$DIR/pocketwl' -s foot" 2>&1 | tee "$XDG_RUNTIME_DIR/pocketwl-drm.log"
+
+echo ":: restarting SurfaceFlinger (Android UI back)..."
+su -c 'setprop ctl.start surfaceflinger' 2>/dev/null || su -c 'start' 2>/dev/null || true
+echo ":: if the Android UI doesn't return, reboot. Log: $XDG_RUNTIME_DIR/pocketwl-drm.log"
