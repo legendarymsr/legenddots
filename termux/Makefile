@@ -31,13 +31,23 @@ LDLIBS  += $(shell pkg-config --libs $(PKGS))
 # just the header and stop.
 .DEFAULT_GOAL := pocketwl
 
+# The wlr-layer-shell protocol is a wlroots protocol (not in wayland-protocols),
+# and Termux ships neither its header nor XML — so the XML is vendored here.
+LAYER_SHELL_XML := wlr-layer-shell-unstable-v1.xml
+
 xdg-shell-protocol.h:
 	@test -n "$(WAYLAND_SCANNER)" || { echo "ERROR: wayland-scanner not found (install 'wayland')" >&2; exit 1; }
 	@test -f "$(XDG_SHELL_XML)"   || { echo "ERROR: xdg-shell.xml not found at $(XDG_SHELL_XML)" >&2; \
 	                                   echo "       install 'wayland-protocols'." >&2; exit 1; }
 	$(WAYLAND_SCANNER) server-header $(XDG_SHELL_XML) $@
 
-pocketwl: xdg-shell-protocol.h pocketwl.c
+wlr-layer-shell-unstable-v1-protocol.h: $(LAYER_SHELL_XML)
+	@test -n "$(WAYLAND_SCANNER)" || { echo "ERROR: wayland-scanner not found (install 'wayland')" >&2; exit 1; }
+	$(WAYLAND_SCANNER) server-header $(LAYER_SHELL_XML) $@
+
+PROTO_HEADERS = xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h
+
+pocketwl: $(PROTO_HEADERS) pocketwl.c
 ifeq ($(WLROOTS),)
 	@echo "ERROR: no wlroots pkg-config file found. 'pkg install wlroots' (needs x11-repo)." >&2; exit 1
 endif
@@ -45,6 +55,6 @@ endif
 	$(CC) $(CFLAGS) -o $@ pocketwl.c $(LDLIBS)
 
 clean:
-	rm -f pocketwl xdg-shell-protocol.h
+	rm -f pocketwl $(PROTO_HEADERS)
 
 .PHONY: clean
