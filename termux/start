@@ -46,7 +46,7 @@ if [[ -z "${POCKETWL_LAUNCHER:-}" ]]; then
   elif command -v wofi       >/dev/null 2>&1; then export POCKETWL_LAUNCHER="wofi --show drun"
   elif command -v tofi-drun  >/dev/null 2>&1; then export POCKETWL_LAUNCHER="tofi-drun"
   elif command -v bemenu-run >/dev/null 2>&1; then export POCKETWL_LAUNCHER="bemenu-run"
-  elif command -v rofi >/dev/null 2>&1; then export POCKETWL_LAUNCHER="bash $DIR/rofi-launch"
+  elif command -v rofi >/dev/null 2>&1; then export POCKETWL_LAUNCHER="rofi -show run"
   elif command -v dmenu_run  >/dev/null 2>&1; then export POCKETWL_LAUNCHER="dmenu_run"
   elif [[ -f "$DIR/launcher" ]] && command -v fzf >/dev/null 2>&1; then
     export POCKETWL_LAUNCHER="$POCKETWL_TERMINAL -e bash $DIR/launcher"
