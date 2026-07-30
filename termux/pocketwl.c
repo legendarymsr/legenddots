@@ -32,6 +32,7 @@
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer.h>
@@ -63,6 +64,15 @@ struct pocketwl_server {
 	struct wl_listener new_xdg_toplevel;
 	struct wl_listener new_xdg_popup;
 	struct wl_list toplevels;
+
+	struct wlr_layer_shell_v1 *layer_shell;
+	struct wl_listener new_layer_surface;
+	// Scene layers, bottom-to-top: background, bottom, [toplevels], top, overlay.
+	struct wlr_scene_tree *layer_bg;
+	struct wlr_scene_tree *layer_bottom;
+	struct wlr_scene_tree *toplevel_tree;
+	struct wlr_scene_tree *layer_top;
+	struct wlr_scene_tree *layer_overlay;
 
 	struct wlr_cursor *cursor;
 	struct wlr_xcursor_manager *cursor_mgr;
@@ -620,6 +630,108 @@ static void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *
 	}
 }
 
+// ── Layer shell (wlr-layer-shell-v1): bars, launchers, wallpapers, notifiers ──
+struct pocketwl_layer_surface {
+	struct wlr_layer_surface_v1 *layer_surface;
+	struct wlr_scene_layer_surface_v1 *scene;
+	struct pocketwl_server *server;
+	struct wl_listener map;
+	struct wl_listener unmap;
+	struct wl_listener commit;
+	struct wl_listener destroy;
+};
+
+static struct wlr_scene_tree *layer_tree_for(struct pocketwl_server *server,
+		enum zwlr_layer_shell_v1_layer layer) {
+	switch (layer) {
+	case ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND: return server->layer_bg;
+	case ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM:     return server->layer_bottom;
+	case ZWLR_LAYER_SHELL_V1_LAYER_TOP:        return server->layer_top;
+	case ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY:    return server->layer_overlay;
+	}
+	return server->layer_top;
+}
+
+static void layer_surface_map(struct wl_listener *listener, void *data) {
+	struct pocketwl_layer_surface *ls = wl_container_of(listener, ls, map);
+	// Keyboard-interactive layers (launchers) take focus so they receive keys.
+	if (ls->layer_surface->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+		struct wlr_keyboard *kb = wlr_seat_get_keyboard(ls->server->seat);
+		if (kb) {
+			wlr_seat_keyboard_notify_enter(ls->server->seat,
+				ls->layer_surface->surface, kb->keycodes, kb->num_keycodes,
+				&kb->modifiers);
+		}
+	}
+}
+
+static void layer_surface_unmap(struct wl_listener *listener, void *data) {
+	struct pocketwl_layer_surface *ls = wl_container_of(listener, ls, unmap);
+	// Hand keyboard focus back to a normal window if there is one.
+	if (!wl_list_empty(&ls->server->toplevels)) {
+		struct pocketwl_toplevel *top =
+			wl_container_of(ls->server->toplevels.next, top, link);
+		focus_toplevel(top, top->xdg_toplevel->base->surface);
+	}
+}
+
+static void layer_surface_commit(struct wl_listener *listener, void *data) {
+	struct pocketwl_layer_surface *ls = wl_container_of(listener, ls, commit);
+	struct wlr_layer_surface_v1 *surf = ls->layer_surface;
+	if (!surf->output) {
+		return;
+	}
+	// Arrange against the full output box. (A minimal compositor: we don't
+	// reserve exclusive zones from toplevels, but anchors/margins are honored,
+	// which is all a launcher/bar needs to appear in the right place.)
+	struct wlr_box full = {0};
+	wlr_output_layout_get_box(ls->server->output_layout, surf->output, &full);
+	struct wlr_box usable = full;
+	wlr_scene_layer_surface_v1_configure(ls->scene, &full, &usable);
+}
+
+static void layer_surface_destroy(struct wl_listener *listener, void *data) {
+	struct pocketwl_layer_surface *ls = wl_container_of(listener, ls, destroy);
+	wl_list_remove(&ls->map.link);
+	wl_list_remove(&ls->unmap.link);
+	wl_list_remove(&ls->commit.link);
+	wl_list_remove(&ls->destroy.link);
+	free(ls);
+}
+
+static void server_new_layer_surface(struct wl_listener *listener, void *data) {
+	struct pocketwl_server *server = wl_container_of(listener, server, new_layer_surface);
+	struct wlr_layer_surface_v1 *surf = data;
+
+	// No output requested → put it on the first one we have.
+	if (!surf->output) {
+		if (wl_list_empty(&server->outputs)) {
+			wlr_layer_surface_v1_destroy(surf);
+			return;
+		}
+		struct pocketwl_output *o =
+			wl_container_of(server->outputs.next, o, link);
+		surf->output = o->wlr_output;
+	}
+
+	struct pocketwl_layer_surface *ls = calloc(1, sizeof(*ls));
+	ls->server = server;
+	ls->layer_surface = surf;
+	struct wlr_scene_tree *tree = layer_tree_for(server, surf->pending.layer);
+	ls->scene = wlr_scene_layer_surface_v1_create(tree, surf);
+	// Keep the scene tree reachable for xdg-popup parenting.
+	surf->surface->data = ls->scene->tree;
+
+	ls->map.notify = layer_surface_map;
+	wl_signal_add(&surf->surface->events.map, &ls->map);
+	ls->unmap.notify = layer_surface_unmap;
+	wl_signal_add(&surf->surface->events.unmap, &ls->unmap);
+	ls->commit.notify = layer_surface_commit;
+	wl_signal_add(&surf->surface->events.commit, &ls->commit);
+	ls->destroy.notify = layer_surface_destroy;
+	wl_signal_add(&surf->events.destroy, &ls->destroy);
+}
+
 static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	struct pocketwl_server *server = wl_container_of(listener, server, new_xdg_toplevel);
 	struct wlr_xdg_toplevel *xdg_toplevel = data;
@@ -628,7 +740,7 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_toplevel;
 	toplevel->scene_tree =
-		wlr_scene_xdg_surface_create(&toplevel->server->scene->tree, xdg_toplevel->base);
+		wlr_scene_xdg_surface_create(toplevel->server->toplevel_tree, xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_toplevel->base->data = toplevel->scene_tree;
 
@@ -668,9 +780,19 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_popup *xdg_popup = data;
 	struct pocketwl_popup *popup = calloc(1, sizeof(*popup));
 	popup->xdg_popup = xdg_popup;
+	// The parent may be an xdg surface (toplevel/popup) or a layer surface.
+	// Both stash their scene tree in the wl_surface's ->data, so use that.
+	struct wlr_scene_tree *parent_tree = NULL;
 	struct wlr_xdg_surface *parent = wlr_xdg_surface_try_from_wlr_surface(xdg_popup->parent);
-	assert(parent != NULL);
-	struct wlr_scene_tree *parent_tree = parent->data;
+	if (parent != NULL) {
+		parent_tree = parent->data;
+	} else if (xdg_popup->parent != NULL) {
+		parent_tree = xdg_popup->parent->data;  // layer surface's scene tree
+	}
+	if (parent_tree == NULL) {
+		free(popup);
+		return;
+	}
 	xdg_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
 	popup->commit.notify = xdg_popup_commit;
 	wl_signal_add(&xdg_popup->base->surface->events.commit, &popup->commit);
@@ -715,12 +837,25 @@ int main(int argc, char *argv[]) {
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
 
+	// Scene layer trees, created bottom-to-top so z-order is correct:
+	// background < bottom < normal windows < top < overlay.
+	server.layer_bg      = wlr_scene_tree_create(&server.scene->tree);
+	server.layer_bottom  = wlr_scene_tree_create(&server.scene->tree);
+	server.toplevel_tree = wlr_scene_tree_create(&server.scene->tree);
+	server.layer_top     = wlr_scene_tree_create(&server.scene->tree);
+	server.layer_overlay = wlr_scene_tree_create(&server.scene->tree);
+
 	wl_list_init(&server.toplevels);
 	server.xdg_shell = wlr_xdg_shell_create(server.wl_display, 3);
 	server.new_xdg_toplevel.notify = server_new_xdg_toplevel;
 	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
 	server.new_xdg_popup.notify = server_new_xdg_popup;
 	wl_signal_add(&server.xdg_shell->events.new_popup, &server.new_xdg_popup);
+
+	// Layer shell — bars, launchers, wallpapers, notification daemons.
+	server.layer_shell = wlr_layer_shell_v1_create(server.wl_display, 4);
+	server.new_layer_surface.notify = server_new_layer_surface;
+	wl_signal_add(&server.layer_shell->events.new_surface, &server.new_layer_surface);
 
 	server.cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
