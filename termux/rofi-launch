@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Alt+D launcher for pocketwl using rofi.
+#
+# Termux's rofi is built with Wayland support, so with WAYLAND_DISPLAY set it
+# tries to run as a Wayland client and demands the wlr-layer-shell protocol,
+# which pocketwl doesn't implement. So we hide WAYLAND_DISPLAY from rofi (forcing
+# its X11 backend, which renders on the Termux:X11 server pocketwl is nested in),
+# and re-inject WAYLAND_DISPLAY only for the command rofi launches — so the picked
+# app opens as a Wayland window inside pocketwl.
+WL="${WAYLAND_DISPLAY:-wayland-0}"
+exec env -u WAYLAND_DISPLAY rofi -show run \
+  -run-command "WAYLAND_DISPLAY=$WL {cmd}"
