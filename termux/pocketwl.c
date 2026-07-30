@@ -146,10 +146,6 @@ static void spawn(const char *cmd) {
 	}
 	if (fork() == 0) {
 		setsid();
-		// pocketwl needs DISPLAY for its X11 *backend*, but the apps it spawns
-		// are pure Wayland clients — clearing DISPLAY makes them (and tools like
-		// fastfetch) report a Wayland session instead of X11.
-		unsetenv("DISPLAY");
 		execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
 		_exit(1);
 	}
