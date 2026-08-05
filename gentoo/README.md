@@ -704,9 +704,9 @@ over sudo.
 
 ### Wayland vs X11 (and why XLibre is a non-starter)
 
-This build runs **Wayland** (niri). The `libre/` build runs **X11** (Xorg +
-ratpoison) because its apps — ratpoison, IceCat — are X11-only. Here's the
-tradeoff, and why the "revive X11" crowd is solving the wrong problem.
+This build runs **Wayland** (niri) — end to end, no X11 in the stack. Here's the
+tradeoff against X11, and why the "revive X11" crowd is solving the wrong
+problem.
 
 | | Wayland | X11 |
 |---|---|---|
@@ -730,7 +730,7 @@ reviving X11 — is a non-starter. It forks the *code* but inherits the *protoco
 wholesale, so every architectural dead end comes along for the ride. It's a
 maintenance fork of a design whose problems live in the spec. Meanwhile stock
 Xorg already exists, already works, and is packaged everywhere for the genuine
-X11 use cases (this repo's own `libre/` build leans on it).
+X11 use cases.
 
 So the sane split is simple: if you want the modern, isolated, tear-free stack,
 run **Wayland** — it fixed the actual problems. If you genuinely need X11 —
