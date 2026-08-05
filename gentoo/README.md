@@ -702,6 +702,43 @@ choice here is deliberate: a smaller, more auditable init with no D-Bus-coupled
 PID 1, matching the same minimal-attack-surface reasoning behind picking doas
 over sudo.
 
+### Wayland vs X11 (and why XLibre is a non-starter)
+
+This build runs **Wayland** (niri). The `libre/` build runs **X11** (Xorg +
+ratpoison) because its apps — ratpoison, IceCat — are X11-only. Here's the
+tradeoff, and why the "revive X11" crowd is solving the wrong problem.
+
+| | Wayland | X11 |
+|---|---|---|
+| Vintage | Protocol from 2008, designed *after* 25 years of watching X's mistakes | Core protocol from 1984, ~40 years of accreted extensions |
+| Architecture | The compositor **is** the display server — one process | X server + a separate window manager + a separate compositing manager |
+| Client isolation | Isolated by default: a client can't read another's input or pixels | **None.** Any client can keylog every keystroke, screenshot any window, and inject events into any other app. By design. |
+| Tearing / vsync | Every frame is atomic — no tearing, ever | Tears unless a compositor bolts vsync on top |
+| HiDPI / mixed DPI | Per-output scale and refresh, native | One global scale; mixed-DPI is a hack |
+| Input | `libinput`, one consistent stack | The old X input layer, quirk by quirk |
+| Network transparency | Not built in — use `waypipe` when you actually need it | Built in (and rarely used, and unencrypted) |
+| Legacy apps | Need `Xwayland` for old X-only apps | Everything runs — it *is* the 40-year-old thing |
+| Upstream | Actively developed | Xorg server is in maintenance mode |
+
+X11's real problem is **in the specification, not the implementation.** The lack
+of client isolation, the server-plus-WM-plus-compositor sprawl, the four decades
+of legacy surface area — none of that is a bug you can patch; it's what the
+protocol *is*.
+
+Which is why **XLibre** — the 2025 hard fork of the Xorg server pitched as
+reviving X11 — is a non-starter. It forks the *code* but inherits the *protocol*
+wholesale, so every architectural dead end comes along for the ride. It's a
+maintenance fork of a design whose problems live in the spec. Meanwhile stock
+Xorg already exists, already works, and is packaged everywhere for the genuine
+X11 use cases (this repo's own `libre/` build leans on it).
+
+So the sane split is simple: if you want the modern, isolated, tear-free stack,
+run **Wayland** — it fixed the actual problems. If you genuinely need X11 —
+legacy apps, a keyboard-driven X WM like ratpoison, a nostalgia rice — run
+**plain Xorg**; it's stable, maintained-enough, and in every repo. XLibre sits
+in the gap between those two answering a question nobody with a working setup is
+asking. Just run X11 like a sane person: stock Xorg, no fork required.
+
 ### Default credentials
 
 | Account | Password      |
