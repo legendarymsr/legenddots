@@ -659,6 +659,49 @@ it installs `app-admin/sudo` instead and grants `wheel` via
 PRIV_ESC=sudo bash install.sh
 ```
 
+### OpenRC vs systemd
+
+This install uses **OpenRC** (`sys-apps/openrc`, Gentoo's default init) rather
+than systemd. The profile is a non-systemd hardened profile, `USE` carries
+`-systemd`, and `elogind` (systemd-logind carved out as a standalone daemon)
+provides the session/seat management a Wayland desktop needs.
+
+| | OpenRC | systemd |
+|---|---|---|
+| Scope | Init + service supervision, and little else | Init, services, logging, sessions, devices, network, timers, mounts, containers… |
+| Codebase | Small — C core + POSIX shell service scripts | Large, tightly integrated suite of binaries around a D-Bus core |
+| Service definition | Shell scripts in `/etc/init.d/` + config in `/etc/conf.d/` | Declarative `.service` unit files |
+| PID 1 | `/sbin/init` (openrc-init or sysvinit) | `systemd` itself |
+| Logging | Traditional syslog — here `sysklogd` writes plain text to `/var/log` | `journald` (indexed binary journal) |
+| Session / seat | `elogind` or `seatd` (this build uses both) | `systemd-logind` |
+| Socket activation | No | Yes |
+| Dependencies | Runs without D-Bus if you want | D-Bus is load-bearing |
+| Philosophy | Do one thing, compose with other tools | One integrated platform |
+
+Day-to-day it's `rc-update` and `rc-service` instead of `systemctl`:
+
+```sh
+rc-update add NetworkManager default   # enable at boot   (systemctl enable)
+rc-service  NetworkManager start        # start now        (systemctl start)
+rc-service  NetworkManager status       # check            (systemctl status)
+rc-update show                          # list enabled     (systemctl list-unit-files)
+```
+
+**One practical consequence worth knowing:** OpenRC has **no socket
+activation**. Under systemd, PipeWire/WirePlumber get started on demand the
+first time something opens their socket; under OpenRC nothing does that for you,
+so user audio daemons must be launched explicitly from the session — which is
+why `niri/config.kdl` starts `pipewire`/`wireplumber` via `spawn-at-startup`
+rather than relying on the init system to bring them up. Same reasoning applies
+to any per-session daemon you'd expect systemd user units to handle.
+
+Switching this build to systemd isn't a flag flip — it's a different profile
+(`default/linux/amd64/23.0/systemd`), swapping `elogind` for `systemd-logind`,
+and converting the OpenRC service registrations to unit enables. The non-systemd
+choice here is deliberate: a smaller, more auditable init with no D-Bus-coupled
+PID 1, matching the same minimal-attack-surface reasoning behind picking doas
+over sudo.
+
 ### Default credentials
 
 | Account | Password      |
