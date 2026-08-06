@@ -871,6 +871,13 @@ support. On a fresh install they're baked in by `install.sh`; on an existing
 system they land on the next `REBUILD_KERNEL=true` run of `setup` (which also
 installs the `exfatprogs`/`fuse` userspace).
 
+**`REBUILD_KERNEL=true` now emerges the latest 6.18 `gentoo-sources` first**,
+re-pointing `/usr/src/linux` at it, seeding `.config` from your running kernel
+(`/proc/config.gz`), applying every option below, building, and — if the version
+bumped — updating rEFInd's `initrd=` line to the new initramfs. That also repairs
+the incomplete-source problem below as a side effect, since it lays down a fresh
+tree.
+
 | Group | Config | Why |
 |-------|--------|-----|
 | **Removable media** | `EXFAT_FS=m`, `FUSE_FS=m` | exFAT is the norm on big USB sticks/SD cards and Ventoy's data partition; FUSE backs ntfs-3g, sshfs, mtpfs, etc. Userspace: `sys-fs/exfatprogs`, `sys-fs/fuse`. |
