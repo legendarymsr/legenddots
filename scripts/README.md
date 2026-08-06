@@ -90,13 +90,16 @@ them):
 click it, `Esc` to cancel. `.m` hands the current URL to `mpv` (yt-dlp plays
 YouTube etc. natively — much lighter than the embedded player on the Air).
 
-**Ad blocker:** blocks known ad/tracking domains at the network level, matched by
-host **suffix** (so `sub.doubleclick.net` is caught too) across ~45 built-ins —
-Google Ads, DoubleClick, Criteo, Taboola, plus analytics/telemetry (Segment,
-Amplitude, Mixpanel, Sentry, Clarity, …). Drop a hosts-format file at
-`~/.config/legendchrome/blocklist.txt` (e.g. [StevenBlack's hosts](https://github.com/StevenBlack/hosts))
-and it's merged in for thousands more. (That file is *read* only — no browsing
-data is ever written.)
+**Ad blocker — simple by default, one button to go heavy:**
+- **Default:** a short core list (~14 domains — DoubleClick, Google Ads, Criteo,
+  Taboola, …), matched by host **suffix** so `sub.doubleclick.net` is caught too.
+- **The `🛡` button** (top-right of the URL bar) extends it: merges the extra
+  analytics/telemetry set (Segment, Amplitude, Mixpanel, Sentry, Clarity, …) and
+  then either a local `~/.config/legendchrome/blocklist.txt` or, if you don't
+  have one, downloads [StevenBlack's hosts](https://github.com/StevenBlack/hosts)
+  in the background — thousands of domains. The button turns green and shows the
+  active count. (The download stays in memory; the local file is *read* only —
+  no browsing data is ever written.)
 
 **YouTube:** auto-skips skippable ads, speeds unskippable ads to 16× (muted),
 hides overlay/feed/masthead ads.
