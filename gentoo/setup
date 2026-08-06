@@ -509,18 +509,34 @@ fi
 # 13. REBUILD KERNEL (opt-in) — apply hardened .config (INIT_STACK_ALL_ZERO etc.)
 # Gated on the flag, not a checkpoint, so it can be re-triggered on demand.
 if [[ "$REBUILD_KERNEL" == "true" ]]; then
-  header "Rebuilding kernel with hardened config..."
+  header "Emerging latest 6.18 gentoo-sources + rebuilding kernel..."
+
+  # Pull the newest 6.18.x gentoo-sources. This also REPAIRS a corrupt/incomplete
+  # tree (the missing-scripts/config symptom) by laying down a clean copy.
+  emerge --oneshot "=sys-kernel/gentoo-sources-6.18*" \
+    || warn "gentoo-sources 6.18 emerge failed — check ACCEPT_KEYWORDS / portage tree"
+
+  # Point /usr/src/linux at the newest 6.18 tree (what eselect kernel set does).
+  NEWSRC=$(ls -d /usr/src/linux-6.18.*-gentoo* 2>/dev/null | sort -V | tail -1)
+  [[ -n "$NEWSRC" ]] && ln -sfn "$NEWSRC" /usr/src/linux
+
   KSRC=/usr/src/linux
-  # The kernel source tree must be complete. A gentoo-sources install missing
-  # scripts/config or the top-level Makefile can't be configured or built —
-  # re-emerge it cleanly first.
   if [[ ! -f "$KSRC/Makefile" || ! -x "$KSRC/scripts/config" ]]; then
-    echo "  ! Kernel source at $KSRC is incomplete (missing Makefile or scripts/config)."
-    echo "    Re-emerge it cleanly, then rerun with REBUILD_KERNEL=true:"
-    echo "      doas emerge --unmerge sys-kernel/gentoo-sources"
-    echo "      doas emerge sys-kernel/gentoo-sources && eselect kernel set 1"
+    echo "  ! Kernel source at $KSRC is still incomplete after emerge — investigate"
+    echo "    sys-kernel/gentoo-sources (unmerge + re-emerge, check disk space)."
   else
     cd "$KSRC"
+    # A freshly-emerged tree has no .config — seed it from the running kernel so
+    # we keep the existing hardware config, then layer our options on top.
+    if [[ ! -f .config ]]; then
+      if [[ -f /proc/config.gz ]]; then
+        zcat /proc/config.gz > .config
+      elif ls /boot/config-* >/dev/null 2>&1; then
+        cp "$(ls -t /boot/config-* | head -1)" .config
+      else
+        make defconfig
+      fi
+    fi
     # Hardening options (in case the hardening step was skipped).
     ./scripts/config -e CONFIG_INIT_STACK_ALL_ZERO \
                      -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \
@@ -549,9 +565,19 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
       # Out-of-tree modules (broadcom-sta wl.ko) must be recompiled against the
       # new kernel or WiFi breaks after reboot.
       emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
-      depmod -a "$(make -s kernelrelease)" 2>/dev/null || true
-      echo -e "${GREEN}Kernel rebuilt. Run 'bash gentoo/troubleshooting/verify-boot'${NC}"
-      echo -e "${GREEN}(if present) before rebooting into the new kernel.${NC}"
+      NEWVER=$(make -s kernelrelease)
+      depmod -a "$NEWVER" 2>/dev/null || true
+
+      # If the version bumped (new 6.18.x), the initramfs filename changed, so
+      # rEFInd's initrd= line must point at the new one or boot fails.
+      NEWINITRD=$(ls -t /boot/initramfs-*"$NEWVER"*.img 2>/dev/null | head -1)
+      if [[ -n "$NEWINITRD" && -f /boot/refind_linux.conf ]]; then
+        sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" \
+          /boot/refind_linux.conf \
+          && echo "  → refind_linux.conf initrd set to $(basename "$NEWINITRD")"
+      fi
+      echo -e "${GREEN}Kernel $NEWVER rebuilt. Run 'bash gentoo/troubleshooting/verify-boot'${NC}"
+      echo -e "${GREEN}before rebooting into it.${NC}"
     else
       warn "Kernel build failed — the new kernel was NOT installed. Fix the error"
       warn "above and rerun with REBUILD_KERNEL=true. Your current kernel is untouched."
