@@ -211,6 +211,7 @@ if ! step_done base_system; then
     sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
     net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
+    sys-fs/exfatprogs sys-fs/fuse \
     x11-terms/alacritty llvm-core/llvm llvm-core/clang
   mark_step base_system
 fi
@@ -435,13 +436,29 @@ fi
 if [[ "$REBUILD_KERNEL" == "true" ]]; then
   header "Rebuilding kernel with hardened config..."
   KSRC=/usr/src/linux
-  if [[ -f "$KSRC/Makefile" ]]; then
+  # The kernel source tree must be complete. A gentoo-sources install missing
+  # scripts/config or the top-level Makefile can't be configured or built —
+  # re-emerge it cleanly first.
+  if [[ ! -f "$KSRC/Makefile" || ! -x "$KSRC/scripts/config" ]]; then
+    echo "  ! Kernel source at $KSRC is incomplete (missing Makefile or scripts/config)."
+    echo "    Re-emerge it cleanly, then rerun with REBUILD_KERNEL=true:"
+    echo "      doas emerge --unmerge sys-kernel/gentoo-sources"
+    echo "      doas emerge sys-kernel/gentoo-sources && eselect kernel set 1"
+  else
     cd "$KSRC"
-    # Ensure the hardening options are set even if the hardening step was skipped.
+    # Hardening options (in case the hardening step was skipped).
     ./scripts/config -e CONFIG_INIT_STACK_ALL_ZERO \
                      -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \
                      -e CONFIG_INIT_ON_FREE_DEFAULT_ON \
                      -m CONFIG_MOUSE_BCM5974
+    # Removable media: exFAT + FUSE (Ventoy data partition, ntfs-3g, sshfs…).
+    ./scripts/config -m CONFIG_EXFAT_FS -m CONFIG_FUSE_FS
+    # Virtualisation: KVM + QEMU/libvirt guest networking.
+    ./scripts/config -e CONFIG_KVM -e CONFIG_KVM_INTEL -e CONFIG_VHOST_NET \
+                     -e CONFIG_TUN -e CONFIG_BRIDGE
+    # Waydroid: Android binder container (ashmem is gone on 6.x — memfd is used).
+    ./scripts/config -e CONFIG_ANDROID -e CONFIG_ANDROID_BINDER_IPC \
+                     -e CONFIG_ANDROID_BINDERFS
     make olddefconfig
     # Same install path as gentoo/install.sh: make install copies vmlinuz to
     # /boot (rEFInd auto-detects it); genkernel regenerates the initramfs.
@@ -455,9 +472,7 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     # new kernel or WiFi breaks after reboot.
     emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
     depmod -a "$(make -s kernelrelease)"
-    echo -e "${GREEN}Kernel rebuilt. Reboot to run the hardened kernel.${NC}"
-  else
-    echo "  ! Kernel source not found at $KSRC — skipping kernel rebuild"
+    echo -e "${GREEN}Kernel rebuilt. Reboot to run the new kernel.${NC}"
   fi
 fi
 
