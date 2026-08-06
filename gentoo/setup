@@ -444,56 +444,66 @@ if ! step_done bcm5974; then
 fi
 
 # 12b. VIRTUALIZATION — QEMU/KVM + libvirt
+# Non-blocking: a failed emerge here must not skip the dotfiles/kernel steps, and
+# the step is only checkpointed on success so a rerun retries cleanly.
 if [[ "$INSTALL_VIRT" == "true" ]] && ! step_done virt; then
   header "Installing QEMU/KVM + libvirt..."
 
   # QEMU needs its target list set, or it builds no system emulators. Append to
   # make.conf idempotently (make_conf step may already be checkpointed).
-  grep -q '^QEMU_SOFTMMU_TARGETS' /etc/portage/make.conf || {
-    echo 'QEMU_SOFTMMU_TARGETS="x86_64"'          >> /etc/portage/make.conf
-    echo 'QEMU_USER_TARGETS="x86_64"'             >> /etc/portage/make.conf
-  }
+  grep -q '^QEMU_SOFTMMU_TARGETS' /etc/portage/make.conf || \
+    printf 'QEMU_SOFTMMU_TARGETS="x86_64"\nQEMU_USER_TARGETS="x86_64"\n' \
+      >> /etc/portage/make.conf
+  mkdir -p /etc/portage/package.use
   # USE flags: libvirt needs the qemu driver + its virtual network; qemu wants
   # spice/usbredir for usable desktop VMs and vhost-net for fast guest NICs.
-  echo "app-emulation/libvirt qemu virt-network" > /etc/portage/package.use/libvirt
+  echo "app-emulation/libvirt qemu virt-network"          > /etc/portage/package.use/libvirt
   echo "app-emulation/qemu spice usbredir vhost-net gtk"  > /etc/portage/package.use/qemu
 
-  emerge app-emulation/qemu app-emulation/libvirt app-emulation/virt-manager \
-         net-misc/bridge-utils
-
-  # kvm group owns /dev/kvm; libvirt group lets the user talk to libvirtd.
-  groupadd -f kvm; groupadd -f libvirt
-  usermod -aG kvm,libvirt legend
-
-  # OpenRC services (no systemd here): the libvirt daemons + default network.
-  rc-update add libvirtd default
-  rc-service libvirtd start 2>/dev/null || warn "start libvirtd after reboot"
-  # Autostart libvirt's default NAT network (virbr0) if virsh is available.
-  if command -v virsh >/dev/null 2>&1; then
-    virsh net-autostart default 2>/dev/null || true
-    virsh net-start default     2>/dev/null || true
+  if emerge app-emulation/qemu app-emulation/libvirt app-emulation/virt-manager \
+            net-misc/bridge-utils; then
+    # kvm group owns /dev/kvm; libvirt group lets the user talk to libvirtd.
+    groupadd -f kvm; groupadd -f libvirt
+    id legend &>/dev/null && usermod -aG kvm,libvirt legend || true
+    # OpenRC services (no systemd here): libvirt daemon + default NAT network.
+    rc-update add libvirtd default 2>/dev/null || true
+    rc-service libvirtd start 2>/dev/null || warn "start libvirtd after reboot"
+    if command -v virsh >/dev/null 2>&1; then
+      virsh net-autostart default 2>/dev/null || true
+      virsh net-start     default 2>/dev/null || true
+    fi
+    mark_step virt
+    echo -e "${GREEN}QEMU/KVM ready — launch virt-manager, or use virsh.${NC}"
+  else
+    warn "QEMU/libvirt emerge failed — resolve it and rerun setup; continuing."
   fi
-  mark_step virt
 fi
 
-# 12c. WAYDROID — Android container (needs the binder kernel config + reboot)
+# 12c. WAYDROID — Android container (needs the binder kernel config + a reboot)
+# Waydroid is not reliably packaged in ::gentoo; try the overlay and fall back to
+# a documented upstream install (see troubleshooting/README.md). Non-blocking.
 if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
   header "Installing Waydroid..."
-  # waydroid lives in the GURU overlay (already enabled in step 5). Its network
-  # script uses iptables/nftables; pull iptables in explicitly.
-  emerge app-emulation/waydroid net-firewall/iptables \
-    || warn "waydroid emerge failed — is the guru overlay synced? (emaint sync --repo guru)"
+  emaint sync --repo guru >/dev/null 2>&1 || true
+  # iptables backs Waydroid's container networking regardless of how waydroid
+  # itself is installed.
+  emerge net-firewall/iptables 2>/dev/null || warn "iptables emerge failed"
 
-  if command -v waydroid >/dev/null 2>&1; then
+  if emerge app-emulation/waydroid 2>/dev/null && command -v waydroid >/dev/null 2>&1; then
     rc-update add waydroid-container default 2>/dev/null || true
-    echo -e "${CYAN}Waydroid installed. It needs the binder kernel config (this${NC}"
-    echo -e "${CYAN}setup enables it) — so AFTER rebuilding the kernel and rebooting:${NC}"
+    echo -e "${GREEN}Waydroid installed.${NC} It needs the binder kernel config (this"
+    echo "setup enables it), so AFTER rebuilding the kernel and rebooting:"
     echo "  doas rc-service waydroid-container start"
     echo "  doas waydroid init          # downloads the Android images (~1 GB)"
-    echo "  waydroid session start &     # from inside your niri session"
+    echo "  waydroid session start &     # from inside your niri (Wayland) session"
     echo "  waydroid show-full-ui"
+    mark_step waydroid
+  else
+    warn "Waydroid isn't in your overlays (it's not reliably packaged for Gentoo)."
+    warn "Install it upstream instead — see the 'Waydroid' section of"
+    warn "  gentoo/troubleshooting/README.md — then re-run to register the service."
+    # Not checkpointed: a later run (after you add an overlay) will retry.
   fi
-  mark_step waydroid
 fi
 
 # 13. REBUILD KERNEL (opt-in) — apply hardened .config (INIT_STACK_ALL_ZERO etc.)
@@ -527,17 +537,25 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     make olddefconfig
     # Same install path as gentoo/install.sh: make install copies vmlinuz to
     # /boot (rEFInd auto-detects it); genkernel regenerates the initramfs.
-    make -j3 && make modules_install && make install
-    if command -v genkernel >/dev/null 2>&1; then
-      genkernel --no-clean --no-mrproper --kernel-config="$KSRC/.config" initramfs
+    # Guarded so a build failure warns and lets the rest of setup finish (the
+    # dotfiles step runs after this) instead of aborting the whole script.
+    if make -j3 && make modules_install && make install; then
+      if command -v genkernel >/dev/null 2>&1; then
+        genkernel --no-clean --no-mrproper --kernel-config="$KSRC/.config" initramfs \
+          || warn "genkernel failed — initramfs NOT regenerated; check before reboot"
+      else
+        echo "  ! genkernel not found — initramfs NOT regenerated; emerge sys-kernel/genkernel and rerun if your boot needs one"
+      fi
+      # Out-of-tree modules (broadcom-sta wl.ko) must be recompiled against the
+      # new kernel or WiFi breaks after reboot.
+      emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
+      depmod -a "$(make -s kernelrelease)" 2>/dev/null || true
+      echo -e "${GREEN}Kernel rebuilt. Run 'bash gentoo/troubleshooting/verify-boot'${NC}"
+      echo -e "${GREEN}(if present) before rebooting into the new kernel.${NC}"
     else
-      echo "  ! genkernel not found — initramfs NOT regenerated; emerge sys-kernel/genkernel and rerun if your boot needs one"
+      warn "Kernel build failed — the new kernel was NOT installed. Fix the error"
+      warn "above and rerun with REBUILD_KERNEL=true. Your current kernel is untouched."
     fi
-    # Out-of-tree modules (broadcom-sta wl.ko) must be recompiled against the
-    # new kernel or WiFi breaks after reboot.
-    emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
-    depmod -a "$(make -s kernelrelease)"
-    echo -e "${GREEN}Kernel rebuilt. Reboot to run the new kernel.${NC}"
   fi
 fi
 
@@ -550,24 +568,30 @@ if [[ "$REBUILD_WORLD" == "true" ]]; then
 fi
 
 # ── DOTFILES (always runs — safe to re-run on existing installs) ──────────────
+# Guarded with `|| warn`: a network hiccup on git pull must not abort setup
+# right before the final instructions, and the symlinks are idempotent.
 header "Updating dotfiles..."
-su - legend -c "
-  if [[ -d ~/legenddots ]]; then
-    cd ~/legenddots && git pull
-  else
-    git clone https://github.com/legendarymsr/legenddots ~/legenddots
-  fi
-  mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim
-  ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
-  ln -sfn ~/legenddots/.zshrc          ~/.zshrc
-  ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
-  ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
-  ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
-  ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
-  ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
-  ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
-  ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
-"
+if id legend &>/dev/null; then
+  su - legend -c '
+    if [[ -d ~/legenddots ]]; then
+      cd ~/legenddots && git pull --ff-only 2>/dev/null || git pull 2>/dev/null || true
+    else
+      git clone https://github.com/legendarymsr/legenddots ~/legenddots || true
+    fi
+    mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim
+    ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
+    ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+    ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
+    ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
+    ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
+    ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
+    ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
+    ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
+    ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
+  ' || warn "dotfiles update had issues (network?) — symlinks may be partial"
+else
+  warn "user 'legend' doesn't exist yet — skipping dotfiles (localization/user step must run first)"
+fi
 
 echo -e "\n${GREEN}Done.${NC}"
 echo ""
