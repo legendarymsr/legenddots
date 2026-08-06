@@ -511,6 +511,13 @@ fi
 if [[ "$REBUILD_KERNEL" == "true" ]]; then
   header "Emerging latest 6.18 gentoo-sources + rebuilding kernel..."
 
+  # Sync the portage tree first so the newest 6.18 longterm (6.18.42+) is
+  # actually available to emerge — gentoo-sources tracks kernel.org with a lag,
+  # so a stale tree would otherwise pull an older 6.18.x.
+  echo "  → syncing portage tree (for the freshest 6.18)..."
+  emerge-webrsync >/dev/null 2>&1 || emaint sync -a >/dev/null 2>&1 \
+    || warn "portage sync failed — will emerge whatever 6.18.x your tree already has"
+
   # Pull the newest 6.18.x gentoo-sources. This also REPAIRS a corrupt/incomplete
   # tree (the missing-scripts/config symptom) by laying down a clean copy.
   emerge --oneshot "=sys-kernel/gentoo-sources-6.18*" \
