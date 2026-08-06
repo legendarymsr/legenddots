@@ -55,22 +55,43 @@ python browser
 
 ## legend-gui
 
-A custom Qt6 browser (`LegendChrome`) with built-in ad blocking and YouTube ad skipping.
+A custom Qt6 browser (`LegendChrome`) with tabs, network-level ad blocking,
+YouTube ad-skipping, and persistent logins. Tokyo Night themed.
 
 **Dependencies:** `PyQt6`, `PyQt6-WebEngine`
 
 ```sh
-python legend-gui
+python legend-gui [url]
 ```
 
-**Ad blocker:** Blocks requests to known ad/tracking domains at the network level
-(Google Ads, DoubleClick, Facebook Pixel, Criteo, Hotjar, OneTrust, Taboola, etc.)
+**Tabs & navigation:** multiple closable/movable tabs, smart URL bar (types that
+aren't URLs become a Brave search), per-tab load progress, and keyboard shortcuts:
 
-**YouTube:** Auto-skips skippable ads, speeds up unskippable ads to 16x, hides
-overlay ads and cookie banners via injected CSS/JS.
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| `Ctrl+T` | new tab | `Ctrl+W` | close tab |
+| `Ctrl+L` | focus URL bar | `Ctrl+R` / `F5` | reload |
+| `Alt+←` / `Alt+→` | back / forward | `Ctrl+Tab` | next tab |
+| `Ctrl+±` / `Ctrl+0` | zoom / reset | `F11` | fullscreen |
+| `Alt+Home` | home | `Ctrl+Q` | quit |
 
-**Styling:** JetBrains Mono Nerd Font forced site-wide, dark mode enabled via
-Chromium flags, Tokyo Night URL bar.
+**Ad blocker:** blocks known ad/tracking domains at the network level, matched by
+host **suffix** (so `sub.doubleclick.net` is caught too), across ~45 built-in
+domains — Google Ads, DoubleClick, Criteo, Taboola, plus analytics/telemetry
+(Segment, Amplitude, Mixpanel, Sentry, Clarity, …). Drop a hosts-format file at
+`~/.config/legendchrome/blocklist.txt` (e.g. [StevenBlack's hosts](https://github.com/StevenBlack/hosts))
+and it's merged in for thousands more.
+
+**YouTube:** auto-skips skippable ads, speeds unskippable ads to 16× (muted),
+hides overlay/feed/masthead ads and cookie banners via injected CSS/JS.
+
+**Persistence:** a named profile at `~/.config/legendchrome/` keeps cookies and
+logins across restarts (with cache + downloads to `~/Downloads`). A modern
+Chrome user-agent is set so sites don't serve the QtWebEngine fallback.
+
+**Styling:** JetBrains Mono Nerd Font forced site-wide, Chromium dark mode,
+Tokyo Night URL bar and tab bar. New-window/`target=_blank` links open as tabs;
+video fullscreen works.
 
 ---
 

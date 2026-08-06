@@ -1,136 +1,293 @@
 #!/usr/bin/env python3
+"""LegendChrome — a lean PyQt6 browser: tabs, network ad-blocking, YouTube
+ad-skipping, persistent logins. Tokyo Night themed.
+
+Deps:  pip install PyQt6 PyQt6-WebEngine
+Run:   python legend-gui  [url]
+
+Optional big blocklist: drop a hosts-format file at
+~/.config/legendchrome/blocklist.txt (e.g. StevenBlack's hosts) and it's merged
+with the built-in list at startup.
+"""
 import sys
 import os
-from PyQt6.QtCore import QUrl
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLineEdit, QVBoxLayout, QWidget
-from PyQt6.QtWebEngineCore import QWebEngineUrlRequestInterceptor, QWebEngineProfile, QWebEngineScript
+from pathlib import Path
+
+os.environ.setdefault(
+    "QTWEBENGINE_CHROMIUM_FLAGS",
+    "--blink-settings=forceDarkModeEnabled=true "
+    "--enable-features=WebRTCPipeWireCapturer",
+)
+
+from PyQt6.QtCore import QUrl, Qt
+from PyQt6.QtGui import QKeySequence, QShortcut, QAction
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QLineEdit, QVBoxLayout, QHBoxLayout, QWidget,
+    QTabWidget, QToolButton, QStyle,
+)
+from PyQt6.QtWebEngineCore import (
+    QWebEngineUrlRequestInterceptor, QWebEngineProfile, QWebEngineScript,
+    QWebEnginePage, QWebEngineSettings,
+)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
-# --- 0. FORCE DARK MODE ---
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--blink-settings=forceDarkModeEnabled=true"
+CONFIG_DIR = Path.home() / ".config" / "legendchrome"
+HOME_URL = "https://search.brave.com"
+SEARCH_URL = "https://search.brave.com/search?q={}"
 
-# --- 1. THE NETWORK FILTER ---
+# Tokyo Night
+BG, FG, ACCENT, DIM = "#1a1b26", "#c0caf5", "#7aa2f7", "#414868"
+
+BUILTIN_BLOCKLIST = {
+    "doubleclick.net", "googleadservices.com", "google-analytics.com",
+    "googlesyndication.com", "pagead2.googlesyndication.com", "adservice.google.com",
+    "googletagmanager.com", "googletagservices.com", "g.doubleclick.net",
+    "facebook.com/tr", "connect.facebook.net", "criteo.com", "criteo.net",
+    "amazon-adsystem.com", "adnxs.com", "hotjar.com", "cookiebot.com",
+    "onetrust.com", "cookielaw.org", "taboola.com", "outbrain.com",
+    "scorecardresearch.com", "quantserve.com", "moatads.com", "adsrvr.org",
+    "rubiconproject.com", "pubmatic.com", "openx.net", "casalemedia.com",
+    "bidswitch.net", "sharethrough.com", "smartadserver.com", "yieldmo.com",
+    "mixpanel.com", "segment.com", "amplitude.com", "fullstory.com",
+    "bugsnag.com", "sentry.io", "branch.io", "appsflyer.com", "adjust.com",
+    "chartbeat.com", "newrelic.com", "nr-data.net", "clarity.ms",
+}
+
+
+def load_blocklist():
+    """Built-in set plus an optional hosts-format file, matched by host suffix."""
+    domains = set(BUILTIN_BLOCKLIST)
+    extra = CONFIG_DIR / "blocklist.txt"
+    if extra.exists():
+        for line in extra.read_text(errors="ignore").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # "0.0.0.0 domain" / "127.0.0.1 domain" / bare "domain"
+            parts = line.split()
+            host = parts[-1]
+            if host not in ("localhost", "0.0.0.0", "127.0.0.1"):
+                domains.add(host)
+    return domains
+
+
 class AdBlocker(QWebEngineUrlRequestInterceptor):
-    def __init__(self):
+    def __init__(self, domains):
         super().__init__()
-        self.blacklist = [
-            "doubleclick.net", "googleadservices.com", "google-analytics.com",
-            "facebook.com/tr", "criteo.com", "amazon-adsystem.com",
-            "adnxs.com", "hotjar.com", "cookiebot.com", "onetrust.com",
-            "pagead2.googlesyndication.com", "taboola.com", "outbrain.com"
-        ]
+        self.domains = domains
 
     def interceptRequest(self, info):
-        url = info.requestUrl().toString()
-        for bad in self.blacklist:
-            if bad in url:
-                print(f"🛡️ BLOCKED: {url}")
+        host = info.requestUrl().host()
+        if not host:
+            return
+        parts = host.split(".")
+        # check the host and each parent domain against the blocklist set
+        for i in range(len(parts) - 1):
+            if ".".join(parts[i:]) in self.domains:
+                info.block(True)
+                return
+        # substring paths like facebook.com/tr
+        full = info.requestUrl().toString()
+        for d in ("facebook.com/tr",):
+            if d in full:
                 info.block(True)
                 return
 
-# --- 2. THE GUI FRAME ---
+
+YOUTUBE_JS = r"""
+(function() {
+    const css = document.createElement('style');
+    css.innerText = `
+      body,p,h1,h2,h3,span,div,a { font-family:'JetBrainsMono Nerd Font',monospace !important; }
+      #cookie-banner,.cookie-banner,#onetrust-banner-sdk,.fc-ab-root,
+      ytd-ad-slot-renderer,.ytp-ad-module,.video-ads,.ytp-ad-overlay-container,
+      ytd-banner-promo-renderer-background,ytd-in-feed-ad-layout-renderer,
+      #masthead-ad,.ytd-display-ad-renderer { display:none !important; }`;
+    document.documentElement.appendChild(css);
+
+    setInterval(() => {
+        const skip = document.querySelector(
+          '.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.videoAdUiSkipButton,.ytp-skip-ad-button');
+        if (skip) skip.click();
+        const adMod = document.querySelector('.ytp-ad-module,.ad-showing');
+        const vid = document.querySelector('video');
+        if (vid && document.querySelector('.ad-showing, .ytp-ad-player-overlay')) {
+            vid.playbackRate = 16.0; vid.muted = true;
+        }
+        const pop = document.querySelector('ytd-popup-container tp-yt-paper-dialog');
+        if (pop) pop.remove();
+    }, 400);
+})();
+"""
+
+
+class LegendPage(QWebEnginePage):
+    """A page bound to the shared profile that opens new windows as new tabs."""
+    def __init__(self, profile, window):
+        super().__init__(profile, window)
+        self.window = window
+        s = self.settings()
+        s.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)
+        self.fullScreenRequested.connect(lambda req: (req.accept(),
+            self.window.showNormal() if self.window.isFullScreen() else self.window.showFullScreen()))
+
+    def createWindow(self, _type):
+        return self.window.add_tab().page()
+
+
 class LegendChrome(QMainWindow):
-    def __init__(self):
+    def __init__(self, start_url):
         super().__init__()
         self.setWindowTitle("LegendChrome // SILENCER")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(100, 100, 1280, 820)
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-        self.interceptor = AdBlocker()
-        self.profile = QWebEngineProfile.defaultProfile()
+        # Persistent profile — cookies/logins survive restarts.
+        self.profile = QWebEngineProfile("legendchrome", self)
+        self.profile.setPersistentStoragePath(str(CONFIG_DIR / "storage"))
+        self.profile.setCachePath(str(CONFIG_DIR / "cache"))
+        self.profile.setHttpUserAgent(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/126.0.0.0 Safari/537.36")
+        self.interceptor = AdBlocker(load_blocklist())
         self.profile.setUrlRequestInterceptor(self.interceptor)
-        
-        self.inject_killer_scripts()
+        self.profile.downloadRequested.connect(self._on_download)
+        self._install_scripts()
 
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
+        # URL bar + tabs
         self.url_bar = QLineEdit()
-        self.url_bar.setPlaceholderText("Enter URL...")
-        self.url_bar.returnPressed.connect(self.navigate_to_url)
-        self.url_bar.setStyleSheet("""
-            QLineEdit {
-                background-color: #1a1b26; color: #c0caf5;
-                border: none; padding: 10px;
-                font-family: 'JetBrainsMono Nerd Font'; font-size: 14px;
-                border-bottom: 2px solid #7aa2f7;
-            }
-        """)
+        self.url_bar.setPlaceholderText("Search Brave or enter URL…")
+        self.url_bar.returnPressed.connect(self.navigate)
+        self.url_bar.setStyleSheet(f"""
+            QLineEdit {{ background:{BG}; color:{FG}; border:none; padding:9px 12px;
+                        font-family:'JetBrainsMono Nerd Font'; font-size:14px;
+                        border-bottom:2px solid {ACCENT}; }}""")
 
-        self.browser = QWebEngineView()
-        self.browser.setUrl(QUrl("https://www.youtube.com")) 
-        self.browser.urlChanged.connect(self.update_url_bar)
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setTabsClosable(True)
+        self.tabs.setMovable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self._tab_changed)
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border:0; }}
+            QTabBar::tab {{ background:{BG}; color:{FG}; padding:6px 14px; border:0;
+                            font-family:'JetBrainsMono Nerd Font'; }}
+            QTabBar::tab:selected {{ border-bottom:2px solid {ACCENT}; }}
+            QTabBar::tab:!selected {{ color:{DIM}; }}""")
 
-        main_layout.addWidget(self.url_bar)
-        main_layout.addWidget(self.browser)
-
-        container = QWidget()
-        container.setLayout(main_layout)
+        layout = QVBoxLayout(); layout.setContentsMargins(0, 0, 0, 0); layout.setSpacing(0)
+        layout.addWidget(self.url_bar)
+        layout.addWidget(self.tabs)
+        container = QWidget(); container.setLayout(layout)
         self.setCentralWidget(container)
+        self.setStyleSheet(f"QMainWindow {{ background:{BG}; }}")
 
-    def inject_killer_scripts(self):
-        # A. CSS: Force Fonts & Hide Layout Bloat
-        css_raw = """
-        body, p, h1, h2, h3, span, div, a { 
-            font-family: 'JetBrainsMono Nerd Font', monospace !important; 
-        }
-        #cookie-banner, .cookie-banner, #onetrust-banner-sdk, 
-        .fc-ab-root, ytd-ad-slot-renderer, .ytp-ad-module,
-        .video-ads, .ytp-ad-overlay-container,
-        ytd-banner-promo-renderer-background
-        { display: none !important; }
-        """
-        clean_css = css_raw.replace('\n', ' ')
-        
-        # B. JS: The Auto-Skipper
-        # We use a placeholder ###CSS### to avoid Python syntax errors
-        js_template = """
-        (function() {
-            const style = document.createElement('style');
-            style.innerText = `###CSS###`;
-            document.head.appendChild(style);
+        self._shortcuts()
+        self.add_tab(start_url)
 
-            setInterval(() => {
-                const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .videoAdUiSkipButton');
-                const adVideo = document.querySelector('video');
-                const adOverlay = document.querySelector('.ytp-ad-module');
-                
-                if (skipBtn) { 
-                    skipBtn.click(); 
-                    console.log('LegendChrome: Ad Skipped');
-                }
-                
-                if (adOverlay && adOverlay.children.length > 0 && adVideo) {
-                    adVideo.playbackRate = 16.0;
-                    adVideo.muted = true;
-                }
-                
-                const popup = document.querySelector('ytd-popup-container');
-                if (popup) popup.style.display = 'none';
-            }, 500);
-        })();
-        """
-        
-        # Safe Injection
-        final_js = js_template.replace("###CSS###", clean_css)
-        
-        script = QWebEngineScript()
-        script.setName("KillerScript")
-        script.setSourceCode(final_js)
-        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
-        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-        self.profile.scripts().insert(script)
+    # ── tabs ──────────────────────────────────────────────────────────────
+    def add_tab(self, url=None):
+        view = QWebEngineView()
+        view.setPage(LegendPage(self.profile, self))
+        view.urlChanged.connect(lambda q, v=view: self._url_changed(v, q))
+        view.titleChanged.connect(lambda t, v=view: self._title_changed(v, t))
+        view.loadProgress.connect(lambda p, v=view: self._progress(v, p))
+        idx = self.tabs.addTab(view, "New Tab")
+        self.tabs.setCurrentIndex(idx)
+        view.setUrl(QUrl(url or HOME_URL))
+        return view
 
-    def navigate_to_url(self):
-        url = self.url_bar.text()
-        if not url.startswith("http"): url = "https://" + url
-        self.browser.setUrl(QUrl(url))
+    def close_tab(self, idx):
+        if self.tabs.count() <= 1:
+            self.add_tab()  # keep at least one
+        w = self.tabs.widget(idx)
+        self.tabs.removeTab(idx)
+        w.deleteLater()
 
-    def update_url_bar(self, q):
-        self.url_bar.setText(q.toString())
+    def current(self):
+        return self.tabs.currentWidget()
+
+    def _tab_changed(self, _):
+        v = self.current()
+        if v:
+            self.url_bar.setText(v.url().toString())
+
+    def _url_changed(self, view, q):
+        if view is self.current():
+            self.url_bar.setText(q.toString())
+
+    def _title_changed(self, view, title):
+        idx = self.tabs.indexOf(view)
+        if idx >= 0:
+            self.tabs.setTabText(idx, (title[:22] + "…") if len(title) > 23 else title or "…")
+
+    def _progress(self, view, pct):
+        # Show load progress in the tab label while loading.
+        if 0 < pct < 100:
+            idx = self.tabs.indexOf(view)
+            if idx >= 0:
+                self.tabs.setTabText(idx, f"… {pct}%")
+
+    # ── navigation ────────────────────────────────────────────────────────
+    def navigate(self):
+        text = self.url_bar.text().strip()
+        if not text:
+            return
+        if " " in text or ("." not in text and not text.startswith(("http", "localhost", "about:"))):
+            url = SEARCH_URL.format(QUrl.toPercentEncoding(text).data().decode())
+        elif not text.startswith(("http://", "https://", "about:")):
+            url = "https://" + text
+        else:
+            url = text
+        self.current().setUrl(QUrl(url))
+
+    def _install_scripts(self):
+        s = QWebEngineScript()
+        s.setName("KillerScript")
+        s.setSourceCode(YOUTUBE_JS)
+        s.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
+        s.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        s.setRunsOnSubFrames(False)
+        self.profile.scripts().insert(s)
+
+    def _on_download(self, item):
+        dest = Path.home() / "Downloads"
+        dest.mkdir(exist_ok=True)
+        item.setDownloadDirectory(str(dest))
+        item.accept()
+        print(f"⬇ downloading {item.downloadFileName()} → {dest}")
+
+    # ── shortcuts ─────────────────────────────────────────────────────────
+    def _shortcuts(self):
+        def sc(seq, fn):
+            QShortcut(QKeySequence(seq), self, activated=fn)
+        sc("Ctrl+T", lambda: (self.add_tab(), self.url_bar.setFocus()))
+        sc("Ctrl+W", lambda: self.close_tab(self.tabs.currentIndex()))
+        sc("Ctrl+L", lambda: (self.url_bar.setFocus(), self.url_bar.selectAll()))
+        sc("Ctrl+R", lambda: self.current().reload())
+        sc("F5", lambda: self.current().reload())
+        sc("Alt+Left", lambda: self.current().back())
+        sc("Alt+Right", lambda: self.current().forward())
+        sc("Ctrl+Tab", lambda: self.tabs.setCurrentIndex((self.tabs.currentIndex() + 1) % self.tabs.count()))
+        sc("Ctrl+Shift+Tab", lambda: self.tabs.setCurrentIndex((self.tabs.currentIndex() - 1) % self.tabs.count()))
+        sc("Ctrl+=", lambda: self.current().setZoomFactor(self.current().zoomFactor() + 0.1))
+        sc("Ctrl++", lambda: self.current().setZoomFactor(self.current().zoomFactor() + 0.1))
+        sc("Ctrl+-", lambda: self.current().setZoomFactor(self.current().zoomFactor() - 0.1))
+        sc("Ctrl+0", lambda: self.current().setZoomFactor(1.0))
+        sc("F11", lambda: self.showNormal() if self.isFullScreen() else self.showFullScreen())
+        sc("Ctrl+Q", self.close)
+        sc("Alt+Home", lambda: self.current().setUrl(QUrl(HOME_URL)))
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = LegendChrome()
-    window.show()
+    start = sys.argv[1] if len(sys.argv) > 1 else HOME_URL
+    if not start.startswith(("http", "about:")):
+        start = "https://" + start
+    win = LegendChrome(start)
+    win.show()
     sys.exit(app.exec())
