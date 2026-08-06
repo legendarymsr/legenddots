@@ -66,7 +66,9 @@ echo 262144 > /proc/sys/vm/max_map_count
 if ! step_done portage_sync; then
   header "Syncing portage tree..."
   emerge-webrsync
-  eselect profile set default/linux/amd64/23.0/hardened
+  # no-multilib profile: a genuinely 32-bit-free system. Enforces ABI_X86=64 and
+  # drops the 32-bit toolchain entirely (nothing here needs it — no Wine/Steam).
+  eselect profile set default/linux/amd64/23.0/no-multilib/hardened
   mark_step portage_sync
 fi
 
@@ -122,8 +124,9 @@ if ! step_done package_use; then
   echo "gui-apps/waybar tray wireplumber"               > /etc/portage/package.use/waybar
   echo "gui-apps/swaybg gdk-pixbuf"                    > /etc/portage/package.use/swaybg
   echo "x11-libs/gdk-pixbuf jpeg"                      > /etc/portage/package.use/gdk-pixbuf
-  # No 32-bit multilib toolchain — halves gcc build time. Safe on a pure-64-bit
-  # box (ABI_X86="64"); remove this if you ever need Wine or 32-bit binaries.
+  # Belt-and-suspenders: the no-multilib profile already forces this off, but
+  # pinning it keeps gcc 32-bit-free even if the profile ever changes. Remove
+  # both this and the no-multilib profile if you ever need Wine / 32-bit binaries.
   echo "sys-devel/gcc -multilib"                       > /etc/portage/package.use/gcc
   echo "media-fonts/nerdfonts jetbrainsmono"            > /etc/portage/package.use/nerdfonts
   echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
@@ -175,7 +178,8 @@ if ! step_done wd40; then
     echo "profile-formats = portage-2" >> /var/db/repos/local/metadata/layout.conf
     mkdir -p /var/db/repos/local/profiles/wd40-hardened
     echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
-    { echo "gentoo:default/linux/amd64/23.0/hardened"
+    # Parent on the no-multilib hardened profile — keeps the system 32-bit-free.
+    { echo "gentoo:default/linux/amd64/23.0/no-multilib/hardened"
       echo "gentoo:features/wd40"
     } > /var/db/repos/local/profiles/wd40-hardened/parent
     echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc

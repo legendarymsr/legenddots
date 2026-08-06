@@ -118,7 +118,7 @@ echo 262144 > /proc/sys/vm/max_map_count
 if ! step_done portage_sync; then
   header "Syncing portage tree..."
   emerge-webrsync
-  eselect profile set default/linux/amd64/23.0/hardened
+  eselect profile set default/linux/amd64/23.0/no-multilib/hardened
   mark_step portage_sync
 fi
 
@@ -340,7 +340,7 @@ if ! step_done wd40; then
     mkdir -p /var/db/repos/local/profiles/wd40-hardened
     echo "8" > /var/db/repos/local/profiles/wd40-hardened/eapi
     {
-      echo "gentoo:default/linux/amd64/23.0/hardened"
+      echo "gentoo:default/linux/amd64/23.0/no-multilib/hardened"
       echo "gentoo:features/wd40"
     } > /var/db/repos/local/profiles/wd40-hardened/parent
     echo "amd64 wd40-hardened stable" > /var/db/repos/local/profiles/profiles.desc
