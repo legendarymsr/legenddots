@@ -434,6 +434,31 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_EXT4_FS
   ./scripts/config -e CONFIG_BLK_DEV_SD
 
+  # --- REMOVABLE MEDIA: exFAT + FUSE ---
+  # exFAT is the norm on large USB sticks and SD cards (and Ventoy's data
+  # partition); FUSE backs userspace filesystems (ntfs-3g, sshfs, mtpfs, etc.).
+  # Built as modules so they load on demand.
+  ./scripts/config -m CONFIG_EXFAT_FS
+  ./scripts/config -m CONFIG_FUSE_FS
+
+  # --- VIRTUALISATION: KVM + networking for QEMU/libvirt ---
+  # Haswell is Intel, so kvm_intel. vhost-net accelerates guest networking;
+  # tun + bridge provide the tap/bridge devices libvirt/QEMU wire guests to.
+  ./scripts/config -e CONFIG_KVM
+  ./scripts/config -e CONFIG_KVM_INTEL
+  ./scripts/config -e CONFIG_VHOST_NET
+  ./scripts/config -e CONFIG_TUN
+  ./scripts/config -e CONFIG_BRIDGE
+
+  # --- WAYDROID: Android container (binder) ---
+  # Waydroid runs a full Android userspace in an LXC container over the kernel's
+  # Android binder IPC. binderfs exposes the binder devices; on kernels ≥5.18
+  # ashmem is gone from mainline (Waydroid uses memfd instead), so we don't set
+  # CONFIG_ASHMEM — it would just be dropped by olddefconfig on 6.x.
+  ./scripts/config -e CONFIG_ANDROID
+  ./scripts/config -e CONFIG_ANDROID_BINDER_IPC
+  ./scripts/config -e CONFIG_ANDROID_BINDERFS
+
   # --- BROADCOM-STA (wl) COMPATIBILITY ---
   # broadcom-sta refuses to build against CONFIG_PREEMPT_RCU (pulled in by
   # PREEMPT_DYNAMIC's default of "Preemptible Kernel") and against the

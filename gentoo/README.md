@@ -864,6 +864,48 @@ compiling instead.
 
 ---
 
+## Kernel — extra features (exFAT, KVM, Waydroid)
+
+The kernel config also enables three feature groups beyond the base hardware
+support. On a fresh install they're baked in by `install.sh`; on an existing
+system they land on the next `REBUILD_KERNEL=true` run of `setup` (which also
+installs the `exfatprogs`/`fuse` userspace).
+
+| Group | Config | Why |
+|-------|--------|-----|
+| **Removable media** | `EXFAT_FS=m`, `FUSE_FS=m` | exFAT is the norm on big USB sticks/SD cards and Ventoy's data partition; FUSE backs ntfs-3g, sshfs, mtpfs, etc. Userspace: `sys-fs/exfatprogs`, `sys-fs/fuse`. |
+| **Virtualisation** | `KVM=y`, `KVM_INTEL=y`, `VHOST_NET=y`, `TUN=y`, `BRIDGE=y` | QEMU/libvirt acceleration on the Haswell Intel core, with vhost-net + tap/bridge for guest networking. |
+| **Waydroid** | `ANDROID=y`, `ANDROID_BINDER_IPC=y`, `ANDROID_BINDERFS=y` | Waydroid runs a full Android userspace in an LXC container over the kernel's binder IPC. |
+
+**On `CONFIG_ASHMEM`:** deliberately *not* set. ashmem was removed from mainline
+in 5.18; on the 6.x kernel here Waydroid uses `memfd` instead, so setting it
+would just be dropped by `make olddefconfig`. Older kernels needed an out-of-tree
+module — not relevant here.
+
+Verify what's actually in your running config:
+
+```sh
+grep -E "CONFIG_EXFAT_FS|CONFIG_FUSE_FS|CONFIG_KVM|CONFIG_VHOST_NET|CONFIG_TUN=|CONFIG_BRIDGE=|CONFIG_ANDROID_BINDER" /usr/src/linux/.config
+```
+
+### If `scripts/config` or the Makefile is missing
+
+If a kernel rebuild fails because `/usr/src/linux/scripts/config` or the
+top-level `Makefile` isn't there, the `gentoo-sources` install is incomplete or
+corrupt (this is exactly what breaks `make olddefconfig`). Re-emerge it cleanly,
+then rerun the rebuild:
+
+```sh
+doas emerge --unmerge sys-kernel/gentoo-sources
+doas emerge sys-kernel/gentoo-sources && doas eselect kernel set 1
+REBUILD_KERNEL=true doas -E bash ~/legenddots/gentoo/setup
+```
+
+`setup`'s rebuild step now checks for both files up front and points you here
+instead of failing halfway through.
+
+---
+
 ## Desktop — guru nerdfonts ebuild bug
 
 `media-fonts/nerdfonts-3.4.0::guru` was refactored upstream on
