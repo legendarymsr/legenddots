@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# check-32bit — report any 32-bit (multilib) remnants on the system. READ-ONLY;
+# changes nothing. Run as your normal user:
+#   bash ~/legenddots/gentoo/troubleshooting/check-32bit
+#
+# A clean no-multilib system should come back all-green. Anything flagged is a
+# leftover from a build made before switching to the no-multilib profile — fix
+# with the commands printed at the end.
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+ok()   { echo -e "${GREEN}  ✓ $*${NC}"; }
+warn() { echo -e "${YELLOW}  ! $*${NC}"; }
+bad()  { echo -e "${RED}  ✗ $*${NC}"; }
+sec()  { echo -e "\n${CYAN}── $* ─────────────────────────────────────${NC}"; }
+
+FOUND=0   # count of real 32-bit findings
+
+sec "Profile"
+PROFILE=$(eselect profile show 2>/dev/null | sed -n 's/^[[:space:]]*//; 2p')
+echo "  current: ${PROFILE:-unknown}"
+if echo "$PROFILE" | grep -q "no-multilib"; then
+  ok "no-multilib profile — 32-bit is forbidden at the profile level"
+else
+  bad "not a no-multilib profile — 32-bit builds are still permitted"
+  FOUND=$((FOUND+1))
+fi
+
+sec "ABI_X86"
+ABI=$(portageq envvar ABI_X86 2>/dev/null || echo "?")
+echo "  ABI_X86 = $ABI"
+if [[ "$ABI" == "64" ]]; then
+  ok "only the 64-bit ABI is enabled"
+else
+  bad "ABI_X86 includes a 32-bit ABI ($ABI) — packages may build 32-bit variants"
+  FOUND=$((FOUND+1))
+fi
+
+sec "32-bit library directories"
+for d in /usr/lib32 /lib32; do
+  if [[ -d "$d" ]]; then
+    n=$(find "$d" -type f 2>/dev/null | wc -l)
+    if (( n > 0 )); then
+      bad "$d exists with $n file(s) — 32-bit libraries still installed"
+      find "$d" -type f 2>/dev/null | head -8 | sed 's/^/      /'
+      (( n > 8 )) && echo "      … and $((n-8)) more"
+      FOUND=$((FOUND+1))
+    else
+      warn "$d exists but is empty (harmless — can rmdir)"
+    fi
+  else
+    ok "$d absent"
+  fi
+done
+
+sec "gcc multilib libraries"
+GCC_MULTI=$(ls -d /usr/lib/gcc/*/*/32 2>/dev/null)
+if [[ -n "$GCC_MULTI" ]]; then
+  bad "gcc still ships 32-bit runtime libs:"
+  echo "$GCC_MULTI" | sed 's/^/      /'
+  bad "→ gcc was built WITH multilib; rebuild it (see below)"
+  FOUND=$((FOUND+1))
+else
+  ok "gcc has no 32-bit multilib runtime dir"
+fi
+if command -v gcc >/dev/null 2>&1; then
+  if gcc -print-multi-lib 2>/dev/null | grep -q 'm32'; then
+    bad "gcc -print-multi-lib reports an m32 variant (multilib gcc)"
+    FOUND=$((FOUND+1))
+  else
+    ok "gcc reports no m32 multilib variant"
+  fi
+fi
+
+sec "Packages built with the 32-bit ABI (abi_x86_32)"
+# /var/db/pkg/<cat>/<pkg>/USE records the flags each package was built with.
+PKGS=$(grep -l -w abi_x86_32 /var/db/pkg/*/*/USE 2>/dev/null)
+if [[ -n "$PKGS" ]]; then
+  bad "$(echo "$PKGS" | wc -l) package(s) were built with abi_x86_32:"
+  echo "$PKGS" | sed 's#/var/db/pkg/##; s#/USE$##' | sed 's/^/      /' | head -15
+  FOUND=$((FOUND+1))
+else
+  ok "no installed package was built with abi_x86_32"
+fi
+
+sec "Stray 32-bit ELF binaries/libraries"
+# Scan the usual binary/library dirs for anything that's actually 32-bit ELF.
+STRAY=$(find /usr/bin /usr/lib /usr/lib64 /bin -maxdepth 1 -type f 2>/dev/null \
+  | while read -r f; do
+      file -b "$f" 2>/dev/null | grep -q 'ELF 32-bit' && echo "$f"
+    done)
+if [[ -n "$STRAY" ]]; then
+  bad "32-bit ELF files found outside the lib32 dirs:"
+  echo "$STRAY" | head -10 | sed 's/^/      /'
+  FOUND=$((FOUND+1))
+else
+  ok "no stray 32-bit ELF binaries in the main bin/lib dirs"
+fi
+
+sec "gcc -multilib pin (package.use)"
+if grep -qs 'sys-devel/gcc .*-multilib' /etc/portage/package.use/* 2>/dev/null; then
+  ok "sys-devel/gcc -multilib is pinned in package.use"
+else
+  warn "no 'sys-devel/gcc -multilib' pin (the no-multilib profile still covers it)"
+fi
+
+echo
+if (( FOUND == 0 )); then
+  echo -e "${GREEN}Clean — no 32-bit remnants. Your system is fully 64-bit.${NC}"
+else
+  echo -e "${RED}$FOUND area(s) still carry 32-bit remnants.${NC} Fix with:"
+  echo "  doas eselect profile set default/linux/amd64/23.0/no-multilib/hardened"
+  echo "  doas emerge --changed-use --deep @world   # rebuild 64-bit-only"
+  echo "  doas emerge --depclean                    # sweep orphaned 32-bit libs"
+  echo "  # then re-run this check; /usr/lib32 should be gone"
+  exit 1
+fi
