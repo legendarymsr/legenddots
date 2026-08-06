@@ -22,10 +22,11 @@ os.environ.setdefault(
     "--blink-settings=forceDarkModeEnabled=true",
 )
 
-from PyQt6.QtCore import QUrl
+from PyQt6.QtCore import QUrl, QThread, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QLineEdit, QVBoxLayout, QWidget, QTabWidget,
+    QApplication, QMainWindow, QLineEdit, QVBoxLayout, QHBoxLayout, QWidget,
+    QTabWidget, QPushButton,
 )
 from PyQt6.QtWebEngineCore import (
     QWebEngineUrlRequestInterceptor, QWebEngineProfile, QWebEngineScript,
@@ -36,15 +37,22 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 CONFIG_DIR = Path.home() / ".config" / "legendchrome"
 HOME_URL = "https://search.brave.com"
 SEARCH_URL = "https://search.brave.com/search?q={}"
-BG, FG, ACCENT, DIM = "#1a1b26", "#c0caf5", "#7aa2f7", "#414868"
+STEVENBLACK_URL = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+BG, FG, ACCENT, DIM, GREEN = "#1a1b26", "#c0caf5", "#7aa2f7", "#414868", "#9ece6a"
 
-BUILTIN_BLOCKLIST = {
+# Default: a short, simple core of the worst ad/tracking domains.
+SIMPLE_BLOCKLIST = {
     "doubleclick.net", "googleadservices.com", "google-analytics.com",
-    "googlesyndication.com", "pagead2.googlesyndication.com", "adservice.google.com",
-    "googletagmanager.com", "googletagservices.com", "criteo.com", "criteo.net",
-    "amazon-adsystem.com", "adnxs.com", "hotjar.com", "cookiebot.com",
-    "onetrust.com", "cookielaw.org", "taboola.com", "outbrain.com",
-    "scorecardresearch.com", "quantserve.com", "moatads.com", "adsrvr.org",
+    "googlesyndication.com", "pagead2.googlesyndication.com", "googletagmanager.com",
+    "googletagservices.com", "amazon-adsystem.com", "adnxs.com", "criteo.com",
+    "taboola.com", "outbrain.com", "scorecardresearch.com", "adsrvr.org",
+}
+
+# Extra: analytics/telemetry + more ad networks. Merged in by the "Extend" button
+# (along with a local ~/.config/legendchrome/blocklist.txt or StevenBlack's hosts).
+EXTRA_BLOCKLIST = {
+    "adservice.google.com", "criteo.net", "hotjar.com", "cookiebot.com",
+    "onetrust.com", "cookielaw.org", "quantserve.com", "moatads.com",
     "rubiconproject.com", "pubmatic.com", "openx.net", "casalemedia.com",
     "bidswitch.net", "sharethrough.com", "smartadserver.com", "yieldmo.com",
     "mixpanel.com", "segment.com", "amplitude.com", "fullstory.com",
@@ -53,11 +61,12 @@ BUILTIN_BLOCKLIST = {
 }
 
 
-def load_blocklist():
-    domains = set(BUILTIN_BLOCKLIST)
-    extra = CONFIG_DIR / "blocklist.txt"
-    if extra.exists():
-        for line in extra.read_text(errors="ignore").splitlines():
+def load_local_blocklist():
+    """Domains from an optional user-provided hosts-format file (read-only)."""
+    domains = set()
+    f = CONFIG_DIR / "blocklist.txt"
+    if f.exists():
+        for line in f.read_text(errors="ignore").splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
@@ -65,6 +74,29 @@ def load_blocklist():
             if host not in ("localhost", "0.0.0.0", "127.0.0.1"):
                 domains.add(host)
     return domains
+
+
+class FetchWorker(QThread):
+    """Downloads StevenBlack's hosts in the background (kept in memory only)."""
+    done = pyqtSignal(set)
+
+    def run(self):
+        import urllib.request
+        domains = set()
+        try:
+            req = urllib.request.Request(STEVENBLACK_URL, headers={"User-Agent": "legendchrome"})
+            data = urllib.request.urlopen(req, timeout=25).read().decode("utf-8", "ignore")
+            for line in data.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                p = line.split()
+                if len(p) >= 2 and p[0] in ("0.0.0.0", "127.0.0.1"):
+                    if p[1] not in ("localhost", "0.0.0.0", "127.0.0.1"):
+                        domains.add(p[1])
+        except Exception as e:  # network/DNS/etc — just report, stay usable
+            print("blocklist fetch failed:", e)
+        self.done.emit(domains)
 
 
 class AdBlocker(QWebEngineUrlRequestInterceptor):
@@ -226,7 +258,9 @@ class LegendChrome(QMainWindow):
         self.profile.setHttpUserAgent(
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/126.0.0.0 Safari/537.36")
-        self.interceptor = AdBlocker(load_blocklist())
+        # Simple by default — just the core list. The 🛡 button extends it.
+        self.interceptor = AdBlocker(set(SIMPLE_BLOCKLIST))
+        self._extended = False
         self.profile.setUrlRequestInterceptor(self.interceptor)
         # Block ALL third-party cookies (stronger than banner-hiding alone).
         self.profile.cookieStore().setCookieFilter(lambda req: not req.thirdParty)
@@ -240,6 +274,15 @@ class LegendChrome(QMainWindow):
             QLineEdit {{ background:{BG}; color:{FG}; border:none; padding:9px 12px;
                         font-family:'JetBrainsMono Nerd Font'; font-size:14px;
                         border-bottom:2px solid {ACCENT}; }}""")
+
+        # Extend-blocklist button — simple list by default, click to go heavy.
+        self.extend_btn = QPushButton("🛡")
+        self.extend_btn.setToolTip("Extend blocklist (analytics/telemetry + StevenBlack hosts)")
+        self.extend_btn.clicked.connect(self.extend_blocklist)
+        self._style_btn(ACCENT)
+        top_row = QHBoxLayout(); top_row.setContentsMargins(0, 0, 0, 0); top_row.setSpacing(0)
+        top_row.addWidget(self.url_bar); top_row.addWidget(self.extend_btn)
+        top_widget = QWidget(); top_widget.setLayout(top_row)
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -255,13 +298,51 @@ class LegendChrome(QMainWindow):
             QTabBar::tab:!selected {{ color:{DIM}; }}""")
 
         layout = QVBoxLayout(); layout.setContentsMargins(0, 0, 0, 0); layout.setSpacing(0)
-        layout.addWidget(self.url_bar); layout.addWidget(self.tabs)
+        layout.addWidget(top_widget); layout.addWidget(self.tabs)
         container = QWidget(); container.setLayout(layout)
         self.setCentralWidget(container)
         self.setStyleSheet(f"QMainWindow {{ background:{BG}; }}")
 
         self._shortcuts()
         self.add_tab(start_url)
+
+    # ── blocklist extend button ───────────────────────────────────────────
+    def _style_btn(self, border):
+        self.extend_btn.setStyleSheet(f"""
+            QPushButton {{ background:{BG}; color:{FG}; border:none; padding:9px 14px;
+                          font-family:'JetBrainsMono Nerd Font'; font-size:13px;
+                          border-bottom:2px solid {border}; }}
+            QPushButton:hover {{ color:{ACCENT}; }}
+            QPushButton:disabled {{ color:{GREEN}; }}""")
+
+    def extend_blocklist(self):
+        if self._extended:
+            return
+        # Immediately merge the extra built-ins + any local blocklist.txt.
+        merged = set(self.interceptor.domains) | EXTRA_BLOCKLIST | load_local_blocklist()
+        self.interceptor.domains = merged   # atomic swap; interceptor reads fresh
+        if (CONFIG_DIR / "blocklist.txt").exists():
+            self._set_extended(len(merged))
+        else:
+            # No local list → pull StevenBlack's hosts in the background.
+            self.extend_btn.setText("⏳")
+            self.extend_btn.setEnabled(False)
+            self._worker = FetchWorker()
+            self._worker.done.connect(self._fetch_done)
+            self._worker.start()
+
+    def _fetch_done(self, domains):
+        merged = set(self.interceptor.domains) | domains
+        self.interceptor.domains = merged
+        self._set_extended(len(merged))
+
+    def _set_extended(self, count):
+        self._extended = True
+        self.extend_btn.setText(f"🛡 {count}")
+        self.extend_btn.setEnabled(False)
+        self.extend_btn.setToolTip(f"Extended blocklist active — {count} domains blocked")
+        self._style_btn(GREEN)
+        print(f"blocklist extended → {count} domains")
 
     def add_tab(self, url=None):
         view = QWebEngineView()
