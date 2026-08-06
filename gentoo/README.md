@@ -904,6 +904,28 @@ REBUILD_KERNEL=true doas -E bash ~/legenddots/gentoo/setup
 `setup`'s rebuild step now checks for both files up front and points you here
 instead of failing halfway through.
 
+### Userspace: QEMU/KVM and Waydroid
+
+`setup` also installs the userspace for these, each behind a `[Y/n]` prompt
+(default Yes; override with `INSTALL_VIRT=false` / `INSTALL_WAYDROID=false`):
+
+- **QEMU/KVM** — `qemu`, `libvirt`, `virt-manager`, `bridge-utils`. Sets
+  `QEMU_SOFTMMU_TARGETS="x86_64"` in `make.conf` (without it qemu builds no
+  emulators), adds `legend` to the `kvm` and `libvirt` groups, enables the
+  `libvirtd` OpenRC service, and autostarts libvirt's default NAT network
+  (`virbr0`). After it's up: `virt-manager`, or `virsh`.
+
+- **Waydroid** — `app-emulation/waydroid` (from the GURU overlay) + `iptables`
+  for its container networking, and the `waydroid-container` OpenRC service.
+  Waydroid needs the **binder** kernel config, so it only works after you rebuild
+  the kernel (which enables it) and reboot. Then:
+  ```sh
+  doas rc-service waydroid-container start
+  doas waydroid init          # downloads the Android images (~1 GB)
+  waydroid session start &     # from inside your niri (Wayland) session
+  waydroid show-full-ui
+  ```
+
 ---
 
 ## Desktop — guru nerdfonts ebuild bug
