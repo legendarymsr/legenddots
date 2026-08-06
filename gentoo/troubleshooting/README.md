@@ -15,6 +15,7 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `verify-boot` | no (you) | no (read-only) | About to reboot after a kernel rebuild — confirm it won't brick |
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
+| `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
 
 > `setup` (post-install provisioning) lives at `../setup`, not here — it's a core
 > script alongside install/resume/niri, not a troubleshooting tool.
@@ -100,3 +101,19 @@ For when the display is broken or `/dev/dri/renderD128` is missing because
 render node niri needs). Reads `/proc/cmdline`, and if `nomodeset` is present,
 strips it from `/boot/refind_linux.conf`. Reboot afterward, then start niri with
 `bash ~/legenddots/gentoo/niri`.
+
+## `check-32bit` — audit for 32-bit / multilib remnants (read-only)
+
+```sh
+bash ~/legenddots/gentoo/troubleshooting/check-32bit
+```
+
+Confirms the system is genuinely 64-bit-only after the switch to the no-multilib
+profile. Checks the active profile, `ABI_X86`, `/usr/lib32` + `/lib32`, gcc's
+multilib runtime libs (`gcc -print-multi-lib`), packages built with `abi_x86_32`
+(from `/var/db/pkg/*/*/USE`), and any stray `ELF 32-bit` binaries in the main
+bin/lib dirs. Ends `Clean` or lists what's left with the exact fix
+(profile switch → `emerge --changed-use --deep @world` → `--depclean`); exits
+non-zero if anything's found. Typical first run flags `/usr/lib32` and gcc's
+32-bit libs — leftovers from a build made before switching profiles — which the
+rebuild sweeps out.
