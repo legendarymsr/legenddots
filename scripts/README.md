@@ -55,43 +55,56 @@ python browser
 
 ## legend-gui
 
-A custom Qt6 browser (`LegendChrome`) with tabs, network-level ad blocking,
-YouTube ad-skipping, and persistent logins. Tokyo Night themed.
+A custom Qt6 browser (`LegendChrome`) — **amnesic by design**, with tabs,
+network-level ad blocking, YouTube ad-skipping, and qutebrowser-style keys.
+Tokyo Night themed.
 
-**Dependencies:** `PyQt6`, `PyQt6-WebEngine`
+**Dependencies:** `PyQt6`, `PyQt6-WebEngine` (and `mpv` for `.m`)
 
 ```sh
 python legend-gui [url]
 ```
 
-**Tabs & navigation:** multiple closable/movable tabs, smart URL bar (types that
-aren't URLs become a Brave search), per-tab load progress, and keyboard shortcuts:
+**Amnesic:** off-the-record profile — **no history, no on-disk cookies, no
+cache.** Session cookies live in RAM and vanish the instant you close it. This is
+deliberate; there is no history/bookmark store to leak.
+
+**Privacy / cookies:**
+- **All third-party cookies blocked** at the store level (not just banner-hiding).
+- `DNT: 1` and `Sec-GPC: 1` sent on every request.
+- Cookie/consent banners auto-**rejected** (clicks "reject all" where it can) and
+  hidden via CSS.
+
+**Keys — qutebrowser-style, focus-aware** (typing in a page input never triggers
+them):
 
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
-| `Ctrl+T` | new tab | `Ctrl+W` | close tab |
-| `Ctrl+L` | focus URL bar | `Ctrl+R` / `F5` | reload |
-| `Alt+←` / `Alt+→` | back / forward | `Ctrl+Tab` | next tab |
-| `Ctrl+±` / `Ctrl+0` | zoom / reset | `F11` | fullscreen |
-| `Alt+Home` | home | `Ctrl+Q` | quit |
+| `f` | **hint links** — type the label to click | `.m` | send page to **mpv** |
+| `Ctrl+T` / `Ctrl+W` | new / close tab | `Ctrl+L` | focus URL bar |
+| `Alt+←` / `Alt+→` | back / forward | `Ctrl+R` / `F5` | reload |
+| `Ctrl+Tab` | next tab | `Ctrl+±` / `Ctrl+0` | zoom / reset |
+| `F11` | fullscreen | `Alt+Home` | home | `Ctrl+Q` | quit |
+
+`f` overlays letter labels on every clickable element in view; type a label to
+click it, `Esc` to cancel. `.m` hands the current URL to `mpv` (yt-dlp plays
+YouTube etc. natively — much lighter than the embedded player on the Air).
 
 **Ad blocker:** blocks known ad/tracking domains at the network level, matched by
-host **suffix** (so `sub.doubleclick.net` is caught too), across ~45 built-in
-domains — Google Ads, DoubleClick, Criteo, Taboola, plus analytics/telemetry
-(Segment, Amplitude, Mixpanel, Sentry, Clarity, …). Drop a hosts-format file at
+host **suffix** (so `sub.doubleclick.net` is caught too) across ~45 built-ins —
+Google Ads, DoubleClick, Criteo, Taboola, plus analytics/telemetry (Segment,
+Amplitude, Mixpanel, Sentry, Clarity, …). Drop a hosts-format file at
 `~/.config/legendchrome/blocklist.txt` (e.g. [StevenBlack's hosts](https://github.com/StevenBlack/hosts))
-and it's merged in for thousands more.
+and it's merged in for thousands more. (That file is *read* only — no browsing
+data is ever written.)
 
 **YouTube:** auto-skips skippable ads, speeds unskippable ads to 16× (muted),
-hides overlay/feed/masthead ads and cookie banners via injected CSS/JS.
+hides overlay/feed/masthead ads.
 
-**Persistence:** a named profile at `~/.config/legendchrome/` keeps cookies and
-logins across restarts (with cache + downloads to `~/Downloads`). A modern
-Chrome user-agent is set so sites don't serve the QtWebEngine fallback.
-
-**Styling:** JetBrains Mono Nerd Font forced site-wide, Chromium dark mode,
-Tokyo Night URL bar and tab bar. New-window/`target=_blank` links open as tabs;
-video fullscreen works.
+**Misc:** smart URL bar (non-URLs → Brave search), closable/movable tabs with
+load progress, new-window/`target=_blank` links open as tabs, video fullscreen,
+a modern Chrome user-agent (no QtWebEngine fallback), JetBrains Mono Nerd Font
+site-wide, Chromium dark mode.
 
 ---
 

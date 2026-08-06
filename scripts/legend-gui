@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
-"""LegendChrome — a lean PyQt6 browser: tabs, network ad-blocking, YouTube
-ad-skipping, persistent logins. Tokyo Night themed.
+"""LegendChrome — a lean, AMNESIC PyQt6 browser.
 
-Deps:  pip install PyQt6 PyQt6-WebEngine
+By design it remembers nothing: off-the-record profile (no history, no on-disk
+cookies, no cache), all third-party cookies blocked, DNT + GPC sent, cookie
+banners auto-rejected. Plus tabs, network ad-blocking, YouTube ad-skipping, and
+qutebrowser-style keys: `f` to hint links, `.m` to send the page to mpv.
+
+Deps:  pip install PyQt6 PyQt6-WebEngine   (and `mpv` for `.m`)
 Run:   python legend-gui  [url]
 
-Optional big blocklist: drop a hosts-format file at
-~/.config/legendchrome/blocklist.txt (e.g. StevenBlack's hosts) and it's merged
-with the built-in list at startup.
+Optional big blocklist: hosts-format file at ~/.config/legendchrome/blocklist.txt
+(read only — no browsing data is ever written there).
 """
 import sys
 import os
+import subprocess
 from pathlib import Path
 
 os.environ.setdefault(
     "QTWEBENGINE_CHROMIUM_FLAGS",
-    "--blink-settings=forceDarkModeEnabled=true "
-    "--enable-features=WebRTCPipeWireCapturer",
+    "--blink-settings=forceDarkModeEnabled=true",
 )
 
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QKeySequence, QShortcut, QAction
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QLineEdit, QVBoxLayout, QHBoxLayout, QWidget,
-    QTabWidget, QToolButton, QStyle,
+    QApplication, QMainWindow, QLineEdit, QVBoxLayout, QWidget, QTabWidget,
 )
 from PyQt6.QtWebEngineCore import (
     QWebEngineUrlRequestInterceptor, QWebEngineProfile, QWebEngineScript,
@@ -34,15 +36,12 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 CONFIG_DIR = Path.home() / ".config" / "legendchrome"
 HOME_URL = "https://search.brave.com"
 SEARCH_URL = "https://search.brave.com/search?q={}"
-
-# Tokyo Night
 BG, FG, ACCENT, DIM = "#1a1b26", "#c0caf5", "#7aa2f7", "#414868"
 
 BUILTIN_BLOCKLIST = {
     "doubleclick.net", "googleadservices.com", "google-analytics.com",
     "googlesyndication.com", "pagead2.googlesyndication.com", "adservice.google.com",
-    "googletagmanager.com", "googletagservices.com", "g.doubleclick.net",
-    "facebook.com/tr", "connect.facebook.net", "criteo.com", "criteo.net",
+    "googletagmanager.com", "googletagservices.com", "criteo.com", "criteo.net",
     "amazon-adsystem.com", "adnxs.com", "hotjar.com", "cookiebot.com",
     "onetrust.com", "cookielaw.org", "taboola.com", "outbrain.com",
     "scorecardresearch.com", "quantserve.com", "moatads.com", "adsrvr.org",
@@ -55,7 +54,6 @@ BUILTIN_BLOCKLIST = {
 
 
 def load_blocklist():
-    """Built-in set plus an optional hosts-format file, matched by host suffix."""
     domains = set(BUILTIN_BLOCKLIST)
     extra = CONFIG_DIR / "blocklist.txt"
     if extra.exists():
@@ -63,9 +61,7 @@ def load_blocklist():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            # "0.0.0.0 domain" / "127.0.0.1 domain" / bare "domain"
-            parts = line.split()
-            host = parts[-1]
+            host = line.split()[-1]
             if host not in ("localhost", "0.0.0.0", "127.0.0.1"):
                 domains.add(host)
     return domains
@@ -77,52 +73,121 @@ class AdBlocker(QWebEngineUrlRequestInterceptor):
         self.domains = domains
 
     def interceptRequest(self, info):
+        # Privacy signals on every request.
+        info.setHttpHeader(b"DNT", b"1")
+        info.setHttpHeader(b"Sec-GPC", b"1")
         host = info.requestUrl().host()
-        if not host:
-            return
-        parts = host.split(".")
-        # check the host and each parent domain against the blocklist set
-        for i in range(len(parts) - 1):
-            if ".".join(parts[i:]) in self.domains:
-                info.block(True)
-                return
-        # substring paths like facebook.com/tr
-        full = info.requestUrl().toString()
-        for d in ("facebook.com/tr",):
-            if d in full:
-                info.block(True)
-                return
+        if host:
+            parts = host.split(".")
+            for i in range(len(parts) - 1):
+                if ".".join(parts[i:]) in self.domains:
+                    info.block(True)
+                    return
+        if "facebook.com/tr" in info.requestUrl().toString():
+            info.block(True)
 
 
-YOUTUBE_JS = r"""
+# CSS/JS: fonts, hide ad + banner chrome, YouTube ad-skip, auto-reject consent.
+SILENCER_JS = r"""
 (function() {
     const css = document.createElement('style');
     css.innerText = `
       body,p,h1,h2,h3,span,div,a { font-family:'JetBrainsMono Nerd Font',monospace !important; }
-      #cookie-banner,.cookie-banner,#onetrust-banner-sdk,.fc-ab-root,
+      #cookie-banner,.cookie-banner,#onetrust-banner-sdk,.ot-sdk-container,.fc-ab-root,
       ytd-ad-slot-renderer,.ytp-ad-module,.video-ads,.ytp-ad-overlay-container,
       ytd-banner-promo-renderer-background,ytd-in-feed-ad-layout-renderer,
-      #masthead-ad,.ytd-display-ad-renderer { display:none !important; }`;
+      #masthead-ad,.ytd-display-ad-renderer,#cookieConsent,.cc-window { display:none !important; }`;
     document.documentElement.appendChild(css);
 
+    const rejects = ['#onetrust-reject-all-handler','.ot-pc-refuse-all-handler',
+        '.fc-cta-do-not-consent','#reject-all','button[id*="reject" i]',
+        'button[aria-label*="reject" i]','.cc-deny','[data-role="reject"]'];
+
     setInterval(() => {
+        // YouTube ads
         const skip = document.querySelector(
           '.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.videoAdUiSkipButton,.ytp-skip-ad-button');
         if (skip) skip.click();
-        const adMod = document.querySelector('.ytp-ad-module,.ad-showing');
         const vid = document.querySelector('video');
-        if (vid && document.querySelector('.ad-showing, .ytp-ad-player-overlay')) {
+        if (vid && document.querySelector('.ad-showing,.ytp-ad-player-overlay')) {
             vid.playbackRate = 16.0; vid.muted = true;
         }
         const pop = document.querySelector('ytd-popup-container tp-yt-paper-dialog');
         if (pop) pop.remove();
-    }, 400);
+        // Cookie/consent: click "reject all" wherever we can find it
+        for (const s of rejects) { const b = document.querySelector(s); if (b) b.click(); }
+    }, 500);
+})();
+"""
+
+# qutebrowser-style keymap: `f` link hints, `.m` -> mpv. All in-page so it is
+# focus-aware (typing in an input never triggers commands). mpv handoff goes to
+# Python via a magic console.log the page class listens for.
+KEYMAP_JS = r"""
+(function() {
+    if (window.__legendKeys) return; window.__legendKeys = true;
+    const editable = el => el && (el.isContentEditable ||
+        /^(input|textarea|select)$/i.test(el.tagName));
+    let hinting = false, leader = false, buf = "", hints = {};
+
+    function clear() {
+        document.querySelectorAll('.__lh').forEach(e => e.remove());
+        hinting = false; buf = ""; hints = {};
+    }
+    function labels(n) {
+        const c = "asdfghjklqwertyuiop".split("");
+        if (n <= c.length) return c.slice(0, n);
+        const out = [];
+        for (const a of c) for (const b of c) if (out.length < n) out.push(a + b);
+        return out;
+    }
+    function hint() {
+        clear();
+        const els = [...document.querySelectorAll(
+            'a[href],button,input[type=submit],input[type=button],[role=button],[onclick]')]
+            .filter(el => { const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0 && r.bottom > 0 &&
+                       r.top < innerHeight && r.right > 0 && r.left < innerWidth; });
+        if (!els.length) return;
+        const labs = labels(els.length);
+        els.forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            const t = document.createElement('span');
+            t.className = '__lh'; t.textContent = labs[i];
+            t.style.cssText = 'position:fixed;z-index:2147483647;left:' + r.left +
+                'px;top:' + r.top + 'px;background:#7aa2f7;color:#1a1b26;' +
+                'font:bold 11px monospace;padding:1px 4px;border-radius:3px;';
+            document.body.appendChild(t);
+            hints[labs[i]] = el;
+        });
+        hinting = true; buf = "";
+    }
+    function mpv() { console.log("LEGENDCMD:mpv:" + location.href); }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        if (editable(document.activeElement) && !hinting) return;  // insert mode
+        if (hinting) {
+            if (e.key === 'Escape') { clear(); e.preventDefault(); return; }
+            if (/^[a-z]$/.test(e.key)) {
+                buf += e.key;
+                if (hints[buf]) { const el = hints[buf]; clear(); el.focus(); el.click(); e.preventDefault(); return; }
+                if (!Object.keys(hints).some(k => k.startsWith(buf))) buf = "";
+                e.preventDefault();
+            }
+            return;
+        }
+        if (leader) { leader = false; if (e.key === 'm') { mpv(); e.preventDefault(); } return; }
+        if (e.key === 'f') { hint(); e.preventDefault(); return; }
+        if (e.key === '.') { leader = true; e.preventDefault(); return; }
+    }, true);
 })();
 """
 
 
 class LegendPage(QWebEnginePage):
-    """A page bound to the shared profile that opens new windows as new tabs."""
+    """Page on the shared profile: opens new windows as tabs, handles the mpv
+    handoff, and enables fullscreen."""
     def __init__(self, profile, window):
         super().__init__(profile, window)
         self.window = window
@@ -137,29 +202,39 @@ class LegendPage(QWebEnginePage):
     def createWindow(self, _type):
         return self.window.add_tab().page()
 
+    def javaScriptConsoleMessage(self, level, msg, line, source):
+        if msg.startswith("LEGENDCMD:mpv:"):
+            url = msg[len("LEGENDCMD:mpv:"):]
+            try:
+                subprocess.Popen(["mpv", url])
+                print(f"▶ mpv {url}")
+            except FileNotFoundError:
+                print("mpv not installed (pkg/emerge media-video/mpv)")
+            return
+        # otherwise swallow page console spam
+
 
 class LegendChrome(QMainWindow):
     def __init__(self, start_url):
         super().__init__()
-        self.setWindowTitle("LegendChrome // SILENCER")
+        self.setWindowTitle("LegendChrome // AMNESIAC")
         self.setGeometry(100, 100, 1280, 820)
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Persistent profile — cookies/logins survive restarts.
-        self.profile = QWebEngineProfile("legendchrome", self)
-        self.profile.setPersistentStoragePath(str(CONFIG_DIR / "storage"))
-        self.profile.setCachePath(str(CONFIG_DIR / "cache"))
+        # AMNESIC: off-the-record profile (no name) → no history, no on-disk
+        # cookies, no cache. Session cookies live in RAM and die on close.
+        self.profile = QWebEngineProfile(self)
         self.profile.setHttpUserAgent(
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/126.0.0.0 Safari/537.36")
         self.interceptor = AdBlocker(load_blocklist())
         self.profile.setUrlRequestInterceptor(self.interceptor)
+        # Block ALL third-party cookies (stronger than banner-hiding alone).
+        self.profile.cookieStore().setCookieFilter(lambda req: not req.thirdParty)
         self.profile.downloadRequested.connect(self._on_download)
         self._install_scripts()
 
-        # URL bar + tabs
         self.url_bar = QLineEdit()
-        self.url_bar.setPlaceholderText("Search Brave or enter URL…")
+        self.url_bar.setPlaceholderText("Search Brave or enter URL…   (f = hint links · .m = mpv)")
         self.url_bar.returnPressed.connect(self.navigate)
         self.url_bar.setStyleSheet(f"""
             QLineEdit {{ background:{BG}; color:{FG}; border:none; padding:9px 12px;
@@ -180,8 +255,7 @@ class LegendChrome(QMainWindow):
             QTabBar::tab:!selected {{ color:{DIM}; }}""")
 
         layout = QVBoxLayout(); layout.setContentsMargins(0, 0, 0, 0); layout.setSpacing(0)
-        layout.addWidget(self.url_bar)
-        layout.addWidget(self.tabs)
+        layout.addWidget(self.url_bar); layout.addWidget(self.tabs)
         container = QWidget(); container.setLayout(layout)
         self.setCentralWidget(container)
         self.setStyleSheet(f"QMainWindow {{ background:{BG}; }}")
@@ -189,7 +263,6 @@ class LegendChrome(QMainWindow):
         self._shortcuts()
         self.add_tab(start_url)
 
-    # ── tabs ──────────────────────────────────────────────────────────────
     def add_tab(self, url=None):
         view = QWebEngineView()
         view.setPage(LegendPage(self.profile, self))
@@ -203,7 +276,7 @@ class LegendChrome(QMainWindow):
 
     def close_tab(self, idx):
         if self.tabs.count() <= 1:
-            self.add_tab()  # keep at least one
+            self.add_tab()
         w = self.tabs.widget(idx)
         self.tabs.removeTab(idx)
         w.deleteLater()
@@ -226,13 +299,11 @@ class LegendChrome(QMainWindow):
             self.tabs.setTabText(idx, (title[:22] + "…") if len(title) > 23 else title or "…")
 
     def _progress(self, view, pct):
-        # Show load progress in the tab label while loading.
         if 0 < pct < 100:
             idx = self.tabs.indexOf(view)
             if idx >= 0:
                 self.tabs.setTabText(idx, f"… {pct}%")
 
-    # ── navigation ────────────────────────────────────────────────────────
     def navigate(self):
         text = self.url_bar.text().strip()
         if not text:
@@ -246,22 +317,22 @@ class LegendChrome(QMainWindow):
         self.current().setUrl(QUrl(url))
 
     def _install_scripts(self):
-        s = QWebEngineScript()
-        s.setName("KillerScript")
-        s.setSourceCode(YOUTUBE_JS)
-        s.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
-        s.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-        s.setRunsOnSubFrames(False)
-        self.profile.scripts().insert(s)
+        for name, src in (("Silencer", SILENCER_JS), ("Keymap", KEYMAP_JS)):
+            s = QWebEngineScript()
+            s.setName(name)
+            s.setSourceCode(src)
+            s.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
+            s.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            s.setRunsOnSubFrames(False)
+            self.profile.scripts().insert(s)
 
     def _on_download(self, item):
         dest = Path.home() / "Downloads"
         dest.mkdir(exist_ok=True)
         item.setDownloadDirectory(str(dest))
         item.accept()
-        print(f"⬇ downloading {item.downloadFileName()} → {dest}")
+        print(f"⬇ {item.downloadFileName()} → {dest}")
 
-    # ── shortcuts ─────────────────────────────────────────────────────────
     def _shortcuts(self):
         def sc(seq, fn):
             QShortcut(QKeySequence(seq), self, activated=fn)
