@@ -16,9 +16,13 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
+| `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
 
 > `setup` (post-install provisioning) lives at `../setup`, not here — it's a core
-> script alongside install/resume/niri, not a troubleshooting tool.
+> script alongside install/resume/niri, not a troubleshooting tool. Likewise
+> `build-rooted-lineage` lives in `../waygentoodroid/` — it's a Waydroid image
+> builder, listed here only so it's discoverable. See
+> [`../waygentoodroid/README.md`](../waygentoodroid/README.md).
 
 ---
 
