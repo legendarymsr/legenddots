@@ -922,8 +922,15 @@ instead of failing halfway through.
   `libvirtd` OpenRC service, and autostarts libvirt's default NAT network
   (`virbr0`). After it's up: `virt-manager`, or `virsh`.
 
-- **Waydroid** — `app-emulation/waydroid` (from the GURU overlay) + `iptables`
-  for its container networking, and the `waydroid-container` OpenRC service.
+- **Waydroid** — **not packaged in ::gentoo**, so `setup` builds it and its
+  gbinder stack **from source**: `lxc` + `dnsmasq` + `iptables` + Python deps from
+  the tree, then git-builds `libglibutil → libgbinder → gbinder-python → waydroid`,
+  and writes an OpenRC `waydroid-container` init script (Waydroid ships only
+  systemd units). Every build step is guarded — a failure warns and setup
+  continues; it only checkpoints once `waydroid` is actually on `PATH`. The
+  gbinder chain is fragile; if the build doesn't complete, the sources are left
+  under `/usr/local/src/` for manual fixing.
+
   Waydroid needs the **binder** kernel config, so it only works after you rebuild
   the kernel (which enables it) and reboot. Then:
   ```sh
@@ -932,6 +939,14 @@ instead of failing halfway through.
   waydroid session start &     # from inside your niri (Wayland) session
   waydroid show-full-ui
   ```
+
+**Portage housekeeping:** at the end, `setup` auto-merges the `._cfg` config
+writes under `/etc/portage` (the `--autounmask-write` USE/keyword changes its own
+emerges generate — safe, since it owns that dir) with `etc-update --automode -5
+/etc/portage`, and marks repo news read (`eselect news read --all`). Pending
+config files *elsewhere* in `/etc` are left untouched and flagged for you to
+review with `doas etc-update` — those may be real package-default changes worth
+looking at.
 
 ---
 
