@@ -160,7 +160,7 @@ KEYMAP_JS = r"""
     if (window.__legendKeys) return; window.__legendKeys = true;
     const editable = el => el && (el.isContentEditable ||
         /^(input|textarea|select)$/i.test(el.tagName));
-    let hinting = false, leader = false, buf = "", hints = {};
+    let hinting = false, leader = false, buf = "", hints = {}, action = "click";
 
     function clear() {
         document.querySelectorAll('.__lh').forEach(e => e.remove());
@@ -173,28 +173,33 @@ KEYMAP_JS = r"""
         for (const a of c) for (const b of c) if (out.length < n) out.push(a + b);
         return out;
     }
-    function hint() {
+    // mode: "click" hints everything clickable; "mpv" hints only links (needs a URL).
+    function hint(mode) {
         clear();
-        const els = [...document.querySelectorAll(
-            'a[href],button,input[type=submit],input[type=button],[role=button],[onclick]')]
+        action = mode;
+        const sel = mode === "mpv"
+            ? 'a[href]'
+            : 'a[href],button,input[type=submit],input[type=button],[role=button],[onclick]';
+        const els = [...document.querySelectorAll(sel)]
             .filter(el => { const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0 && r.bottom > 0 &&
                        r.top < innerHeight && r.right > 0 && r.left < innerWidth; });
         if (!els.length) return;
         const labs = labels(els.length);
+        const bg = mode === "mpv" ? "#9ece6a" : "#7aa2f7";  // green labels = mpv mode
         els.forEach((el, i) => {
             const r = el.getBoundingClientRect();
             const t = document.createElement('span');
             t.className = '__lh'; t.textContent = labs[i];
             t.style.cssText = 'position:fixed;z-index:2147483647;left:' + r.left +
-                'px;top:' + r.top + 'px;background:#7aa2f7;color:#1a1b26;' +
+                'px;top:' + r.top + 'px;background:' + bg + ';color:#1a1b26;' +
                 'font:bold 11px monospace;padding:1px 4px;border-radius:3px;';
             document.body.appendChild(t);
             hints[labs[i]] = el;
         });
         hinting = true; buf = "";
     }
-    function mpv() { console.log("LEGENDCMD:mpv:" + location.href); }
+    function toMpv(url) { if (url) console.log("LEGENDCMD:mpv:" + url); }
 
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -203,14 +208,20 @@ KEYMAP_JS = r"""
             if (e.key === 'Escape') { clear(); e.preventDefault(); return; }
             if (/^[a-z]$/.test(e.key)) {
                 buf += e.key;
-                if (hints[buf]) { const el = hints[buf]; clear(); el.focus(); el.click(); e.preventDefault(); return; }
+                if (hints[buf]) {
+                    const el = hints[buf], act = action; clear();
+                    if (act === "mpv") toMpv(el.href || el.src);
+                    else { el.focus(); el.click(); }
+                    e.preventDefault(); return;
+                }
                 if (!Object.keys(hints).some(k => k.startsWith(buf))) buf = "";
                 e.preventDefault();
             }
             return;
         }
-        if (leader) { leader = false; if (e.key === 'm') { mpv(); e.preventDefault(); } return; }
-        if (e.key === 'f') { hint(); e.preventDefault(); return; }
+        if (leader) { leader = false; if (e.key === 'm') { toMpv(location.href); e.preventDefault(); } return; }
+        if (e.key === 'f') { hint("click"); e.preventDefault(); return; }  // click a link
+        if (e.key === 'F') { hint("mpv");   e.preventDefault(); return; }  // send a link to mpv
         if (e.key === '.') { leader = true; e.preventDefault(); return; }
     }, true);
 })();

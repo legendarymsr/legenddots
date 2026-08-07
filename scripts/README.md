@@ -80,15 +80,19 @@ them):
 
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
-| `f` | **hint links** — type the label to click | `.m` | send page to **mpv** |
+| `f` | **hint links** — type label to click | `F` | **hint a link → mpv** |
+| `.m` | send current page to **mpv** | `Esc` | cancel hinting |
 | `Ctrl+T` / `Ctrl+W` | new / close tab | `Ctrl+L` | focus URL bar |
 | `Alt+←` / `Alt+→` | back / forward | `Ctrl+R` / `F5` | reload |
 | `Ctrl+Tab` | next tab | `Ctrl+±` / `Ctrl+0` | zoom / reset |
-| `F11` | fullscreen | `Alt+Home` | home | `Ctrl+Q` | quit |
+| `F11` | fullscreen | `Ctrl+Q` | quit (`Alt+Home` = home) |
 
 `f` overlays letter labels on every clickable element in view; type a label to
-click it, `Esc` to cancel. `.m` hands the current URL to `mpv` (yt-dlp plays
-YouTube etc. natively — much lighter than the embedded player on the Air).
+click it. **`F` is the same but for mpv** — labels only appear on *links*, the
+labels are **green** (so you know you're in mpv-hint mode), and picking one sends
+that link's URL to `mpv` instead of navigating to it. `.m` does the same for the
+current page. `Esc` cancels. yt-dlp lets mpv play YouTube and most video sites
+natively — much lighter than the embedded player on the Air.
 
 **Ad blocker — simple by default, one button to go heavy:**
 - **Default:** a short core list (~14 domains — DoubleClick, Google Ads, Criteo,
