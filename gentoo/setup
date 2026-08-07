@@ -514,20 +514,21 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
     return 0
   }
 
-  # gbinder stack — these Makefiles need `make release` to build the .so BEFORE
-  # `make install` (install doesn't build). Then ldconfig so the next lib links.
+  # gbinder stack — `make release` builds the .so; `make install` installs the
+  # runtime lib and `install-dev` the headers + pkgconfig (gbinder-python's C
+  # extension needs those headers). ldconfig so the next lib links.
   build_git libglibutil  https://github.com/sailfishos/libglibutil.git \
-    'make release && make install LIBDIR=/usr/lib'
+    'make release && make install install-dev LIBDIR=/usr/lib'
   ldconfig
   build_git libgbinder   https://github.com/mer-hybris/libgbinder.git \
-    'make release && make install LIBDIR=/usr/lib'
+    'make release && make install install-dev LIBDIR=/usr/lib'
   ldconfig
   build_git gbinder-python https://github.com/erfanoabdi/gbinder-python.git \
     'python setup.py install'
   build_git waydroid     https://github.com/waydroid/waydroid.git \
     'make install'
   ldconfig
-  if command -v waydroid >/dev/null 2>&1; then
+  if command -v waydroid >/dev/null 2>&1 && python -c "import gbinder" 2>/dev/null; then
     # Waydroid ships only systemd units; write a minimal OpenRC init script.
     cat > /etc/init.d/waydroid-container << 'EOF'
 #!/sbin/openrc-run
@@ -549,8 +550,9 @@ EOF
     echo "  waydroid show-full-ui"
     mark_step waydroid
   else
-    warn "Waydroid build didn't complete — the gbinder stack is fragile. See the"
-    warn "warnings above; sources are under $WD_SRC/ for manual fixing, then rerun."
+    warn "Waydroid build didn't complete (waydroid CLI and/or 'import gbinder'"
+    warn "missing) — the gbinder stack is fragile. See the warnings above; sources"
+    warn "are under $WD_SRC/ for manual fixing, then rerun. Not checkpointed."
     # Not checkpointed — a later rerun retries.
   fi
 fi
