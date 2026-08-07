@@ -503,12 +503,15 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
     dev-util/gperf sys-devel/gettext \
     || warn "some Waydroid deps failed to emerge — the build may miss something"
 
-  # Clone (shallow) + run a shell build command in the tree. Guarded, non-fatal.
+  # Clone (shallow) + run a shell build command in the tree. Always returns 0 so
+  # a failure just warns — it must NOT abort setup under `set -e`.
   build_git() {  # <name> <url> <shell-build-cmd>
     local name="$1" url="$2" cmd="$3"
-    [[ -d "$WD_SRC/$name" ]] || git clone --depth=1 "$url" "$WD_SRC/$name" \
-      || { warn "clone $name failed"; return 1; }
-    ( cd "$WD_SRC/$name" && bash -c "$cmd" ) || { warn "build/install $name failed"; return 1; }
+    if [[ ! -d "$WD_SRC/$name" ]]; then
+      git clone --depth=1 "$url" "$WD_SRC/$name" || { warn "clone $name failed"; return 0; }
+    fi
+    ( cd "$WD_SRC/$name" && bash -c "$cmd" ) || warn "build/install $name failed"
+    return 0
   }
 
   # gbinder stack — these Makefiles need `make release` to build the .so BEFORE
