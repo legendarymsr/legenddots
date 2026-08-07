@@ -682,12 +682,45 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
   fi
 fi
 
-# 14. REBUILD @WORLD (opt-in) — recompile packages picking up the seccomp USE flag
+# 14. FULL SYSTEM UPDATE (opt-in) — sync + world update + cleanup, all in one.
+# This is THE update routine: `REBUILD_WORLD=true doas bash gentoo/setup` does
+# everything. Hardened against the two stalls we hit: a perl major bump (needs a
+# coordinated rebuild + perl-cleaner) and the kernel-source world entry derailing
+# resolution (setup owns the kernel out-of-band, so it must not be a @world member).
 if [[ "$REBUILD_WORLD" == "true" ]]; then
-  header "Rebuilding @world with updated USE flags (this takes hours)..."
-  emerge --changed-use --deep --with-bdeps=y @world || \
-    echo "  ! @world rebuild hit errors — resolve and rerun: emerge --changed-use --deep @world"
+  header "Full system update (sync + @world + cleanup — takes hours)..."
+
+  # 1. Sync the tree (webrsync snapshot, fall back to full rsync).
+  emerge-webrsync >/dev/null 2>&1 || emaint sync -a >/dev/null 2>&1 \
+    || warn "tree sync failed — updating against the on-disk tree."
+
+  # 2. gentoo-sources is managed by the kernel step (--oneshot), not @world.
+  # Leaving it in @world makes it an unsatisfiable member that derails the whole
+  # resolution, so drop it from the world set (idempotent — no-op if absent).
+  emerge --deselect sys-kernel/gentoo-sources >/dev/null 2>&1 || true
+
+  # 3. The update itself. --backtrack=100 gives portage room to solve subslot
+  # upgrades (perl, python) it otherwise bails on with the default depth.
+  if emerge --update --deep --newuse --with-bdeps=y --backtrack=100 @world; then
+    success "@world updated."
+  else
+    warn "@world update hit a conflict — see the first '!!!' block above. Common"
+    warn "cause is a perl bump; the perl-cleaner pass below usually clears it, then"
+    warn "rerun: emerge --update --deep --newuse --with-bdeps=y --backtrack=100 @world"
+  fi
+
+  # 4. Perl major bumps leave subslot-pinned consumers half-migrated; perl-cleaner
+  # rebuilds them against the new perl. No-op when perl didn't move.
+  if command -v perl-cleaner >/dev/null 2>&1; then
+    perl-cleaner --all 2>/dev/null || warn "perl-cleaner reported errors — check perl consumers."
+  fi
+
+  # 5. Out-of-tree modules (broadcom-sta wl.ko) rebuilt against any new kernel ABI,
+  # then drop orphaned deps.
+  emerge @module-rebuild 2>/dev/null || true
+  depmod -a 2>/dev/null || true
   emerge --depclean 2>/dev/null || true
+  success "System update complete."
 fi
 
 # 15. PORTAGE HOUSEKEEPING — always runs; applies config writes + marks news read

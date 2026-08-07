@@ -308,11 +308,27 @@ checkpointed to `/etc/gentoo-setup.state`, so re-running skips completed steps;
 the dotfiles block at the end runs every time, so re-running also doubles as
 "pull the latest config and re-link."
 
-Two opt-in prompts (default No, 10-second timeout) can rebuild `@world` with
-updated USE flags or rebuild the kernel with the hardened `.config` (which also
-rebuilds the out-of-tree `wl.ko`). Run non-interactively with
-`REBUILD_KERNEL=true REBUILD_WORLD=true doas -E bash ~/legenddots/gentoo/setup`.
+Two opt-in prompts (default No, 10-second timeout) can run a full system update or
+rebuild the kernel with the hardened `.config` (which also rebuilds the out-of-tree
+`wl.ko`). Run non-interactively with
+`REBUILD_KERNEL=true REBUILD_WORLD=true doas bash ~/legenddots/gentoo/setup`.
 
+**Updating the system:** `REBUILD_WORLD=true` **is** the update routine — one
+command does everything: syncs the tree, drops `sys-kernel/gentoo-sources` from
+`@world` (the kernel is managed out-of-band by the kernel step, so it must not be
+a `@world` member derailing resolution), runs
+`emerge --update --deep --newuse --with-bdeps=y --backtrack=100 @world`, then
+`perl-cleaner --all` (auto-heals perl major bumps), `@module-rebuild`, and
+`--depclean`. The `--backtrack=100` + `perl-cleaner` are what keep a perl/python
+subslot bump from stalling the run.
+
+```sh
+# everyday update — everything, one command:
+REBUILD_WORLD=true doas bash ~/legenddots/gentoo/setup
+```
+
+**Updating the kernel** (separate — it's off `@world`): `REBUILD_KERNEL=true` pulls
+the newest 6.18.x, re-applies the `.config` options, rebuilds, and fixes rEFInd.
 After a kernel rebuild, run `troubleshooting/verify-boot` before rebooting.
 
 ---
