@@ -497,11 +497,18 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
   WD_SRC=/usr/local/src
   mkdir -p "$WD_SRC"
 
-  # Deps that ARE in the Gentoo tree.
+  # Deps that ARE in the Gentoo tree. glib + pkgconf are what the gbinder libs
+  # compile and advertise themselves against.
   emerge --noreplace app-containers/lxc net-dns/dnsmasq net-firewall/iptables \
     dev-python/pygobject dev-python/dbus-python dev-vcs/git sys-apps/dbus \
-    dev-util/gperf sys-devel/gettext \
+    dev-util/gperf sys-devel/gettext dev-libs/glib dev-util/pkgconf \
     || warn "some Waydroid deps failed to emerge — the build may miss something"
+
+  # We install the gbinder stack under LIBDIR=/usr/lib. Make sure pkg-config and
+  # the dynamic linker actually look there, or each lib won't find the previous
+  # one (libgbinder needs libglibutil's .pc; gbinder-python needs libgbinder's).
+  export PKG_CONFIG_PATH="/usr/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+  echo /usr/lib > /etc/ld.so.conf.d/gbinder.conf
 
   # Clone (shallow) + run a shell build command in the tree. Always returns 0 so
   # a failure just warns — it must NOT abort setup under `set -e`.
@@ -514,14 +521,17 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
     return 0
   }
 
-  # gbinder stack — `make release` builds the .so; `make install` installs the
-  # runtime lib and `install-dev` the headers + pkgconfig (gbinder-python's C
-  # extension needs those headers). ldconfig so the next lib links.
+  # gbinder stack. `release` builds the .so, but the mer-hybris Makefiles do NOT
+  # list the .pc as a prerequisite of install-dev — so the `pkgconfig` target has
+  # to be named explicitly or install-dev dies on `cannot stat build/*.pc`, and
+  # without that .pc pkg-config can't find the lib and the NEXT build fails to see
+  # its headers. LIBDIR on the build pass so the .pc records /usr/lib. ldconfig
+  # (now that /usr/lib is on its path) so the next lib links against this one.
   build_git libglibutil  https://github.com/sailfishos/libglibutil.git \
-    'make release && make install install-dev LIBDIR=/usr/lib'
+    'make LIBDIR=/usr/lib release pkgconfig && make LIBDIR=/usr/lib install install-dev'
   ldconfig
   build_git libgbinder   https://github.com/mer-hybris/libgbinder.git \
-    'make release && make install install-dev LIBDIR=/usr/lib'
+    'make LIBDIR=/usr/lib release pkgconfig && make LIBDIR=/usr/lib install install-dev'
   ldconfig
   build_git gbinder-python https://github.com/erfanoabdi/gbinder-python.git \
     'python setup.py install'
