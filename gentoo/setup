@@ -9,8 +9,13 @@ set -euo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "Run as root: doas bash gentoo/setup"; exit 1; }
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
-header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+header()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+warn()    { echo -e "${YELLOW}  ! $*${NC}"; }
+success() { echo -e "${GREEN}  ✓ $*${NC}"; }
+ok()      { echo -e "${GREEN}  ✓ $*${NC}"; }
+info()    { echo -e "${CYAN}  → $*${NC}"; }
+die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
 
 # ── Options ──────────────────────────────────────────────────────────────────
 if [[ -z "${ENABLE_WD40:-}" ]]; then
