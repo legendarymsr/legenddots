@@ -612,13 +612,34 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
                      -m CONFIG_MOUSE_BCM5974
     # Removable media: exFAT + FUSE (Ventoy data partition, ntfs-3g, sshfs…).
     ./scripts/config -m CONFIG_EXFAT_FS -m CONFIG_FUSE_FS
-    # Virtualisation: KVM + QEMU/libvirt guest networking.
-    ./scripts/config -e CONFIG_KVM -e CONFIG_KVM_INTEL -e CONFIG_VHOST_NET \
+    # Virtualisation: KVM + QEMU/libvirt guest networking. VIRTUALIZATION is the
+    # parent menu — without it, olddefconfig silently drops KVM.
+    ./scripts/config -e CONFIG_VIRTUALIZATION \
+                     -e CONFIG_KVM -e CONFIG_KVM_INTEL -e CONFIG_VHOST_NET \
                      -e CONFIG_TUN -e CONFIG_BRIDGE
-    # Waydroid: Android binder container (ashmem is gone on 6.x — memfd is used).
-    ./scripts/config -e CONFIG_ANDROID -e CONFIG_ANDROID_BINDER_IPC \
-                     -e CONFIG_ANDROID_BINDERFS
+    # Waydroid: Android binder container. On 6.x there is no CONFIG_ANDROID menu
+    # symbol anymore — BINDER_IPC + BINDERFS (both bool, dep only MMU) are what
+    # matter; ashmem is gone, memfd is used. BINDERFS makes the binder/hwbinder/
+    # vndbinder nodes dynamically; name them so a non-binderfs fallback still works.
+    ./scripts/config -e CONFIG_ANDROID_BINDER_IPC -e CONFIG_ANDROID_BINDERFS \
+                     --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
     make olddefconfig
+    # olddefconfig silently drops any option whose dependency isn't met. Verify
+    # the ones we just set survived BEFORE the ~30-min build + reboot, so a missing
+    # dep surfaces now instead of at `waydroid init` / first `qemu` run.
+    missing=""
+    for opt in CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
+               CONFIG_KVM CONFIG_KVM_INTEL CONFIG_VHOST_NET CONFIG_TUN CONFIG_BRIDGE \
+               CONFIG_EXFAT_FS CONFIG_FUSE_FS; do
+      grep -q "^${opt}=" .config || missing="$missing $opt"
+    done
+    if [[ -n "$missing" ]]; then
+      warn "Kernel options that did NOT stick in .config:$missing"
+      warn "The build continues, but features needing them (Waydroid binder, KVM,"
+      warn "exFAT…) won't work until you enable them + their deps in 'make menuconfig'."
+    else
+      success "Verified .config: binder (IPC+BINDERFS), KVM, exFAT/FUSE all set."
+    fi
     # Same install path as gentoo/install.sh: make install copies vmlinuz to
     # /boot (rEFInd auto-detects it); genkernel regenerates the initramfs.
     # Guarded so a build failure warns and lets the rest of setup finish (the

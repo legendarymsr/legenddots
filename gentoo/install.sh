@@ -444,6 +444,8 @@ if ! step_done kernel; then
   # --- VIRTUALISATION: KVM + networking for QEMU/libvirt ---
   # Haswell is Intel, so kvm_intel. vhost-net accelerates guest networking;
   # tun + bridge provide the tap/bridge devices libvirt/QEMU wire guests to.
+  # VIRTUALIZATION is the parent menu — without it olddefconfig drops KVM.
+  ./scripts/config -e CONFIG_VIRTUALIZATION
   ./scripts/config -e CONFIG_KVM
   ./scripts/config -e CONFIG_KVM_INTEL
   ./scripts/config -e CONFIG_VHOST_NET
@@ -454,10 +456,12 @@ if ! step_done kernel; then
   # Waydroid runs a full Android userspace in an LXC container over the kernel's
   # Android binder IPC. binderfs exposes the binder devices; on kernels ≥5.18
   # ashmem is gone from mainline (Waydroid uses memfd instead), so we don't set
-  # CONFIG_ASHMEM — it would just be dropped by olddefconfig on 6.x.
-  ./scripts/config -e CONFIG_ANDROID
+  # CONFIG_ASHMEM — it would just be dropped by olddefconfig on 6.x. And on 6.x
+  # there is no CONFIG_ANDROID menu symbol anymore (BINDER_IPC/BINDERFS are the
+  # real options, both bool, dep only MMU), so we don't set it either.
   ./scripts/config -e CONFIG_ANDROID_BINDER_IPC
   ./scripts/config -e CONFIG_ANDROID_BINDERFS
+  ./scripts/config --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
 
   # --- BROADCOM-STA (wl) COMPATIBILITY ---
   # broadcom-sta refuses to build against CONFIG_PREEMPT_RCU (pulled in by
