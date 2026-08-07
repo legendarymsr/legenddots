@@ -950,6 +950,12 @@ instead of failing halfway through.
   waydroid show-full-ui
   ```
 
+  **Rooted, GApps-free image:** once Waydroid runs, `gentoo/waygentoodroid/`
+  builds a **rooted LineageOS** image in one command — Magisk (root) + ARM
+  translation (auto: houdini/Intel, ndk/AMD) + microG instead of GApps. See
+  [`waygentoodroid/README.md`](waygentoodroid/README.md), which also covers the
+  Android-version reality (Android 11/13 today; **not** 16 yet) and why.
+
 **Portage housekeeping:** at the end, `setup` auto-merges the `._cfg` config
 writes under `/etc/portage` (the `--autounmask-write` USE/keyword changes its own
 emerges generate — safe, since it owns that dir) with `etc-update --automode -5

@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# =============================================================================
+# waygentoodroid — build a rooted, GApps-free LineageOS image on Waydroid
+# -----------------------------------------------------------------------------
+# Waydroid's stock image already IS LineageOS. This script takes the VANILLA
+# (no-GApps) Lineage image and layers on:
+#   • Magisk (Delta)  → root
+#   • ARM translation → libhoudini on Intel / libndk on AMD (so ARM-only apps run)
+#   • microG          → the FOSS stand-in for Play Services (since we skip GApps)
+# It is idempotent: re-run it to add a module or repair the tree.
+#
+# Run as root on the booted system, AFTER the kernel has binder support:
+#   doas bash gentoo/waygentoodroid/build-rooted-lineage
+#
+# Prereqs: `waydroid` installed (gentoo/setup does this) and a kernel with
+# ANDROID_BINDER_IPC + ANDROID_BINDERFS (verify: ls /dev/binderfs).
+# =============================================================================
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+header()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+warn()    { echo -e "${YELLOW}  ! $*${NC}"; }
+success() { echo -e "${GREEN}  ✓ $*${NC}"; }
+info()    { echo -e "${CYAN}  → $*${NC}"; }
+die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+
+[[ $EUID -eq 0 ]] || die "Run as root: doas bash gentoo/waygentoodroid/build-rooted-lineage"
+
+# ── Options (all env-overridable) ────────────────────────────────────────────
+SYSTEM_TYPE="${SYSTEM_TYPE:-VANILLA}"      # VANILLA = NO GApps (what we want). GAPPS to override.
+SYSTEM_CHANNEL="${SYSTEM_CHANNEL:-}"       # optional custom system OTA URL (see README, Android versions)
+VENDOR_CHANNEL="${VENDOR_CHANNEL:-}"       # optional custom vendor OTA URL
+INSTALL_MAGISK="${INSTALL_MAGISK:-true}"   # root
+INSTALL_ARM="${INSTALL_ARM:-true}"         # ARM->x86 translation (auto-picks houdini/ndk)
+INSTALL_MICROG="${INSTALL_MICROG:-true}"   # FOSS Play-Services replacement (no GApps)
+INSTALL_WIDEVINE="${INSTALL_WIDEVINE:-false}" # L3 DRM (Netflix/Spotify). Off by default.
+REINIT="${REINIT:-false}"                  # force a clean re-download of the image (waydroid init -f)
+WD_SCRIPT_DIR="${WD_SCRIPT_DIR:-/opt/waydroid_script}"
+WD_SCRIPT_URL="${WD_SCRIPT_URL:-https://github.com/casualsnek/waydroid_script}"
+WD_IMAGES="/var/lib/waydroid/images/system.img"
+
+command -v waydroid >/dev/null 2>&1 || die "waydroid not installed — run gentoo/setup first."
+command -v git      >/dev/null 2>&1 || die "git not installed — emerge dev-vcs/git."
+command -v python3  >/dev/null 2>&1 || die "python3 not installed."
+
+# Warn (don't block) if the kernel clearly lacks binder — the image still builds,
+# it just won't RUN until you boot a binder-enabled kernel.
+if [[ ! -e /dev/binder && ! -d /dev/binderfs ]] && ! zgrep -q "CONFIG_ANDROID_BINDERFS=y" /proc/config.gz 2>/dev/null; then
+  warn "No /dev/binder(fs) and BINDERFS not in the running kernel. The image will"
+  warn "build fine, but Waydroid won't start until you rebuild the kernel with"
+  warn "binder support (gentoo/setup, REBUILD_KERNEL) and reboot."
+fi
+
+# ── Pick the ARM translation layer for this CPU ──────────────────────────────
+# libhoudini is Intel's translator (best on your Haswell Air); libndk is the
+# AMD path but also runs on Intel, so it's the safe fallback.
+case "$(grep -m1 '^vendor_id' /proc/cpuinfo | awk '{print $3}')" in
+  GenuineIntel) ARM_MODULE=libhoudini ;;
+  AuthenticAMD) ARM_MODULE=libndk ;;
+  *)            ARM_MODULE=libndk ;;
+esac
+
+header "waygentoodroid — rooted, GApps-free LineageOS on Waydroid"
+info "system type : $SYSTEM_TYPE $([[ "$SYSTEM_TYPE" == VANILLA ]] && echo '(no GApps ✓)')"
+info "root        : $([[ "$INSTALL_MAGISK" == true ]] && echo 'Magisk' || echo 'skipped')"
+info "arm transl. : $([[ "$INSTALL_ARM" == true ]] && echo "$ARM_MODULE" || echo 'skipped')"
+info "microG      : $([[ "$INSTALL_MICROG" == true ]] && echo 'yes' || echo 'no')"
+info "widevine    : $([[ "$INSTALL_WIDEVINE" == true ]] && echo 'yes' || echo 'no')"
+
+# ── 1. Initialise the Lineage image (downloads ~1 GB the first time) ──────────
+header "Step 1 — Waydroid image ($SYSTEM_TYPE)"
+init_args=(-s "$SYSTEM_TYPE")
+[[ -n "$SYSTEM_CHANNEL" ]] && init_args+=(-c "$SYSTEM_CHANNEL")
+[[ -n "$VENDOR_CHANNEL" ]] && init_args+=(-v "$VENDOR_CHANNEL")
+if [[ "$REINIT" == true ]]; then
+  info "REINIT=true → forcing a clean re-download."
+  waydroid init -f "${init_args[@]}" || die "waydroid init -f failed."
+elif [[ ! -f "$WD_IMAGES" ]]; then
+  info "No image yet → initialising."
+  waydroid init "${init_args[@]}" || die "waydroid init failed."
+else
+  success "Image already present ($WD_IMAGES). Set REINIT=true to redownload."
+fi
+
+# ── 2. Fetch waydroid_script (the tool that patches the image) ────────────────
+header "Step 2 — waydroid_script"
+if [[ -d "$WD_SCRIPT_DIR/.git" ]]; then
+  git -C "$WD_SCRIPT_DIR" pull --ff-only || warn "couldn't update waydroid_script; using existing checkout."
+else
+  git clone --depth=1 "$WD_SCRIPT_URL" "$WD_SCRIPT_DIR" || die "clone waydroid_script failed."
+fi
+VENV_PY="$WD_SCRIPT_DIR/venv/bin/python3"
+if [[ ! -x "$VENV_PY" ]]; then
+  python3 -m venv "$WD_SCRIPT_DIR/venv" || die "venv creation failed (emerge dev-python/virtualenv? or python venv module)."
+fi
+"$WD_SCRIPT_DIR/venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1 || true
+"$WD_SCRIPT_DIR/venv/bin/pip" install -q -r "$WD_SCRIPT_DIR/requirements.txt" || die "pip install requirements failed."
+success "waydroid_script ready at $WD_SCRIPT_DIR"
+
+# ── 3. Stop any running session so the image can be mounted for patching ──────
+header "Step 3 — stop session"
+waydroid session stop 2>/dev/null || true
+success "Session stopped (if one was running)."
+
+# ── 4. Patch the image: root + ARM + microG (+ widevine) ──────────────────────
+# Each install is guarded so one failing module doesn't abort the rest.
+run_wd() { "$VENV_PY" "$WD_SCRIPT_DIR/main.py" "$@"; }
+header "Step 4 — patch image"
+if [[ "$INSTALL_MAGISK" == true ]]; then
+  info "Installing Magisk (root)…"
+  run_wd install magisk && success "Magisk installed" || warn "Magisk install failed"
+fi
+if [[ "$INSTALL_ARM" == true ]]; then
+  info "Installing ARM translation ($ARM_MODULE)…"
+  run_wd install "$ARM_MODULE" && success "$ARM_MODULE installed" || warn "$ARM_MODULE install failed"
+fi
+if [[ "$INSTALL_MICROG" == true ]]; then
+  info "Installing microG (Play-Services stand-in)…"
+  run_wd install microg && success "microG installed" || warn "microG install failed"
+fi
+if [[ "$INSTALL_WIDEVINE" == true ]]; then
+  info "Installing Widevine (L3 DRM)…"
+  run_wd install widevine && success "Widevine installed" || warn "Widevine install failed"
+fi
+
+# ── 5. Restart the container so the patched image is remounted ────────────────
+header "Step 5 — restart container"
+if command -v rc-service >/dev/null 2>&1 && [[ -f /etc/init.d/waydroid-container ]]; then
+  rc-service waydroid-container restart 2>/dev/null || warn "couldn't restart waydroid-container; start it manually."
+elif command -v systemctl >/dev/null 2>&1; then
+  systemctl restart waydroid-container 2>/dev/null || warn "couldn't restart waydroid-container; start it manually."
+else
+  warn "No init service found — start the container manually before the session."
+fi
+
+header "Done"
+success "Rooted, GApps-free LineageOS image is built."
+echo
+echo "  Start it (from inside your niri Wayland session, as your user):"
+echo "    waydroid session start &"
+echo "    waydroid show-full-ui"
+echo
+echo "  Verify root:  open the Magisk app inside Android, or:"
+echo "    waydroid shell           # then:  su   (Magisk should grant it)"
+echo
+echo "  Re-run this script anytime to add a module, e.g.:"
+echo "    INSTALL_WIDEVINE=true doas bash gentoo/waygentoodroid/build-rooted-lineage"
+echo "  Nuke & redo from a clean image:"
+echo "    REINIT=true doas bash gentoo/waygentoodroid/build-rooted-lineage"
