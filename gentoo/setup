@@ -143,7 +143,11 @@ if ! step_done package_use; then
     echo "dev-libs/libdbusmenu gtk3"
     echo "dev-cpp/cairomm X"
     echo "dev-cpp/atkmm X"
-    echo "x11-libs/gtk+:3 introspection"
+    # gtk+ (and gtkmm, which ties its X to gtk+'s via [X=]) MUST carry X: both
+    # brave-browser-nightly and qemu's gtk display hard-require gtk+:3[X]. Without
+    # it, `--changed-use @world` tries to rebuild gtk+ as -X and slot-conflicts.
+    echo "x11-libs/gtk+:3 introspection X"
+    echo "dev-cpp/gtkmm X"
     echo "dev-libs/atk introspection"
   } > /etc/portage/package.use/xlibs
   echo "gnome-base/librsvg -introspection -vala" > /etc/portage/package.use/librsvg
@@ -237,8 +241,12 @@ if ! step_done base_system; then
   mark_step base_system
 fi
 
-# Always ensure gtk+ introspection is set (bypasses package_use checkpoint for reruns)
-{ echo "x11-libs/gtk+:3 introspection"
+# Always ensure gtk+ introspection + X is set (bypasses package_use checkpoint for
+# reruns). X is non-negotiable here — brave and qemu[gtk] require gtk+:3[X], and
+# gtkmm[X=] must match — so keep it in the always-runs block to self-heal a system
+# whose gtk+ drifted to -X (the slot conflict a bare `--changed-use @world` hits).
+{ echo "x11-libs/gtk+:3 introspection X"
+  echo "dev-cpp/gtkmm X"
   echo "dev-libs/atk introspection"
 } > /etc/portage/package.use/gtk-introspection
 
