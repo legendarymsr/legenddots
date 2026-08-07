@@ -311,6 +311,10 @@ echo "dev-libs/libdbusmenu gtk3" >> /etc/portage/package.use/xlibs
 # cairomm/atkmm wrap cairo and need the same X flag
 echo "dev-cpp/cairomm X" >> /etc/portage/package.use/xlibs
 echo "dev-cpp/atkmm X" >> /etc/portage/package.use/xlibs
+# gtk+ and gtkmm too: brave-browser-nightly and qemu[gtk] hard-require gtk+:3[X],
+# and gtkmm[X=] must match. Miss these and `--changed-use @world` slot-conflicts.
+echo "x11-libs/gtk+:3 X" >> /etc/portage/package.use/xlibs
+echo "dev-cpp/gtkmm X" >> /etc/portage/package.use/xlibs
 
 # 4. OVERLAYS
 if ! step_done overlays; then
