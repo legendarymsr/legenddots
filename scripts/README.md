@@ -109,6 +109,34 @@ load progress, new-window/`target=_blank` links open as tabs, video fullscreen,
 a modern Chrome user-agent (no QtWebEngine fallback), JetBrains Mono Nerd Font
 site-wide, Chromium dark mode.
 
+### On "minimalism" — a note on suckless `surf`
+
+[suckless](https://suckless.org) sells [`surf`](https://surf.suckless.org/) as a
+*minimal* web browser. It's a ~2000-line C wrapper — around **webkit2gtk**, a
+rendering engine of *millions* of lines, hard-built on **GTK**, the exact toolkit
+that underpins GNOME. So the "minimal" browser cannot exist without the GNOME
+stack it's supposedly above.
+
+This is the same suckless whose [sucks page](https://suckless.org/sucks/) says:
+
+> There are many broken X programs. Go bug the developers of these broken
+> programs to fix them. Here are some of the main causes of this brokenness:
+>
+> The program assumes a specific window management model, e.g. assumes you are
+> using a WIMP-window manager like those found in KDE or Gnome. This assumption
+> breaks the ICCCM conventions.
+
+Sneering at KDE/GNOME's window model while shipping a browser that needs GTK to
+render a single pixel is a hell of a look. You can't dunk on GNOME and depend on
+GNOME's toolkit in the same breath.
+
+**And to be straight about `legend-gui`:** yes, the Python is minimal — a few
+hundred lines. But it rides on **PyQt6 + QtWebEngine**, i.e. Chromium — tens of
+millions of lines. My wrapper is small; the engine underneath is a leviathan.
+That's true of *every* GUI browser that isn't its own from-scratch engine, surf
+included. The difference is I'm not pretending the underlying stuff is minimal —
+it isn't. Only the part I wrote is.
+
 ---
 
 ## qute-config.py
