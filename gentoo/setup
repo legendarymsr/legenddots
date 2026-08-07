@@ -488,30 +488,66 @@ if [[ "$INSTALL_VIRT" == "true" ]] && ! step_done virt; then
   fi
 fi
 
-# 12c. WAYDROID — Android container (needs the binder kernel config + a reboot)
-# Waydroid is not reliably packaged in ::gentoo; try the overlay and fall back to
-# a documented upstream install (see troubleshooting/README.md). Non-blocking.
+# 12c. WAYDROID — Android container. Not packaged in ::gentoo, so build it and
+# its gbinder stack from source (libglibutil → libgbinder → gbinder-python →
+# waydroid). Every step is guarded so a failure warns instead of aborting setup,
+# and the step only checkpoints once `waydroid` is actually on PATH.
 if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
-  header "Installing Waydroid..."
-  emaint sync --repo guru >/dev/null 2>&1 || true
-  # iptables backs Waydroid's container networking regardless of how waydroid
-  # itself is installed.
-  emerge net-firewall/iptables 2>/dev/null || warn "iptables emerge failed"
+  header "Installing Waydroid (from source — not emergeable on Gentoo)..."
+  WD_SRC=/usr/local/src
+  mkdir -p "$WD_SRC"
 
-  if emerge app-emulation/waydroid 2>/dev/null && command -v waydroid >/dev/null 2>&1; then
+  # Deps that ARE in the Gentoo tree.
+  emerge --noreplace app-containers/lxc net-dns/dnsmasq net-firewall/iptables \
+    dev-python/pygobject dev-python/dbus-python dev-vcs/git sys-apps/dbus \
+    dev-util/gperf sys-devel/gettext \
+    || warn "some Waydroid deps failed to emerge — the build may miss something"
+
+  # Clone (shallow) + run a build command in the tree. Guarded, non-fatal.
+  build_git() {  # <name> <url> <build-cmd...>
+    local name="$1" url="$2"; shift 2
+    [[ -d "$WD_SRC/$name" ]] || git clone --depth=1 "$url" "$WD_SRC/$name" \
+      || { warn "clone $name failed"; return 1; }
+    ( cd "$WD_SRC/$name" && "$@" ) || { warn "build/install $name failed"; return 1; }
+  }
+
+  # gbinder stack — the finicky part (Waydroid talks to Android's binder via it).
+  build_git libglibutil  https://github.com/sailfishos/libglibutil.git \
+    make install LIBDIR=/usr/lib "KEEP_SYMBOLS=1"
+  build_git libgbinder   https://github.com/mer-hybris/libgbinder.git \
+    make install LIBDIR=/usr/lib
+  ldconfig
+  build_git gbinder-python https://github.com/erfanoabdi/gbinder-python.git \
+    python setup.py install
+  build_git waydroid     https://github.com/waydroid/waydroid.git \
+    make install
+
+  ldconfig
+  if command -v waydroid >/dev/null 2>&1; then
+    # Waydroid ships only systemd units; write a minimal OpenRC init script.
+    cat > /etc/init.d/waydroid-container << 'EOF'
+#!/sbin/openrc-run
+name="waydroid-container"
+description="Waydroid Android container manager"
+command="/usr/bin/waydroid"
+command_args="container start"
+command_background="yes"
+pidfile="/run/waydroid-container.pid"
+depend() { need dbus; }
+EOF
+    chmod +x /etc/init.d/waydroid-container
     rc-update add waydroid-container default 2>/dev/null || true
-    echo -e "${GREEN}Waydroid installed.${NC} It needs the binder kernel config (this"
-    echo "setup enables it), so AFTER rebuilding the kernel and rebooting:"
+    success "Waydroid built. It needs the binder kernel config (this setup enables"
+    success "it), so AFTER rebuilding the kernel and rebooting:"
     echo "  doas rc-service waydroid-container start"
     echo "  doas waydroid init          # downloads the Android images (~1 GB)"
     echo "  waydroid session start &     # from inside your niri (Wayland) session"
     echo "  waydroid show-full-ui"
     mark_step waydroid
   else
-    warn "Waydroid isn't in your overlays (it's not reliably packaged for Gentoo)."
-    warn "Install it upstream instead — see the 'Waydroid' section of"
-    warn "  gentoo/troubleshooting/README.md — then re-run to register the service."
-    # Not checkpointed: a later run (after you add an overlay) will retry.
+    warn "Waydroid build didn't complete — the gbinder stack is fragile. See the"
+    warn "warnings above; sources are under $WD_SRC/ for manual fixing, then rerun."
+    # Not checkpointed — a later rerun retries.
   fi
 fi
 
@@ -607,6 +643,18 @@ if [[ "$REBUILD_WORLD" == "true" ]]; then
   emerge --changed-use --deep --with-bdeps=y @world || \
     echo "  ! @world rebuild hit errors — resolve and rerun: emerge --changed-use --deep @world"
   emerge --depclean 2>/dev/null || true
+fi
+
+# 15. PORTAGE HOUSEKEEPING — always runs; applies config writes + marks news read
+# The `--autounmask-write` emerges above drop ._cfg files under /etc/portage
+# (needed USE/keyword changes). Auto-merge *only those* (safe — this script owns
+# that dir). Package configs elsewhere in /etc are left for you to review, and
+# all repo news is marked read.
+header "Portage housekeeping (config merges + news)..."
+etc-update --automode -5 /etc/portage >/dev/null 2>&1 || true
+eselect news read --all >/dev/null 2>&1 || true
+if find /etc -name '._cfg????_*' 2>/dev/null | grep -q .; then
+  warn "Config files elsewhere in /etc are pending — review + merge with: doas etc-update"
 fi
 
 # ── DOTFILES (always runs — safe to re-run on existing installs) ──────────────
