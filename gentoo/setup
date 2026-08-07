@@ -503,25 +503,26 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
     dev-util/gperf sys-devel/gettext \
     || warn "some Waydroid deps failed to emerge — the build may miss something"
 
-  # Clone (shallow) + run a build command in the tree. Guarded, non-fatal.
-  build_git() {  # <name> <url> <build-cmd...>
-    local name="$1" url="$2"; shift 2
+  # Clone (shallow) + run a shell build command in the tree. Guarded, non-fatal.
+  build_git() {  # <name> <url> <shell-build-cmd>
+    local name="$1" url="$2" cmd="$3"
     [[ -d "$WD_SRC/$name" ]] || git clone --depth=1 "$url" "$WD_SRC/$name" \
       || { warn "clone $name failed"; return 1; }
-    ( cd "$WD_SRC/$name" && "$@" ) || { warn "build/install $name failed"; return 1; }
+    ( cd "$WD_SRC/$name" && bash -c "$cmd" ) || { warn "build/install $name failed"; return 1; }
   }
 
-  # gbinder stack — the finicky part (Waydroid talks to Android's binder via it).
+  # gbinder stack — these Makefiles need `make release` to build the .so BEFORE
+  # `make install` (install doesn't build). Then ldconfig so the next lib links.
   build_git libglibutil  https://github.com/sailfishos/libglibutil.git \
-    make install LIBDIR=/usr/lib "KEEP_SYMBOLS=1"
+    'make release && make install LIBDIR=/usr/lib'
+  ldconfig
   build_git libgbinder   https://github.com/mer-hybris/libgbinder.git \
-    make install LIBDIR=/usr/lib
+    'make release && make install LIBDIR=/usr/lib'
   ldconfig
   build_git gbinder-python https://github.com/erfanoabdi/gbinder-python.git \
-    python setup.py install
+    'python setup.py install'
   build_git waydroid     https://github.com/waydroid/waydroid.git \
-    make install
-
+    'make install'
   ldconfig
   if command -v waydroid >/dev/null 2>&1; then
     # Waydroid ships only systemd units; write a minimal OpenRC init script.
