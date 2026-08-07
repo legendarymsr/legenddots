@@ -881,13 +881,23 @@ tree.
 | Group | Config | Why |
 |-------|--------|-----|
 | **Removable media** | `EXFAT_FS=m`, `FUSE_FS=m` | exFAT is the norm on big USB sticks/SD cards and Ventoy's data partition; FUSE backs ntfs-3g, sshfs, mtpfs, etc. Userspace: `sys-fs/exfatprogs`, `sys-fs/fuse`. |
-| **Virtualisation** | `KVM=y`, `KVM_INTEL=y`, `VHOST_NET=y`, `TUN=y`, `BRIDGE=y` | QEMU/libvirt acceleration on the Haswell Intel core, with vhost-net + tap/bridge for guest networking. |
-| **Waydroid** | `ANDROID=y`, `ANDROID_BINDER_IPC=y`, `ANDROID_BINDERFS=y` | Waydroid runs a full Android userspace in an LXC container over the kernel's binder IPC. |
+| **Virtualisation** | `VIRTUALIZATION=y`, `KVM=y`, `KVM_INTEL=y`, `VHOST_NET=y`, `TUN=y`, `BRIDGE=y` | QEMU/libvirt acceleration on the Haswell Intel core, with vhost-net + tap/bridge for guest networking. `VIRTUALIZATION` is the parent menu — without it `olddefconfig` silently drops `KVM`. |
+| **Waydroid** | `ANDROID_BINDER_IPC=y`, `ANDROID_BINDERFS=y`, `ANDROID_BINDER_DEVICES="binder,hwbinder,vndbinder"` | Waydroid runs a full Android userspace in an LXC container over the kernel's binder IPC; `binderfs` creates the device nodes. |
+
+**On `CONFIG_ANDROID`:** deliberately *not* set. On 6.x it's just an empty
+`menu "Android"` wrapper — there is no `config ANDROID` symbol anymore, so
+`./scripts/config -e CONFIG_ANDROID` writes a stray line that `olddefconfig`
+drops. The real options are `ANDROID_BINDER_IPC` + `ANDROID_BINDERFS` (both
+`bool`, depending only on `MMU`, so they always stick on x86_64).
 
 **On `CONFIG_ASHMEM`:** deliberately *not* set. ashmem was removed from mainline
 in 5.18; on the 6.x kernel here Waydroid uses `memfd` instead, so setting it
 would just be dropped by `make olddefconfig`. Older kernels needed an out-of-tree
 module — not relevant here.
+
+The kernel-rebuild step **verifies these survived `olddefconfig`** before the
+long build and warns loudly if any didn't stick (a missing parent-menu dep is
+the usual cause), so you find out immediately rather than at `waydroid init`.
 
 Verify what's actually in your running config:
 
