@@ -115,17 +115,25 @@ disk_of() {  # /dev/sda3 -> /dev/sda ; /dev/nvme0n1p3 -> /dev/nvme0n1
 }
 
 # Auto-detect the Gentoo root: an ext4 partition holding a Gentoo userland.
+# Handles partitions that are ALREADY mounted (from a prior session) by peeking
+# at their existing mountpoint instead of re-mounting (which warns + pollutes).
 detect_root() {
-  local dev tmp
+  local dev mp tmp ok
   while read -r dev; do
-    tmp=$(mktemp -d)
-    if mount -o ro "$dev" "$tmp" 2>/dev/null; then
-      if [[ -f "$tmp/etc/portage/make.conf" && -d "$tmp/usr/src" ]]; then
-        umount "$tmp"; rmdir "$tmp"; echo "$dev"; return 0
-      fi
-      umount "$tmp" 2>/dev/null || true
+    mp=$(findmnt -fnro TARGET -S "$dev" 2>/dev/null | head -1)
+    if [[ -n "$mp" ]]; then
+      [[ -f "$mp/etc/portage/make.conf" && -d "$mp/usr/src" ]] && { echo "$dev"; return 0; }
+      continue
     fi
-    rmdir "$tmp" 2>/dev/null || true
+    tmp=$(mktemp -d)
+    if mount -o ro "$dev" "$tmp" >/dev/null 2>&1; then
+      ok=0; [[ -f "$tmp/etc/portage/make.conf" && -d "$tmp/usr/src" ]] && ok=1
+      umount "$tmp" >/dev/null 2>&1
+      rmdir "$tmp" 2>/dev/null
+      [[ "$ok" == 1 ]] && { echo "$dev"; return 0; }
+    else
+      rmdir "$tmp" 2>/dev/null
+    fi
   done < <(lsblk -lnpo NAME,FSTYPE | awk '$2=="ext4"{print $1}')
   return 1
 }
@@ -138,8 +146,16 @@ EFI_DEV="${EFI_DEV:-$(lsblk -lnpo NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2=="vf
 info "root: $ROOT_DEV   efi: ${EFI_DEV:-<none found>}   mount: $MNT"
 
 header "Mounting root + EFI + API filesystems..."
-mkdir -p "$MNT"
-mountpoint -q "$MNT" || mount "$ROOT_DEV" "$MNT" || die "mount $ROOT_DEV failed"
+# If ROOT_DEV is already mounted (a prior session), reuse that mountpoint instead
+# of double-mounting it (which errors with "would change RO state").
+EXISTING_MP=$(findmnt -fnro TARGET -S "$ROOT_DEV" 2>/dev/null | head -1)
+if [[ -n "$EXISTING_MP" ]]; then
+  MNT="$EXISTING_MP"
+  info "$ROOT_DEV already mounted at $MNT — reusing it."
+else
+  mkdir -p "$MNT"
+  mount "$ROOT_DEV" "$MNT" || die "mount $ROOT_DEV failed"
+fi
 if [[ -n "$EFI_DEV" ]]; then
   mkdir -p "$MNT/boot/efi"
   mountpoint -q "$MNT/boot/efi" || mount "$EFI_DEV" "$MNT/boot/efi" || warn "EFI mount failed (not fatal for a rebuild)"
