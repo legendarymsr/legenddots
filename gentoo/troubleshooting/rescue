@@ -25,7 +25,8 @@
 # fixing whatever it stops on. Don't pipe it through `tee` (buffers the output);
 # redirect instead:  bash rescue &> /tmp/rescue.log &  ;  tail -f /tmp/rescue.log
 # =============================================================================
-set -uo pipefail   # NOT -e: a recovery must push past benign failures.
+set -o pipefail   # NOT -e (push past benign failures) and NOT -u (sourcing
+                  # /etc/profile trips nounset and would exit the script silently).
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 header()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
