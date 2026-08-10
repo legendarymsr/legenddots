@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
 # =============================================================================
-# rescue — repair a bricked Gentoo install from a live USB (chroot recovery)
+# rescue — finish an interrupted update + rebuild the kernel, IN PLACE.
 # -----------------------------------------------------------------------------
-# Run as root from ANY live Linux (EndeavourOS, SystemRescue, Gentoo minimal):
+# Run as root from INSIDE your Gentoo system — either booted normally, or after
+# you've mounted + chrooted in from a live USB yourself. This script does NOT
+# mount or chroot anything; it just runs the repair against the current root.
 #
-#   sudo bash rescue                      # auto-detect disk, do everything
-#   ROOT_DEV=/dev/sdb3 sudo bash rescue    # override if auto-detect is wrong
+#   bash rescue                 # do everything
+#   SKIP_WORLD=1  bash rescue    # kernel rebuild only
+#   SKIP_KERNEL=1 bash rescue    # finish @world only
 #
-# Over SSH on flaky WiFi, wrap it so a drop can't kill it:
-#   sudo nohup bash rescue > /tmp/rescue.log 2>&1 &   ;  tail -f /tmp/rescue.log
+# From a live USB, mount + chroot first (once), then run it:
+#   mount /dev/sda3 /mnt && mount /dev/sda1 /mnt/boot/efi
+#   mount -t proc /proc /mnt/proc
+#   mount --rbind /sys /mnt/sys && mount --make-rslave /mnt/sys
+#   mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
+#   mount --rbind /run /mnt/run && mount --make-rslave /mnt/run
+#   echo nameserver 1.1.1.1 > /mnt/etc/resolv.conf
+#   chroot /mnt /bin/bash        # then, inside:  source /etc/profile; bash rescue
 #
-# What it does, in order:
-#   1. finds + mounts your Gentoo root (+ EFI) and the API filesystems with a
-#      SANE /dev (the /dev/fd portage needs), and fixes DNS in the chroot
-#   2. chroots in and finishes any interrupted `@world` update, UNATTENDED
-#   3. rebuilds out-of-tree modules (wl.ko)
-#   4. rebuilds the kernel with its EXISTING .config + regenerates the initramfs
-#   5. repoints rEFInd's initrd= at the rebuilt initramfs
-#   6. runs verify-boot
-#
-# Every step is idempotent — safe to re-run after fixing whatever it stops on.
-# Skips: SKIP_WORLD=1 (no @world), SKIP_KERNEL=1 (no kernel rebuild).
+# It: (1) finishes @world unattended, (2) rebuilds out-of-tree modules,
+# (3) rebuilds the kernel with its existing .config + regenerates the initramfs,
+# (4) repoints rEFInd's initrd=, (5) runs verify-boot. Idempotent — re-run after
+# fixing whatever it stops on. Don't pipe it through `tee` (buffers the output);
+# redirect instead:  bash rescue &> /tmp/rescue.log &  ;  tail -f /tmp/rescue.log
 # =============================================================================
 set -uo pipefail   # NOT -e: a recovery must push past benign failures.
 
@@ -31,159 +34,65 @@ success() { echo -e "${GREEN}  ✓ $*${NC}"; }
 info()    { echo -e "${CYAN}  → $*${NC}"; }
 die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "run as root: sudo bash rescue"
+[[ $EUID -eq 0 ]] || die "run as root: bash rescue"
+command -v emerge >/dev/null 2>&1 || die "no emerge here — you're not inside the Gentoo system (chroot in first)."
+source /etc/profile 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PHASE 2 — inside the chroot (re-exec'd from phase 1, or run with --inside on a
-# system you've already chrooted into / booted).
-# ─────────────────────────────────────────────────────────────────────────────
-if [[ "${RESCUE_INSIDE:-}" == "1" || "${1:-}" == "--inside" ]]; then
-  source /etc/profile 2>/dev/null || true
+[[ -e /dev/fd ]] || warn "/dev/fd missing — portage may refuse to run (fix the chroot's /dev mounts)."
+getent hosts gentoo.org >/dev/null 2>&1 || echo "nameserver 1.1.1.1" > /etc/resolv.conf
 
-  [[ -e /dev/fd ]] || warn "/dev/fd missing — portage may refuse to run (bad host mounts)."
-  getent hosts gentoo.org >/dev/null 2>&1 || echo "nameserver 1.1.1.1" > /etc/resolv.conf
+if [[ "${SKIP_WORLD:-}" != "1" ]]; then
+  header "Finishing @world update (unattended — this is the long one)..."
+  # --autounmask-continue writes needed USE/keyword changes and keeps going;
+  # --keep-going means one bad package doesn't halt the rest.
+  emerge --update --deep --newuse --with-bdeps=y --backtrack=100 \
+         --autounmask-continue=y --keep-going=y @world \
+    || warn "@world reported errors above — resolve them and re-run rescue."
+  emerge --depclean 2>/dev/null || true
+fi
 
-  if [[ "${SKIP_WORLD:-}" != "1" ]]; then
-    header "Finishing @world update (unattended — this is the long one)..."
-    # --autounmask-continue writes needed USE/keyword changes and keeps going;
-    # --keep-going means one bad package doesn't halt the rest.
-    emerge --update --deep --newuse --with-bdeps=y --backtrack=100 \
-           --autounmask-continue=y --keep-going=y @world \
-      || warn "@world reported errors above — resolve them and re-run rescue."
-    emerge --depclean 2>/dev/null || true
-  fi
+header "Rebuilding out-of-tree modules (wl.ko etc.)..."
+emerge @module-rebuild 2>/dev/null || warn "@module-rebuild failed — WiFi may break; rebuild net-wireless/broadcom-sta."
 
-  header "Rebuilding out-of-tree modules (wl.ko etc.)..."
-  emerge @module-rebuild 2>/dev/null || warn "@module-rebuild failed — WiFi may break; rebuild net-wireless/broadcom-sta."
-
-  if [[ "${SKIP_KERNEL:-}" != "1" ]]; then
-    KSRC=/usr/src/linux
-    if [[ -f "$KSRC/.config" && -x "$KSRC/scripts/config" ]]; then
-      KVER=$(cd "$KSRC" && make -s kernelrelease 2>/dev/null)
-      header "Rebuilding kernel ${KVER} with its existing .config..."
-      # olddefconfig keeps your config, just resolves any new symbols. -j3 is
-      # safe on the 4 GB Air (bigger -j OOMs gcc). make install rotates
-      # vmlinuz -> vmlinuz.old and copies the new image to /boot.
-      if ( cd "$KSRC" && make olddefconfig && make -j3 && make modules_install && make install ); then
-        if command -v genkernel >/dev/null 2>&1; then
-          genkernel --no-clean --no-mrproper --kernel-config="$KSRC/.config" initramfs \
-            || warn "genkernel failed — initramfs NOT regenerated; do NOT reboot until fixed."
-        else
-          warn "genkernel missing — initramfs NOT regenerated (emerge sys-kernel/genkernel)."
-        fi
-        depmod -a "$KVER" 2>/dev/null || true
-        # Repoint rEFInd's shared initrd= line at the (possibly renamed) initramfs.
-        NEWINITRD=$(ls -t /boot/initramfs-*"$KVER"*.img 2>/dev/null | head -1)
-        if [[ -n "$NEWINITRD" && -f /boot/refind_linux.conf ]]; then
-          sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" \
-            /boot/refind_linux.conf && success "refind_linux.conf initrd -> $(basename "$NEWINITRD")"
-        fi
-        success "Kernel ${KVER} rebuilt + installed."
+if [[ "${SKIP_KERNEL:-}" != "1" ]]; then
+  KSRC=/usr/src/linux
+  if [[ -f "$KSRC/.config" && -x "$KSRC/scripts/config" ]]; then
+    KVER=$(cd "$KSRC" && make -s kernelrelease 2>/dev/null)
+    header "Rebuilding kernel ${KVER} with its existing .config..."
+    # olddefconfig keeps your config, just resolves any new symbols. -j3 is safe
+    # on the 4 GB Air (bigger -j OOMs gcc). make install rotates vmlinuz ->
+    # vmlinuz.old and copies the new image to /boot.
+    if ( cd "$KSRC" && make olddefconfig && make -j3 && make modules_install && make install ); then
+      if command -v genkernel >/dev/null 2>&1; then
+        genkernel --no-clean --no-mrproper --kernel-config="$KSRC/.config" initramfs \
+          || warn "genkernel failed — initramfs NOT regenerated; do NOT reboot until fixed."
       else
-        die "kernel build failed — fix the error above and re-run rescue."
+        warn "genkernel missing — initramfs NOT regenerated (emerge sys-kernel/genkernel)."
       fi
+      depmod -a "$KVER" 2>/dev/null || true
+      # Repoint rEFInd's shared initrd= line at the (possibly renamed) initramfs.
+      NEWINITRD=$(ls -t /boot/initramfs-*"$KVER"*.img 2>/dev/null | head -1)
+      if [[ -n "$NEWINITRD" && -f /boot/refind_linux.conf ]]; then
+        sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" \
+          /boot/refind_linux.conf && success "refind_linux.conf initrd -> $(basename "$NEWINITRD")"
+      fi
+      success "Kernel ${KVER} rebuilt + installed."
     else
-      warn "No kernel .config at $KSRC — skipping kernel rebuild (set the source with eselect kernel)."
+      die "kernel build failed — fix the error above and re-run rescue."
     fi
+  else
+    warn "No kernel .config at $KSRC — skipping kernel rebuild (set the source with eselect kernel)."
   fi
-
-  # verify-boot from wherever the repo lives
-  for p in /home/legend/legenddots /root/legenddots /legenddots; do
-    if [[ -f "$p/gentoo/troubleshooting/verify-boot" ]]; then
-      header "verify-boot"
-      bash "$p/gentoo/troubleshooting/verify-boot" || true
-      break
-    fi
-  done
-
-  header "Chroot recovery done."
-  success "If verify-boot is green: exit, unmount, and reboot into your kernel."
-  exit 0
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PHASE 1 — on the live host: find the disk, mount everything, chroot, re-exec.
-# ─────────────────────────────────────────────────────────────────────────────
-MNT="${MNT:-/mnt/gentoo}"
+# verify-boot from wherever the repo lives
+for p in /root/legenddots /home/legend/legenddots /legenddots; do
+  if [[ -f "$p/gentoo/troubleshooting/verify-boot" ]]; then
+    header "verify-boot"
+    bash "$p/gentoo/troubleshooting/verify-boot" || true
+    break
+  fi
+done
 
-disk_of() {  # /dev/sda3 -> /dev/sda ; /dev/nvme0n1p3 -> /dev/nvme0n1
-  case "$1" in
-    /dev/nvme*n*p*) echo "${1%p*}" ;;
-    /dev/mmcblk*p*) echo "${1%p*}" ;;
-    *)              echo "${1%%[0-9]*}" ;;
-  esac
-}
-
-# Auto-detect the Gentoo root: an ext4 partition holding a Gentoo userland.
-# Handles partitions that are ALREADY mounted (from a prior session) by peeking
-# at their existing mountpoint instead of re-mounting (which warns + pollutes).
-detect_root() {
-  local dev mp tmp ok
-  while read -r dev; do
-    mp=$(findmnt -fnro TARGET -S "$dev" 2>/dev/null | head -1)
-    if [[ -n "$mp" ]]; then
-      [[ -f "$mp/etc/portage/make.conf" && -d "$mp/usr/src" ]] && { echo "$dev"; return 0; }
-      continue
-    fi
-    tmp=$(mktemp -d)
-    if mount -o ro "$dev" "$tmp" >/dev/null 2>&1; then
-      ok=0; [[ -f "$tmp/etc/portage/make.conf" && -d "$tmp/usr/src" ]] && ok=1
-      umount "$tmp" >/dev/null 2>&1
-      rmdir "$tmp" 2>/dev/null
-      [[ "$ok" == 1 ]] && { echo "$dev"; return 0; }
-    else
-      rmdir "$tmp" 2>/dev/null
-    fi
-  done < <(lsblk -lnpo NAME,FSTYPE | awk '$2=="ext4"{print $1}')
-  return 1
-}
-
-header "Locating your Gentoo install..."
-ROOT_DEV="${ROOT_DEV:-$(detect_root || true)}"
-[[ -n "$ROOT_DEV" ]] || die "couldn't find a Gentoo root; pass it: ROOT_DEV=/dev/sdXN sudo bash rescue"
-DISK=$(disk_of "$ROOT_DEV")
-EFI_DEV="${EFI_DEV:-$(lsblk -lnpo NAME,FSTYPE "$DISK" 2>/dev/null | awk '$2=="vfat"{print $1; exit}')}"
-info "root: $ROOT_DEV   efi: ${EFI_DEV:-<none found>}   mount: $MNT"
-
-header "Mounting root + EFI + API filesystems..."
-# If ROOT_DEV is already mounted (a prior session), reuse that mountpoint instead
-# of double-mounting it (which errors with "would change RO state").
-EXISTING_MP=$(findmnt -fnro TARGET -S "$ROOT_DEV" 2>/dev/null | head -1)
-if [[ -n "$EXISTING_MP" ]]; then
-  MNT="$EXISTING_MP"
-  info "$ROOT_DEV already mounted at $MNT — reusing it."
-else
-  mkdir -p "$MNT"
-  mount "$ROOT_DEV" "$MNT" || die "mount $ROOT_DEV failed"
-fi
-if [[ -n "$EFI_DEV" ]]; then
-  mkdir -p "$MNT/boot/efi"
-  mountpoint -q "$MNT/boot/efi" || mount "$EFI_DEV" "$MNT/boot/efi" || warn "EFI mount failed (not fatal for a rebuild)"
-fi
-# A sane /dev (incl. /dev/fd -> /proc/self/fd) is what portage validates.
-mountpoint -q "$MNT/proc" || mount -t proc /proc "$MNT/proc"
-mountpoint -q "$MNT/sys"  || { mount --rbind /sys "$MNT/sys"; mount --make-rslave "$MNT/sys"; }
-mountpoint -q "$MNT/dev"  || { mount --rbind /dev "$MNT/dev"; mount --make-rslave "$MNT/dev"; }
-mountpoint -q "$MNT/run"  || { mount --rbind /run "$MNT/run"; mount --make-rslave "$MNT/run"; }
-getent hosts gentoo.org >/dev/null 2>&1 && cp -L /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null \
-  || echo "nameserver 1.1.1.1" > "$MNT/etc/resolv.conf"
-success "Mounted. /dev/fd in chroot: $(readlink -f "$MNT/dev/fd" 2>/dev/null || echo '?')"
-
-header "Entering chroot to finish the repair..."
-SELF=$(readlink -f "$0")
-cp "$SELF" "$MNT/tmp/.rescue-inner" && chmod +x "$MNT/tmp/.rescue-inner"
-RESCUE_INSIDE=1 SKIP_WORLD="${SKIP_WORLD:-}" SKIP_KERNEL="${SKIP_KERNEL:-}" \
-  chroot "$MNT" /tmp/.rescue-inner
-rc=$?
-rm -f "$MNT/tmp/.rescue-inner"
-
-echo
-if [[ $rc -eq 0 ]]; then
-  success "Recovery finished. To reboot into your system:"
-  echo "    sudo umount -R $MNT   # optional; a reboot unmounts anyway"
-  echo "    sudo reboot           # then pick your kernel in rEFInd"
-else
-  warn "The chroot step exited non-zero ($rc). Read the output above, fix it,"
-  warn "and re-run:  sudo bash rescue   (it resumes cleanly)."
-fi
-exit $rc
+header "Done."
+success "If verify-boot is green: exit the chroot, unmount, and reboot into your kernel."
