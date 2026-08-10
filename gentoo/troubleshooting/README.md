@@ -123,51 +123,47 @@ non-zero if anything's found. Typical first run flags `/usr/lib32` and gcc's
 32-bit libs — leftovers from a build made before switching profiles — which the
 rebuild sweeps out.
 
-## `rescue` — repair a bricked system from a live USB
+## `rescue` — finish an interrupted update + rebuild the kernel (in place)
 
-Run this **from a live Linux USB** (EndeavourOS, SystemRescue, the Gentoo minimal
-ISO — any 64-bit one), as root, when the system won't boot or an `emerge` was
-interrupted and left it inconsistent:
-
-```sh
-sudo bash rescue
-```
-
-It does the whole chroot-recovery dance in one command — no memorizing mount
-sequences:
-
-1. **Finds and mounts** your Gentoo root (auto-detects the ext4 partition with a
-   Gentoo userland; override with `ROOT_DEV=/dev/sdXN`), the EFI partition, and
-   the API filesystems (`proc`/`sys`/`dev`/`run`) with a **sane `/dev`** — the
-   `/dev/fd` that portage refuses to run without — then fixes DNS in the chroot.
-2. **chroots in and finishes `@world` unattended** (`--autounmask-continue`
-   `--keep-going --backtrack=100`), then `--depclean`.
-3. **Rebuilds out-of-tree modules** (`wl.ko`) against the kernel.
-4. **Rebuilds the kernel** with its *existing* `.config` (`make olddefconfig &&
-   make -j3 && make modules_install && make install`) and **regenerates the
-   initramfs** with genkernel.
-5. **Repoints rEFInd's `initrd=`** at the rebuilt initramfs.
-6. Runs **`verify-boot`**.
-
-Every step is idempotent — if it stops on something, fix that and re-run; it
-resumes cleanly. Skip the slow phases with `SKIP_WORLD=1` or `SKIP_KERNEL=1`.
-
-**Over SSH on flaky WiFi**, wrap it so a drop can't kill it:
+Runs **inside your Gentoo system** — either booted normally, or after you've
+chrooted in from a live USB. It does *not* mount or chroot anything itself (that
+was more trouble than help); it just runs the repair against the current root:
 
 ```sh
-sudo nohup bash rescue > /tmp/rescue.log 2>&1 &
-tail -f /tmp/rescue.log     # Ctrl-C stops the tail, not the rescue
+bash rescue                 # do everything
+SKIP_WORLD=1  bash rescue    # kernel rebuild only
+SKIP_KERNEL=1 bash rescue    # finish @world only
 ```
 
-> Why the kernel gets rebuilt: after `make install` runs twice, both `vmlinuz`
+It: (1) finishes `@world` unattended (`--autounmask-continue --keep-going
+--backtrack=100`) + `--depclean`, (2) rebuilds out-of-tree modules (`wl.ko`),
+(3) rebuilds the kernel with its *existing* `.config` (`make olddefconfig &&
+make -j3 && make modules_install && make install`) + regenerates the initramfs,
+(4) repoints rEFInd's `initrd=`, (5) runs `verify-boot`. Idempotent — if it
+stops on something, fix that and re-run.
+
+**Don't pipe it through `tee`** — that buffers the output so it looks frozen.
+Redirect instead if you want a log:
+```sh
+bash rescue &> /tmp/rescue.log &
+tail -f /tmp/rescue.log
+```
+
+**From a live USB**, mount + chroot in first (once), then run it:
+```sh
+mount /dev/sda3 /mnt && mount /dev/sda1 /mnt/boot/efi
+mount -t proc /proc /mnt/proc
+mount --rbind /sys /mnt/sys && mount --make-rslave /mnt/sys
+mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
+mount --rbind /run /mnt/run && mount --make-rslave /mnt/run
+echo nameserver 1.1.1.1 > /mnt/etc/resolv.conf
+chroot /mnt /bin/bash
+source /etc/profile
+bash /root/legenddots/gentoo/troubleshooting/rescue
+```
+
+> Why it rebuilds the kernel: after `make install` runs twice, both `vmlinuz`
 > and `vmlinuz.old` can end up being the *same* freshly-built kernel — so a bad
-> build leaves you with no working fallback and both rEFInd entries freeze
-> identically. `rescue` rebuilds against the finished toolchain and regenerates a
-> matching initramfs, which is what actually gets you booting again.
-
-Already booted (or already chrooted in) and just want the rebuild half? Run the
-same script with `--inside`:
-
-```sh
-sudo bash rescue --inside
-```
+> build leaves no working fallback and both rEFInd entries freeze identically.
+> Rebuilding against the finished toolchain + a matching initramfs is what gets
+> you booting again.
