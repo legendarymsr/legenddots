@@ -97,10 +97,27 @@ fi
 "$WD_SCRIPT_DIR/venv/bin/pip" install -q -r "$WD_SCRIPT_DIR/requirements.txt" || die "pip install requirements failed."
 success "waydroid_script ready at $WD_SCRIPT_DIR"
 
-# ── 3. Stop any running session so the image can be mounted for patching ──────
-header "Step 3 — stop session"
+# ── 3. Stop the session, but START the container manager ─────────────────────
+# waydroid_script installs modules via `waydroid upgrade -o`, which talks to the
+# container MANAGER — if it isn't running the install dies on "Couldn't get LXC
+# status. Assuming STOPPED". So stop any user session (frees the image) but bring
+# the container manager up. (Needs binder in the kernel: ls /dev/binderfs.)
+header "Step 3 — stop session, start container manager"
 waydroid session stop 2>/dev/null || true
-success "Session stopped (if one was running)."
+if [[ -f /etc/init.d/waydroid-container ]] && command -v rc-service >/dev/null 2>&1; then
+  rc-service waydroid-container start 2>/dev/null || warn "couldn't start waydroid-container service"
+elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files waydroid-container.service >/dev/null 2>&1; then
+  systemctl start waydroid-container 2>/dev/null || warn "couldn't start waydroid-container.service"
+else
+  ( setsid waydroid container start >/dev/null 2>&1 & )   # no service unit — background the daemon
+fi
+sleep 4
+if [[ -e /dev/binder ]]; then
+  success "Container manager started."
+else
+  warn "No /dev/binder — container can't run; module installs will fail on 'LXC status'."
+  warn "Rebuild the kernel with binder (troubleshooting/rebuild-kernel), reboot, then rerun."
+fi
 
 # ── 4. Patch the image: root + ARM + microG (+ widevine) ──────────────────────
 # Each install is guarded so one failing module doesn't abort the rest.
