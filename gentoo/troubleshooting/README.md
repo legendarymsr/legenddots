@@ -222,3 +222,48 @@ Gotchas this flow works around:
   backgrounding (above) gives the same "survives a WiFi drop" resilience.
 - **If the USB took `sda`**, your disk is `sdb`/`sdc`/… — read `lsblk -f` and swap
   the device names throughout.
+
+### Kernel freezes at rEFInd "Starting vmlinuz" — rebuild from a known-good config
+
+**Symptom:** rEFInd shows `Starting vmlinuz` / `Using load options …` and hangs
+there with **no kernel output at all**. The image loads but never executes — the
+kernel *build/config* is bad (a `REBUILD_KERNEL` that produced a non-booting
+kernel). The cmdline is fine (it's the same one that booted before); the kernel
+itself is the problem. Fix: rebuild from a config you know booted.
+
+Run **inside the chroot** (do the live-USB mount + chroot, blocks 1–3 above,
+first). Then copy-paste:
+
+```sh
+# 1. list configs saved by past 'make install' — you want one from a kernel
+#    version you KNOW booted (usually an OLDER one than the broken build)
+ls -la /boot/config-*
+
+# 2. point GOODCFG at that file (edit the version to match step 1)
+GOODCFG=/boot/config-6.18.35-gentoo-r1
+
+# 3. get the kernel sources back (a past depclean may have removed them)
+emerge --oneshot "=sys-kernel/gentoo-sources-6.18*"
+ln -sfn "$(ls -d /usr/src/linux-6.18* | sort -V | tail -1)" /usr/src/linux
+
+# 4. seed the known-good config and build
+cp "$GOODCFG" /usr/src/linux/.config
+cd /usr/src/linux
+make olddefconfig
+make -j3 && make modules_install && make install
+
+# 5. regenerate the initramfs and repoint rEFInd's initrd= at it
+genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs
+KVER=$(make -s kernelrelease)
+NEWINITRD=$(ls -t /boot/initramfs-*"$KVER"*.img | head -1)
+sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" /boot/refind_linux.conf
+
+# 6. verify, then leave + reboot
+bash /root/legenddots/gentoo/troubleshooting/verify-boot
+exit && umount -R /mnt && reboot
+```
+
+> **Don't** use `rescue`'s auto-config-restore for this — it grabs the *newest*
+> `/boot/config-*`, which is the broken build. Pick the older, known-good config
+> by hand (step 2). And `SKIP_KERNEL=1 bash rescue` first if you only want to
+> finish `@world` without touching the kernel.
