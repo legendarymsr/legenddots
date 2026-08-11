@@ -660,8 +660,9 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
         echo "  ! genkernel not found — initramfs NOT regenerated; emerge sys-kernel/genkernel and rerun if your boot needs one"
       fi
       # Out-of-tree modules (broadcom-sta wl.ko) must be recompiled against the
-      # new kernel or WiFi breaks after reboot.
-      emerge @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
+      # new kernel or WiFi breaks after reboot. --usepkg=n forces a source build:
+      # a stale binpkg is compiled for a different kernel and leaves no wl.ko here.
+      emerge --usepkg=n @module-rebuild 2>/dev/null || echo "  ! @module-rebuild failed — rebuild net-wireless/broadcom-sta manually before rebooting"
       NEWVER=$(make -s kernelrelease)
       depmod -a "$NEWVER" 2>/dev/null || true
 
