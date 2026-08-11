@@ -28,16 +28,23 @@ die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
 command -v emerge >/dev/null 2>&1 || die "no emerge — run this inside the Gentoo system (chroot in first)."
 source /etc/profile 2>/dev/null || true
 
-header "Ensuring kernel sources are present..."
-if [[ ! -x /usr/src/linux/scripts/config ]]; then
-  warn "no kernel source tree — emerging gentoo-sources..."
-  ACCEPT_KEYWORDS="-~amd64 amd64" emerge sys-kernel/gentoo-sources || die "gentoo-sources emerge failed"
+# Which kernel series to build. Default 6.18 (the longterm this system targets).
+# MUST be pinned — an unpinned `emerge gentoo-sources` now grabs the 7.x series,
+# which broadcom-sta's wl.ko doesn't build against and nothing else here expects.
+KSERIES="${KSERIES:-6.18}"
+
+header "Ensuring ${KSERIES} kernel sources are present..."
+if ! ls -d /usr/src/linux-${KSERIES}* >/dev/null 2>&1; then
+  warn "no ${KSERIES} source tree — emerging =sys-kernel/gentoo-sources-${KSERIES}*..."
+  emerge "=sys-kernel/gentoo-sources-${KSERIES}*" || die "gentoo-sources ${KSERIES} emerge failed (check ACCEPT_KEYWORDS)"
 fi
 command -v genkernel >/dev/null 2>&1 || emerge sys-kernel/genkernel sys-kernel/linux-firmware || warn "genkernel/firmware emerge issue"
-# Point /usr/src/linux at the newest source tree.
-NEWEST=$(ls -d /usr/src/linux-* 2>/dev/null | sort -V | tail -1)
-[[ -n "$NEWEST" ]] && ln -sfn "$NEWEST" /usr/src/linux
+# Point /usr/src/linux at the newest ${KSERIES} tree — NOT any newer series.
+NEWEST=$(ls -d /usr/src/linux-${KSERIES}* 2>/dev/null | sort -V | tail -1)
+[[ -n "$NEWEST" ]] || die "no /usr/src/linux-${KSERIES}* tree found after emerge"
+ln -sfn "$NEWEST" /usr/src/linux
 cd /usr/src/linux || die "no /usr/src/linux"
+success "building from $NEWEST"
 
 header "Seeding defconfig + applying the proven MBA 6,2 config..."
 make defconfig

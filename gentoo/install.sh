@@ -396,7 +396,9 @@ if ! step_done kernel; then
   # "-~amd64" explicitly drops the inherited testing acceptance first, so
   # this one emerge call is genuinely restricted to the latest *stable*
   # release without touching the testing-wide default everything else uses.
-  ACCEPT_KEYWORDS="-~amd64 amd64" emerge sys-kernel/gentoo-sources
+  # Pin to the 6.18 longterm — an unpinned emerge now floats to the 7.x series,
+  # which net-wireless/broadcom-sta's out-of-tree wl.ko does not build against.
+  emerge "=sys-kernel/gentoo-sources-6.18*"
   emerge sys-kernel/genkernel sys-kernel/linux-firmware sys-firmware/intel-microcode
   eselect kernel set 1
   cd /usr/src/linux
