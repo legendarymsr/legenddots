@@ -618,6 +618,18 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
                      -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \
                      -e CONFIG_INIT_ON_FREE_DEFAULT_ON \
                      -m CONFIG_MOUSE_BCM5974
+    # BOOT-CRITICAL — applied unconditionally so that even a defconfig-seeded
+    # rebuild still boots. Apple EFI display stack (or it boots blind), built-in
+    # root drivers (or the initramfs can't mount root), broadcom PREEMPT_NONE (or
+    # wl.ko won't build), and IKCONFIG so the NEXT rebuild has /proc/config.gz to
+    # re-seed from instead of falling back to defconfig. This is the exact set
+    # whose absence produced a boot-blind kernel.
+    ./scripts/config -e CONFIG_DRM_I915 -e CONFIG_DRM_SIMPLEDRM \
+                     -e CONFIG_DRM_FBDEV_EMULATION -e CONFIG_SYSFB_SIMPLEFB \
+                     -e CONFIG_FRAMEBUFFER_CONSOLE \
+                     -e CONFIG_EXT4_FS -e CONFIG_BLK_DEV_SD -e CONFIG_SATA_AHCI \
+                     -e CONFIG_IKCONFIG -e CONFIG_IKCONFIG_PROC \
+                     -d CONFIG_PREEMPT_DYNAMIC -d CONFIG_PREEMPT -e CONFIG_PREEMPT_NONE
     # Removable media: exFAT + FUSE (Ventoy data partition, ntfs-3g, sshfs…).
     ./scripts/config -m CONFIG_EXFAT_FS -m CONFIG_FUSE_FS
     # Virtualisation: KVM + QEMU/libvirt guest networking. VIRTUALIZATION is the
@@ -636,7 +648,9 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     # the ones we just set survived BEFORE the ~30-min build + reboot, so a missing
     # dep surfaces now instead of at `waydroid init` / first `qemu` run.
     missing=""
-    for opt in CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
+    for opt in CONFIG_DRM_SIMPLEDRM CONFIG_SYSFB_SIMPLEFB CONFIG_FRAMEBUFFER_CONSOLE \
+               CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD \
+               CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
                CONFIG_KVM CONFIG_KVM_INTEL CONFIG_VHOST_NET CONFIG_TUN CONFIG_BRIDGE \
                CONFIG_EXFAT_FS CONFIG_FUSE_FS; do
       grep -q "^${opt}=" .config || missing="$missing $opt"
