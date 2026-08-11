@@ -75,19 +75,23 @@ only a red `✗` blocks you.
 doas bash ~/legenddots/gentoo/troubleshooting/fix-wifi
 ```
 
-Evicts any competing Broadcom driver (`brcmfmac`/`b43`/`bcma`/`ssb`), loads
-`wl`, restarts NetworkManager, and reports device status. If it prints
-`wl FAILED` (symbol/vermagic mismatch after a kernel rebuild), boot `vmlinuz.old`
-at the rEFInd menu — WiFi works there — then rebuild the module for the new
-kernel:
+Does the whole recovery in one command: evicts competing Broadcom drivers
+(`brcmfmac`/`b43`/`bcma`/`ssb`), loads `wl`, **stops a stray `dhcpcd`** that would
+grab the interface out from under NetworkManager (the cause of `wlp3s0
+connected (externally)` with a stale IP + `NO-CARRIER` + dead DNS), hands the
+device to NM, scans, and then **prompts you for an SSID + password and
+connects** — so there's no chain of `nmcli` lines to type. Ends by confirming a
+default route / DNS.
+
+If it prints `wl FAILED` (symbol/vermagic mismatch after a kernel rebuild),
+rebuild the module against the running kernel (`--usepkg=n` forces a *source*
+build so `wl.ko` matches — a stale binpkg is built for a different kernel):
 
 ```sh
-doas emerge @module-rebuild && doas depmod -a
+doas emerge --usepkg=n @module-rebuild && doas depmod -a
 ```
 
-If WiFi simply *dropped* after working (device shows `disconnected`/`unavailable`
-in `nmcli device status`), it's usually a reconnect or rfkill issue, not the
-module:
+If the scan shows nothing, the radio may be blocked:
 
 ```sh
 doas rfkill unblock all && doas rc-service NetworkManager restart
