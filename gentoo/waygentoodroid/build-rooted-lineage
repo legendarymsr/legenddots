@@ -100,23 +100,58 @@ success "waydroid_script ready at $WD_SCRIPT_DIR"
 # ── 3. Stop the session, but START the container manager ─────────────────────
 # waydroid_script installs modules via `waydroid upgrade -o`, which talks to the
 # container MANAGER — if it isn't running the install dies on "Couldn't get LXC
-# status. Assuming STOPPED". So stop any user session (frees the image) but bring
-# the container manager up. (Needs binder in the kernel: ls /dev/binderfs.)
+# status. Assuming STOPPED". Getting it up reliably needs three things: binder in
+# the kernel, the system dbus running, and the container run as a proper daemon
+# (a hand-backgrounded `waydroid container start` dies).
 header "Step 3 — stop session, start container manager"
 waydroid session stop 2>/dev/null || true
-if [[ -f /etc/init.d/waydroid-container ]] && command -v rc-service >/dev/null 2>&1; then
-  rc-service waydroid-container start 2>/dev/null || warn "couldn't start waydroid-container service"
-elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files waydroid-container.service >/dev/null 2>&1; then
-  systemctl start waydroid-container 2>/dev/null || warn "couldn't start waydroid-container.service"
-else
-  ( setsid waydroid container start >/dev/null 2>&1 & )   # no service unit — background the daemon
+
+[[ -e /dev/binder ]] || warn "No /dev/binder — kernel binder missing; the container can't run. \
+Rebuild with binder (troubleshooting/rebuild-kernel) + reboot, then rerun."
+
+# (a) system dbus — the container daemon talks over it; on a bare TTY it's often
+# not running yet.
+if command -v rc-service >/dev/null 2>&1; then
+  rc-service dbus status >/dev/null 2>&1 || rc-service dbus start 2>/dev/null || warn "couldn't start dbus"
+  rc-update add dbus default 2>/dev/null || true
 fi
-sleep 4
-if [[ -e /dev/binder ]]; then
-  success "Container manager started."
+
+# (b) ensure the OpenRC service exists (setup writes it; recreate if missing so
+# the daemon is supervised properly instead of hand-backgrounded).
+if command -v rc-service >/dev/null 2>&1 && [[ ! -f /etc/init.d/waydroid-container ]]; then
+  cat > /etc/init.d/waydroid-container <<'EOF'
+#!/sbin/openrc-run
+name="waydroid-container"
+command="/usr/bin/waydroid"
+command_args="container start"
+command_background="yes"
+pidfile="/run/waydroid-container.pid"
+depend() { need dbus; }
+EOF
+  chmod +x /etc/init.d/waydroid-container
+  rc-update add waydroid-container default 2>/dev/null || true
+fi
+
+# (c) start it.
+if [[ -f /etc/init.d/waydroid-container ]] && command -v rc-service >/dev/null 2>&1; then
+  rc-service waydroid-container restart 2>/dev/null || rc-service waydroid-container start 2>/dev/null || warn "waydroid-container service failed"
+elif command -v systemctl >/dev/null 2>&1; then
+  systemctl restart waydroid-container 2>/dev/null || warn "waydroid-container.service failed"
 else
-  warn "No /dev/binder — container can't run; module installs will fail on 'LXC status'."
-  warn "Rebuild the kernel with binder (troubleshooting/rebuild-kernel), reboot, then rerun."
+  ( setsid waydroid container start >/dev/null 2>&1 & )
+fi
+
+# (d) verify the daemon is actually alive before patching — poll for its process.
+CONTAINER_UP=""
+for _ in 1 2 3 4 5 6; do
+  if pgrep -f 'waydroid.*container' >/dev/null 2>&1; then CONTAINER_UP=1; break; fi
+  sleep 2
+done
+if [[ -n "$CONTAINER_UP" ]]; then
+  success "Container manager is running."
+else
+  warn "Container manager did NOT stay up — module installs will fail on 'LXC status'."
+  warn "Run it in the foreground to see the error:  doas waydroid container start"
 fi
 
 # ── 4. Patch the image: root + ARM + microG (+ widevine) ──────────────────────
