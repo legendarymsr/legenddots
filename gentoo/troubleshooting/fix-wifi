@@ -26,6 +26,17 @@ WIFI=$(ls /sys/class/net 2>/dev/null | grep -E '^wl' | head -1)
 [[ -n "$WIFI" ]] || { echo ">>> no wl* interface yet — check: doas dmesg | grep -i wl"; exit 1; }
 echo "== wifi interface: $WIFI =="
 
+# Broadcom wl DROPS under idle/load with WiFi power management on. Kill it now and
+# persist it (NetworkManager + TLP) so the drops don't come back after a reboot.
+echo "== disabling WiFi power management (the drop cause) =="
+iw dev "$WIFI" set power_save off 2>/dev/null && echo "  runtime power_save off"
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/wifi-powersave.conf
+if [[ -f /etc/tlp.conf ]] && ! grep -q '^WIFI_PWR_ON_BAT=off' /etc/tlp.conf; then
+  printf '\n# Broadcom wl drops with WiFi power saving on — keep it off.\nWIFI_PWR_ON_AC=off\nWIFI_PWR_ON_BAT=off\n' >> /etc/tlp.conf
+  rc-service tlp restart 2>/dev/null || true
+fi
+
 # A stray dhcpcd (or netifrc net.*) holding the interface makes NetworkManager
 # report it as 'connected (externally)' with a STALE ip and NO real association
 # (NO-CARRIER) — so nothing routes and DNS fails. Hand WiFi to NM exclusively.
@@ -48,18 +59,27 @@ echo "== available networks =="
 nmcli device wifi list 2>/dev/null || echo "  (scan failed — radio off? try: doas rfkill unblock all)"
 
 echo
-read -rp "Connect to which SSID? (blank to skip) " SSID
-if [[ -n "${SSID:-}" ]]; then
-  read -rsp "Password for \"$SSID\": " PASS; echo
-  if nmcli device wifi connect "$SSID" password "$PASS"; then
-    echo ">>> connected. Testing DNS:"
-    ping -c2 gentoo.org
-  else
-    echo ">>> connect failed — check SSID/password and rerun, or: doas rfkill unblock all"
-  fi
+# First try a connection you've already saved — the restart above drops the link,
+# and 'con up' restores it with the stored password (no re-typing). Only prompt if
+# there's no saved wifi profile or it won't come up.
+SAVED=$(nmcli -t -g NAME,TYPE con show 2>/dev/null | awk -F: '$2=="802-11-wireless"{print $1; exit}')
+if [[ -n "$SAVED" ]] && nmcli con up "$SAVED" >/dev/null 2>&1; then
+  echo ">>> reconnected to saved network: $SAVED"
+  ping -c2 gentoo.org
 else
-  echo "Skipped. Connect later with:"
-  echo "  doas nmcli device wifi connect \"SSID\" password \"PASS\""
+  read -rp "Connect to which SSID? (blank to skip) " SSID
+  if [[ -n "${SSID:-}" ]]; then
+    read -rsp "Password for \"$SSID\": " PASS; echo
+    if nmcli device wifi connect "$SSID" password "$PASS"; then
+      echo ">>> connected. Testing DNS:"
+      ping -c2 gentoo.org
+    else
+      echo ">>> connect failed — check SSID/password and rerun, or: doas rfkill unblock all"
+    fi
+  else
+    echo "Skipped. Connect later with:"
+    echo "  doas nmcli device wifi connect \"SSID\" password \"PASS\""
+  fi
 fi
 
 echo
