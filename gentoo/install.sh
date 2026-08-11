@@ -440,6 +440,14 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_EXT4_FS
   ./scripts/config -e CONFIG_BLK_DEV_SD
 
+  # --- IN-KERNEL CONFIG (/proc/config.gz) ---
+  # Exposes the running kernel's exact config at /proc/config.gz. Without it, a
+  # future REBUILD_KERNEL can't re-seed from the KNOWN-GOOD running config and
+  # falls back to bare `make defconfig` -- which drops the Apple display stack +
+  # built-in root drivers and produces a boot-blind kernel. Always keep this on.
+  ./scripts/config -e CONFIG_IKCONFIG
+  ./scripts/config -e CONFIG_IKCONFIG_PROC
+
   # --- REMOVABLE MEDIA: exFAT + FUSE ---
   # exFAT is the norm on large USB sticks and SD cards (and Ventoy's data
   # partition); FUSE backs userspace filesystems (ntfs-3g, sshfs, mtpfs, etc.).

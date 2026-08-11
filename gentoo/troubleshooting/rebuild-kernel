@@ -86,6 +86,11 @@ make defconfig
 ./scripts/config -e CONFIG_EXT4_FS
 ./scripts/config -e CONFIG_BLK_DEV_SD
 
+# --- IN-KERNEL CONFIG (/proc/config.gz) — so a future rebuild can re-seed from
+# the running config instead of falling back to boot-blind `make defconfig`. ---
+./scripts/config -e CONFIG_IKCONFIG
+./scripts/config -e CONFIG_IKCONFIG_PROC
+
 # --- REMOVABLE MEDIA: exFAT + FUSE ---
 ./scripts/config -m CONFIG_EXFAT_FS
 ./scripts/config -m CONFIG_FUSE_FS
