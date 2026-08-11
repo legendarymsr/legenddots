@@ -160,7 +160,9 @@ make -j3 && make modules_install && make install || die "kernel build/install fa
 header "Regenerating initramfs + out-of-tree modules..."
 genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs \
   || warn "genkernel failed — initramfs NOT regenerated; do NOT reboot until fixed."
-emerge @module-rebuild 2>/dev/null || warn "@module-rebuild failed — rebuild net-wireless/broadcom-sta."
+# --usepkg=n: a stale binpkg of broadcom-sta is built for a DIFFERENT kernel, so
+# using it leaves no wl.ko for this one. Force a source compile against /usr/src/linux.
+emerge --usepkg=n @module-rebuild 2>/dev/null || warn "@module-rebuild failed — rebuild net-wireless/broadcom-sta."
 KVER=$(make -s kernelrelease)
 depmod -a "$KVER" 2>/dev/null || true
 

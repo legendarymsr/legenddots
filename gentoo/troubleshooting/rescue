@@ -70,7 +70,9 @@ if [[ "${SKIP_KERNEL:-}" != "1" && ! -f /usr/src/linux/.config ]]; then
 fi
 
 header "Rebuilding out-of-tree modules (wl.ko etc.)..."
-emerge @module-rebuild 2>/dev/null || warn "@module-rebuild failed — WiFi may break; rebuild net-wireless/broadcom-sta."
+# --usepkg=n: a stale broadcom-sta binpkg is built for a different kernel; using
+# it leaves no wl.ko for this one. Force a source compile against /usr/src/linux.
+emerge --usepkg=n @module-rebuild 2>/dev/null || warn "@module-rebuild failed — WiFi may break; rebuild net-wireless/broadcom-sta."
 
 if [[ "${SKIP_KERNEL:-}" != "1" ]]; then
   KSRC=/usr/src/linux
