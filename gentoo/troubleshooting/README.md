@@ -158,12 +158,12 @@ tail -f /tmp/rescue.log
 ### Full recovery from a live USB (EndeavourOS) — copy-paste
 
 Boot a 64-bit live USB (EndeavourOS is handy — it has NetworkManager + a real
-desktop). Everything below is run **as root** (`sudo -i` first on the EndeavourOS
-live session). Assumes the standard layout (`sda1` EFI, `sda2` swap, `sda3`
-root) — run `lsblk -f` first and swap device names if the USB grabbed `sda`.
+desktop). Assumes the standard layout (`sda1` EFI, `sda2` swap, `sda3` root) —
+run `lsblk -f` first and swap device names if the USB grabbed `sda`.
 
-**1. Network, and stop the live env sabotaging the recovery:**
+**1. Become root, get network, and stop the live env sabotaging the recovery:**
 ```sh
+sudo -i                                 # ← become root FIRST (prompt turns to #)
 nmtui                                   # connect to WiFi
 iw dev wlan0 set power_save off         # Broadcom drops under load otherwise
 # STOP it suspending on idle/lid-close — this is what kills long builds + SSH:
