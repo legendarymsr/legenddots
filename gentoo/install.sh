@@ -466,6 +466,21 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_TUN
   ./scripts/config -e CONFIG_BRIDGE
 
+  # --- NETFILTER / iptables (Waydroid container networking) ---
+  # waydroid-net.sh sets up a bridge + iptables NAT/filter/mangle for the Android
+  # container. defconfig omits the legacy ip_tables stack, so without these
+  # 'iptables' fails with 'Table does not exist', the container gets no network,
+  # and Android never boots. Also veth for the container's virtual interface.
+  ./scripts/config -e CONFIG_NETFILTER -e CONFIG_NETFILTER_ADVANCED -e CONFIG_NETFILTER_XTABLES
+  ./scripts/config -m CONFIG_NF_CONNTRACK -m CONFIG_NF_NAT -m CONFIG_NF_TABLES
+  ./scripts/config -m CONFIG_IP_NF_IPTABLES -m CONFIG_IP_NF_FILTER -m CONFIG_IP_NF_NAT \
+                   -m CONFIG_IP_NF_MANGLE -m CONFIG_IP_NF_TARGET_MASQUERADE
+  ./scripts/config -m CONFIG_NETFILTER_XT_TARGET_MASQUERADE \
+                   -m CONFIG_NETFILTER_XT_TARGET_CHECKSUM \
+                   -m CONFIG_NETFILTER_XT_MATCH_CONNTRACK \
+                   -m CONFIG_NETFILTER_XT_MATCH_COMMENT
+  ./scripts/config -m CONFIG_VETH
+
   # --- WAYDROID: Android container (binder) ---
   # Waydroid runs a full Android userspace in an LXC container over the kernel's
   # Android binder IPC. binderfs exposes the binder devices; on kernels ≥5.18

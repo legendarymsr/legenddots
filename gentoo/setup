@@ -645,6 +645,15 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     ./scripts/config -e CONFIG_VIRTUALIZATION \
                      -e CONFIG_KVM -e CONFIG_KVM_INTEL -e CONFIG_VHOST_NET \
                      -e CONFIG_TUN -e CONFIG_BRIDGE
+    # Netfilter/iptables for Waydroid container networking. defconfig omits the
+    # legacy ip_tables stack, so waydroid-net.sh fails 'Table does not exist',
+    # the container gets no network, and Android never boots.
+    ./scripts/config -e CONFIG_NETFILTER -e CONFIG_NETFILTER_ADVANCED -e CONFIG_NETFILTER_XTABLES \
+                     -m CONFIG_NF_CONNTRACK -m CONFIG_NF_NAT -m CONFIG_NF_TABLES \
+                     -m CONFIG_IP_NF_IPTABLES -m CONFIG_IP_NF_FILTER -m CONFIG_IP_NF_NAT \
+                     -m CONFIG_IP_NF_MANGLE -m CONFIG_IP_NF_TARGET_MASQUERADE \
+                     -m CONFIG_NETFILTER_XT_TARGET_MASQUERADE -m CONFIG_NETFILTER_XT_TARGET_CHECKSUM \
+                     -m CONFIG_VETH
     # Waydroid: Android binder container. On 6.x there is no CONFIG_ANDROID menu
     # symbol anymore — BINDER_IPC + BINDERFS (both bool, dep only MMU) are what
     # matter; ashmem is gone, memfd is used. BINDERFS makes the binder/hwbinder/
