@@ -250,6 +250,14 @@ fi
   echo "dev-libs/atk introspection"
 } > /etc/portage/package.use/gtk-introspection
 
+# Always ensure WiFi power management is OFF — Broadcom wl drops the connection
+# under idle/load with it on. Persist it in both NetworkManager and TLP.
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/wifi-powersave.conf
+if [[ -f /etc/tlp.conf ]] && ! grep -q '^WIFI_PWR_ON_BAT=off' /etc/tlp.conf; then
+  printf '\n# Broadcom wl drops with WiFi power saving on — keep it off.\nWIFI_PWR_ON_AC=off\nWIFI_PWR_ON_BAT=off\n' >> /etc/tlp.conf
+fi
+
 # 9. DESKTOP
 if ! step_done desktop; then
   header "Emerging desktop (niri + Wayland stack)..."
