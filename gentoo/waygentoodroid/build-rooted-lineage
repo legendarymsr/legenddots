@@ -97,6 +97,19 @@ fi
 "$WD_SCRIPT_DIR/venv/bin/pip" install -q -r "$WD_SCRIPT_DIR/requirements.txt" || die "pip install requirements failed."
 success "waydroid_script ready at $WD_SCRIPT_DIR"
 
+# waydroid_script's container.upgrade() RAISES unless `waydroid upgrade -o` prints
+# "Stopping/Starting container" — which only happens when a SESSION is running. On
+# a headless/TTY box there's no session, so it prints "Couldn't get LXC status" and
+# EVERY module install false-fails even though upgrade exits 0 and the files ARE
+# applied. Relax that output check so installs report their real (success) result.
+# Re-applied each run because the git pull above reverts it.
+"$VENV_PY" - "$WD_SCRIPT_DIR/tools/container.py" <<'PY' 2>/dev/null && success "relaxed waydroid_script's upgrade output check"
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+s2 = re.sub(r'ignore=r"[^"]*Starting container"', 'ignore=r".*"', s)
+open(p, "w").write(s2); print("ok" if s2 != s else "nochange")
+PY
+
 # ── 3. Stop the session, but START the container manager ─────────────────────
 # waydroid_script installs modules via `waydroid upgrade -o`, which talks to the
 # container MANAGER — if it isn't running the install dies on "Couldn't get LXC
