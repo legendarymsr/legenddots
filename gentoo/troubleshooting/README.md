@@ -149,21 +149,76 @@ bash rescue &> /tmp/rescue.log &
 tail -f /tmp/rescue.log
 ```
 
-**From a live USB**, mount + chroot in first (once), then run it:
-```sh
-mount /dev/sda3 /mnt && mount /dev/sda1 /mnt/boot/efi
-mount -t proc /proc /mnt/proc
-mount --rbind /sys /mnt/sys && mount --make-rslave /mnt/sys
-mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
-mount --rbind /run /mnt/run && mount --make-rslave /mnt/run
-echo nameserver 1.1.1.1 > /mnt/etc/resolv.conf
-chroot /mnt /bin/bash
-source /etc/profile
-bash /root/legenddots/gentoo/troubleshooting/rescue
-```
-
 > Why it rebuilds the kernel: after `make install` runs twice, both `vmlinuz`
 > and `vmlinuz.old` can end up being the *same* freshly-built kernel — so a bad
 > build leaves no working fallback and both rEFInd entries freeze identically.
 > Rebuilding against the finished toolchain + a matching initramfs is what gets
 > you booting again.
+
+### Full recovery from a live USB (EndeavourOS) — copy-paste
+
+Boot a 64-bit live USB (EndeavourOS is handy — it has NetworkManager + a real
+desktop). Everything below is run **as root** (`sudo -i` first on the EndeavourOS
+live session). Assumes the standard layout (`sda1` EFI, `sda2` swap, `sda3`
+root) — run `lsblk -f` first and swap device names if the USB grabbed `sda`.
+
+**1. Network, and stop the live env sabotaging the recovery:**
+```sh
+nmtui                                   # connect to WiFi
+iw dev wlan0 set power_save off         # Broadcom drops under load otherwise
+# STOP it suspending on idle/lid-close — this is what kills long builds + SSH:
+systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+ip -4 addr show wlan0                    # note the IP if you'll SSH in from a phone
+```
+
+**(optional) SSH in from your phone** for a real keyboard:
+```sh
+passwd                                   # set a password for 'liveuser'
+systemctl start sshd
+#   then on the phone:   ssh liveuser@<that IP>
+#   stale host key from a previous boot?   ssh-keygen -R <that IP>
+```
+
+**2. Mount your Gentoo system with a sane `/dev`:**
+```sh
+lsblk -f                                 # confirm sda1/sda2/sda3
+mount /dev/sda3 /mnt
+mount /dev/sda1 /mnt/boot/efi
+mount -t proc /proc /mnt/proc
+mount --rbind /sys /mnt/sys && mount --make-rslave /mnt/sys
+mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
+mount --rbind /run /mnt/run && mount --make-rslave /mnt/run
+echo nameserver 1.1.1.1 > /mnt/etc/resolv.conf
+```
+
+**3. chroot in and run the repair:**
+```sh
+chroot /mnt /bin/bash
+source /etc/profile
+ls -l /dev/fd                            # must show -> /proc/self/fd (portage needs it)
+[ -d /root/legenddots ] || git clone https://github.com/legendarymsr/legenddots.git /root/legenddots
+bash /root/legenddots/gentoo/troubleshooting/rescue
+```
+To watch it without depending on the SSH link staying up (never `tee` — it
+buffers the output into silence):
+```sh
+bash /root/legenddots/gentoo/troubleshooting/rescue &> /tmp/rescue.log &
+tail -f /tmp/rescue.log
+```
+
+**4. When `verify-boot` is green, leave and reboot:**
+```sh
+exit                                     # out of the chroot
+umount -R /mnt
+reboot                                   # then pick your kernel in rEFInd
+```
+
+Gotchas this flow works around:
+- **Don't use `arch-chroot`** — it sometimes leaves `/dev/fd` broken and portage
+  refuses to run (`Failed to validate a sane '/dev'`). The explicit `mount -t proc`
+  + plain `chroot` above avoids it.
+- **Don't `pacman -S tmux`** on the EndeavourOS live env — its Arch mirrors are
+  often unconfigured (`no servers configured for repository: extra`). `nohup` /
+  backgrounding (above) gives the same "survives a WiFi drop" resilience.
+- **If the USB took `sda`**, your disk is `sdb`/`sdc`/… — read `lsblk -f` and swap
+  the device names throughout.
