@@ -34,16 +34,27 @@ source /etc/profile 2>/dev/null || true
 KSERIES="${KSERIES:-6.18}"
 
 header "Ensuring ${KSERIES} kernel sources are present..."
-if ! ls -d /usr/src/linux-${KSERIES}* >/dev/null 2>&1; then
-  warn "no ${KSERIES} source tree — emerging =sys-kernel/gentoo-sources-${KSERIES}*..."
+# A COMPLETE tree = has Makefile + scripts/config. A past depclean can leave a
+# gutted dir (build artifacts remain, but the portage-owned source is deleted),
+# so checking the directory exists is NOT enough — check for the real source.
+newest_complete() {
+  local d best=""
+  for d in $(ls -d /usr/src/linux-${KSERIES}* 2>/dev/null | sort -V); do
+    [[ -f "$d/Makefile" && -x "$d/scripts/config" ]] && best="$d"
+  done
+  [[ -n "$best" ]] && echo "$best"
+}
+if [[ -z "$(newest_complete)" ]]; then
+  warn "no complete ${KSERIES} source tree — removing any gutted leftover + re-emerging..."
+  rm -rf /usr/src/linux-${KSERIES}*    # clear a depclean-gutted dir so it extracts clean
   emerge "=sys-kernel/gentoo-sources-${KSERIES}*" || die "gentoo-sources ${KSERIES} emerge failed (check ACCEPT_KEYWORDS)"
 fi
 command -v genkernel >/dev/null 2>&1 || emerge sys-kernel/genkernel sys-kernel/linux-firmware || warn "genkernel/firmware emerge issue"
-# Point /usr/src/linux at the newest ${KSERIES} tree — NOT any newer series.
-NEWEST=$(ls -d /usr/src/linux-${KSERIES}* 2>/dev/null | sort -V | tail -1)
-[[ -n "$NEWEST" ]] || die "no /usr/src/linux-${KSERIES}* tree found after emerge"
+# Point /usr/src/linux at the newest COMPLETE ${KSERIES} tree — not a newer series.
+NEWEST=$(newest_complete)
+[[ -n "$NEWEST" ]] || die "still no complete ${KSERIES} source tree after emerge"
 ln -sfn "$NEWEST" /usr/src/linux
-cd /usr/src/linux || die "no /usr/src/linux"
+cd "$NEWEST" || die "cd $NEWEST failed"
 success "building from $NEWEST"
 
 header "Seeding defconfig + applying the proven MBA 6,2 config..."
