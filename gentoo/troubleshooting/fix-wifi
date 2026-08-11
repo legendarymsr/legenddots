@@ -1,89 +1,99 @@
 #!/usr/bin/env bash
-# One-shot WiFi recovery + connect for the Broadcom wl driver on this MacBook Air.
+# fix-wifi — Broadcom wl recovery + connect, GENTLE by default.
 # Run: doas bash ~/legenddots/gentoo/troubleshooting/fix-wifi
-# Loads wl (evicting competing drivers), stops a stray dhcpcd that would grab the
-# interface out from under NetworkManager, hands the device to NM, scans, and
-# prompts you to connect. One command, no copy-pasting a chain of nmcli lines.
+#
+# If WiFi is already up, it only ensures power management stays off (the drop
+# cause) and exits — it does NOT restart NetworkManager or disconnect you. It only
+# does the disruptive recovery (reload wl, stop dhcpcd, nudge NM, reconnect) when
+# WiFi is actually down. Pass --force to run the full recovery regardless.
 set -u
 
 [[ $EUID -eq 0 ]] || { echo "run with doas: doas bash gentoo/troubleshooting/fix-wifi"; exit 1; }
+FORCE=""; [[ "${1:-}" == "--force" ]] && FORCE=1
+
+WIFI=$(ls /sys/class/net 2>/dev/null | grep -E '^wl' | head -1)
+online() { ip route 2>/dev/null | grep -q '^default'; }
+
+# Broadcom wl drops under idle/load with WiFi power saving on. Turn it off now
+# (instant, non-disruptive) and persist it in NetworkManager + TLP. Safe anytime.
+persist_powersave() {
+  [[ -n "$WIFI" ]] && iw dev "$WIFI" set power_save off 2>/dev/null && echo "  power_save off ($WIFI)"
+  mkdir -p /etc/NetworkManager/conf.d
+  printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/wifi-powersave.conf
+  if [[ -f /etc/tlp.conf ]] && ! grep -q '^WIFI_PWR_ON_BAT=off' /etc/tlp.conf; then
+    printf '\n# Broadcom wl drops with WiFi power saving on — keep it off.\nWIFI_PWR_ON_AC=off\nWIFI_PWR_ON_BAT=off\n' >> /etc/tlp.conf
+  fi
+}
+
+# --- Fast path: already online → only keep power management off, touch nothing else.
+if [[ -z "$FORCE" ]] && online; then
+  echo ">>> WiFi is already up — keeping power management off, not restarting anything."
+  persist_powersave
+  ip route | grep '^default'
+  echo ">>> Done. (Run with --force to do the full recovery anyway.)"
+  exit 0
+fi
+
+echo "== WiFi is down — running recovery =="
 
 echo "== evicting competing broadcom drivers (if any) =="
 rmmod brcmfmac brcmsmac b43 bcma ssb 2>/dev/null || true
 
 echo "== loading wl =="
-if modprobe wl 2>&1; then
+if lsmod | grep -q '^wl '; then
+  echo ">>> wl already loaded"
+elif modprobe wl 2>&1; then
   echo ">>> wl loaded"
 else
-  echo ">>> wl FAILED to load — likely a symbol/vermagic mismatch after a kernel"
-  echo "    rebuild. Rebuild the module against the running kernel:"
+  echo ">>> wl FAILED to load — symbol/vermagic mismatch after a kernel rebuild."
+  echo "    Rebuild it against the running kernel (source build, matches the kernel):"
   echo "      doas emerge --usepkg=n @module-rebuild && doas depmod -a"
-  echo "    (or boot vmlinuz.old at rEFInd — WiFi works there — and rebuild.)"
   exit 1
 fi
 
 WIFI=$(ls /sys/class/net 2>/dev/null | grep -E '^wl' | head -1)
 [[ -n "$WIFI" ]] || { echo ">>> no wl* interface yet — check: doas dmesg | grep -i wl"; exit 1; }
 echo "== wifi interface: $WIFI =="
+persist_powersave
 
-# Broadcom wl DROPS under idle/load with WiFi power management on. Kill it now and
-# persist it (NetworkManager + TLP) so the drops don't come back after a reboot.
-echo "== disabling WiFi power management (the drop cause) =="
-iw dev "$WIFI" set power_save off 2>/dev/null && echo "  runtime power_save off"
-mkdir -p /etc/NetworkManager/conf.d
-printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/wifi-powersave.conf
-if [[ -f /etc/tlp.conf ]] && ! grep -q '^WIFI_PWR_ON_BAT=off' /etc/tlp.conf; then
-  printf '\n# Broadcom wl drops with WiFi power saving on — keep it off.\nWIFI_PWR_ON_AC=off\nWIFI_PWR_ON_BAT=off\n' >> /etc/tlp.conf
-  rc-service tlp restart 2>/dev/null || true
-fi
-
-# A stray dhcpcd (or netifrc net.*) holding the interface makes NetworkManager
-# report it as 'connected (externally)' with a STALE ip and NO real association
-# (NO-CARRIER) — so nothing routes and DNS fails. Hand WiFi to NM exclusively.
+# A stray dhcpcd/netifrc holding the interface makes NM show it 'connected
+# (externally)' with a stale IP + NO-CARRIER. Hand WiFi to NM exclusively.
 echo "== stopping conflicting network services (so NM owns WiFi) =="
 rc-service dhcpcd stop 2>/dev/null || true
 rc-service "net.$WIFI" stop 2>/dev/null || true
 rc-update del dhcpcd default 2>/dev/null && echo "  (removed dhcpcd from boot — NM handles DHCP)" || true
 
-echo "== restarting NetworkManager =="
-rc-service NetworkManager restart
+# Start NM only if it isn't running — otherwise nudge the device, no full restart.
+if rc-service NetworkManager status >/dev/null 2>&1; then
+  echo "== NetworkManager already running — nudging WiFi (no restart) =="
+  nmcli radio wifi on              2>/dev/null || true
+  nmcli device set "$WIFI" managed yes 2>/dev/null || true
+else
+  echo "== starting NetworkManager =="
+  rc-service NetworkManager start
+fi
 sleep 2
-nmcli radio wifi on                     2>/dev/null || true
-nmcli device set "$WIFI" managed yes     2>/dev/null || true
-nmcli device disconnect "$WIFI"          2>/dev/null || true   # clear stale external state
-sleep 1
-nmcli device wifi rescan                 2>/dev/null || true
+nmcli device wifi rescan 2>/dev/null || true
 sleep 2
 
-echo "== available networks =="
-nmcli device wifi list 2>/dev/null || echo "  (scan failed — radio off? try: doas rfkill unblock all)"
-
-echo
-# First try a connection you've already saved — the restart above drops the link,
-# and 'con up' restores it with the stored password (no re-typing). Only prompt if
-# there's no saved wifi profile or it won't come up.
+# Reconnect a saved network first (no password re-entry); else scan + prompt.
 SAVED=$(nmcli -t -g NAME,TYPE con show 2>/dev/null | awk -F: '$2=="802-11-wireless"{print $1; exit}')
 if [[ -n "$SAVED" ]] && nmcli con up "$SAVED" >/dev/null 2>&1; then
   echo ">>> reconnected to saved network: $SAVED"
-  ping -c2 gentoo.org
 else
-  read -rp "Connect to which SSID? (blank to skip) " SSID
+  echo "== available networks =="
+  nmcli device wifi list 2>/dev/null || echo "  (scan failed — try: doas rfkill unblock all)"
+  echo
+  read -rp "Connect to which SSID? (use the EXACT name above; blank to skip) " SSID
   if [[ -n "${SSID:-}" ]]; then
     read -rsp "Password for \"$SSID\": " PASS; echo
-    if nmcli device wifi connect "$SSID" password "$PASS"; then
-      echo ">>> connected. Testing DNS:"
-      ping -c2 gentoo.org
-    else
-      echo ">>> connect failed — check SSID/password and rerun, or: doas rfkill unblock all"
-    fi
-  else
-    echo "Skipped. Connect later with:"
-    echo "  doas nmcli device wifi connect \"SSID\" password \"PASS\""
+    nmcli device wifi connect "$SSID" password "$PASS" \
+      || echo ">>> connect failed — 'could not be found' usually means the name isn't EXACT; copy it off the list and rerun."
   fi
 fi
 
 echo
 echo "== status =="
 nmcli device status 2>/dev/null
-ip route 2>/dev/null | grep -q '^default' && echo ">>> default route present — you're online" \
-  || echo ">>> no default route yet — not associated; rerun and pick your SSID"
+online && echo ">>> online — default route present." \
+       || echo ">>> still offline — rescan (doas nmcli dev wifi rescan) and pick the exact SSID."
