@@ -17,6 +17,7 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
 | `rescue` | yes (`sudo`, from a **live USB**) | yes | System won't boot / an update was interrupted — chroot in and rebuild everything |
+| `rebuild-kernel` | yes (root, in chroot) | yes | Kernel hangs at rEFInd "Starting vmlinuz" / boots blind — rebuild from the proven config |
 | `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
 
 > `setup` (post-install provisioning) lives at `../setup`, not here — it's a core
@@ -223,47 +224,37 @@ Gotchas this flow works around:
 - **If the USB took `sda`**, your disk is `sdb`/`sdc`/… — read `lsblk -f` and swap
   the device names throughout.
 
-### Kernel freezes at rEFInd "Starting vmlinuz" — rebuild from a known-good config
+### Kernel freezes at rEFInd "Starting vmlinuz" — `rebuild-kernel`
 
 **Symptom:** rEFInd shows `Starting vmlinuz` / `Using load options …` and hangs
-there with **no kernel output at all**. The image loads but never executes — the
-kernel *build/config* is bad (a `REBUILD_KERNEL` that produced a non-booting
-kernel). The cmdline is fine (it's the same one that booted before); the kernel
-itself is the problem. Fix: rebuild from a config you know booted.
+there with **no kernel output at all**. The image loads but never executes (or
+boots *blind* with no display / can't mount root). This is a `REBUILD_KERNEL`
+that fell back to bare `make defconfig` — no `/proc/config.gz` on the running
+kernel and no saved `/boot/config-*` — and so **dropped the Apple EFI display
+stack** (`DRM_SIMPLEDRM`, `SYSFB_SIMPLEFB`, `FRAMEBUFFER_CONSOLE`) and the
+built-in root drivers (`EXT4_FS`, `SATA_AHCI`, `BLK_DEV_SD`). The cmdline is fine;
+the *config* is the problem.
 
-Run **inside the chroot** (do the live-USB mount + chroot, blocks 1–3 above,
-first). Then copy-paste:
+There is **no saved good `.config`** to reuse (`/boot/config-*` doesn't exist —
+`make install` never saved one, and depclean deleted the source tree's copy). So
+the fix rebuilds from `install.sh`'s **proven recipe** — `make defconfig` + every
+hardware/display/driver/hardening tweak. It's ~50 config lines, so it's a script,
+not a paste. Boot the live USB, mount + chroot in (blocks 1–3 above), then **one
+line**:
 
 ```sh
-# 1. list configs saved by past 'make install' — you want one from a kernel
-#    version you KNOW booted (usually an OLDER one than the broken build)
-ls -la /boot/config-*
+bash /root/legenddots/gentoo/troubleshooting/rebuild-kernel
+```
 
-# 2. point GOODCFG at that file (edit the version to match step 1)
-GOODCFG=/boot/config-6.18.35-gentoo-r1
+It re-emerges `gentoo-sources` if the tree is gone, applies the full config,
+**verifies the display + root drivers are `=y` before the long build**, rebuilds
+the kernel + initramfs + `wl.ko`, repoints rEFInd's `initrd=`, and runs
+`verify-boot`. When it's green:
 
-# 3. get the kernel sources back (a past depclean may have removed them)
-emerge --oneshot "=sys-kernel/gentoo-sources-6.18*"
-ln -sfn "$(ls -d /usr/src/linux-6.18* | sort -V | tail -1)" /usr/src/linux
-
-# 4. seed the known-good config and build
-cp "$GOODCFG" /usr/src/linux/.config
-cd /usr/src/linux
-make olddefconfig
-make -j3 && make modules_install && make install
-
-# 5. regenerate the initramfs and repoint rEFInd's initrd= at it
-genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs
-KVER=$(make -s kernelrelease)
-NEWINITRD=$(ls -t /boot/initramfs-*"$KVER"*.img | head -1)
-sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" /boot/refind_linux.conf
-
-# 6. verify, then leave + reboot
-bash /root/legenddots/gentoo/troubleshooting/verify-boot
+```sh
 exit && umount -R /mnt && reboot
 ```
 
-> **Don't** use `rescue`'s auto-config-restore for this — it grabs the *newest*
-> `/boot/config-*`, which is the broken build. Pick the older, known-good config
-> by hand (step 2). And `SKIP_KERNEL=1 bash rescue` first if you only want to
-> finish `@world` without touching the kernel.
+> Do **not** use `rescue`'s auto-config-restore for this failure — it grabs the
+> *newest* `/boot/config-*` (the broken build). `rebuild-kernel` builds the config
+> from scratch instead, which is what you want when no good config survives.
