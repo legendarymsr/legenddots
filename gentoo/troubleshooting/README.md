@@ -255,6 +255,20 @@ the kernel + initramfs + `wl.ko`, repoints rEFInd's `initrd=`, and runs
 exit && umount -R /mnt && reboot
 ```
 
+**If `verify-boot` flags `✗ wl.ko MISSING`** (a stale broadcom-sta *binary*
+package got used instead of a source build — `@module-rebuild` without
+`--usepkg=n`), fix just the WiFi module without rebuilding the whole kernel.
+This derives the version from `/usr/src/linux`, so it's copy-paste-safe:
+
+```sh
+emerge --usepkg=n @module-rebuild
+depmod -a "$(make -s -C /usr/src/linux kernelrelease)"
+bash /root/legenddots/gentoo/troubleshooting/verify-boot
+```
+
+`--usepkg=n` forces a source compile of `wl.ko` against the kernel you just built.
+Re-run `verify-boot` until it's all green, then `exit && umount -R /mnt && reboot`.
+
 > Do **not** use `rescue`'s auto-config-restore for this failure — it grabs the
 > *newest* `/boot/config-*` (the broken build). `rebuild-kernel` builds the config
 > from scratch instead, which is what you want when no good config survives.
