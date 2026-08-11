@@ -49,7 +49,24 @@ if [[ "${SKIP_WORLD:-}" != "1" ]]; then
   emerge --update --deep --newuse --with-bdeps=y --backtrack=100 \
          --autounmask-continue=y --keep-going=y @world \
     || warn "@world reported errors above — resolve them and re-run rescue."
-  emerge --depclean 2>/dev/null || true
+  # NO --depclean here: gentoo-sources is deselected from @world (so it doesn't
+  # derail resolution), which means depclean would DELETE the kernel source tree
+  # + its .config and make the kernel rebuild below impossible. Run depclean by
+  # hand on a healthy, booted system instead.
+fi
+
+# If the kernel source went missing (e.g. a past depclean removed it), re-emerge
+# it and restore the .config from /boot so the rebuild below can run.
+if [[ "${SKIP_KERNEL:-}" != "1" && ! -f /usr/src/linux/.config ]]; then
+  warn "kernel .config missing — re-emerging gentoo-sources + restoring config..."
+  emerge --oneshot "=sys-kernel/gentoo-sources-6.18*" 2>/dev/null || warn "gentoo-sources re-emerge failed"
+  # point /usr/src/linux at the newest 6.18 tree
+  NEWEST=$(ls -d /usr/src/linux-6.18* 2>/dev/null | sort -V | tail -1)
+  [[ -n "$NEWEST" ]] && ln -sfn "$NEWEST" /usr/src/linux
+  # restore the config saved by the last `make install`
+  CFG=$(ls -t /boot/config-6.18* 2>/dev/null | head -1)
+  [[ -n "$CFG" && ! -f /usr/src/linux/.config ]] && cp "$CFG" /usr/src/linux/.config \
+    && success "restored .config from $(basename "$CFG")"
 fi
 
 header "Rebuilding out-of-tree modules (wl.ko etc.)..."
