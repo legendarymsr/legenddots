@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# =============================================================================
+# rebuild-kernel — rebuild the kernel from the PROVEN, bootable config.
+# -----------------------------------------------------------------------------
+# Use this when the kernel won't boot — especially when it hangs at rEFInd's
+# "Starting vmlinuz" with no output (a REBUILD_KERNEL that fell back to bare
+# `make defconfig` and dropped the Apple EFI display stack + built-in root
+# drivers, so the machine boots blind / can't mount root).
+#
+# It reproduces install.sh's kernel recipe EXACTLY: `make defconfig` + every
+# hardware/hardening/driver tweak (simpledrm + framebuffer console for the Mac
+# display, ext4/ahci/sd built-in, broadcom PREEMPT_NONE, MEI removal, KVM,
+# binder, zswap, KASLR…), then builds, installs, regenerates the initramfs, and
+# repoints rEFInd.
+#
+# Run as root INSIDE the Gentoo system (booted, or chrooted from a live USB):
+#   bash rebuild-kernel
+# =============================================================================
+set -o pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+header()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+warn()    { echo -e "${YELLOW}  ! $*${NC}"; }
+success() { echo -e "${GREEN}  ✓ $*${NC}"; }
+die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+
+[[ $EUID -eq 0 ]] || die "run as root: bash rebuild-kernel"
+command -v emerge >/dev/null 2>&1 || die "no emerge — run this inside the Gentoo system (chroot in first)."
+source /etc/profile 2>/dev/null || true
+
+header "Ensuring kernel sources are present..."
+if [[ ! -x /usr/src/linux/scripts/config ]]; then
+  warn "no kernel source tree — emerging gentoo-sources..."
+  ACCEPT_KEYWORDS="-~amd64 amd64" emerge sys-kernel/gentoo-sources || die "gentoo-sources emerge failed"
+fi
+command -v genkernel >/dev/null 2>&1 || emerge sys-kernel/genkernel sys-kernel/linux-firmware || warn "genkernel/firmware emerge issue"
+# Point /usr/src/linux at the newest source tree.
+NEWEST=$(ls -d /usr/src/linux-* 2>/dev/null | sort -V | tail -1)
+[[ -n "$NEWEST" ]] && ln -sfn "$NEWEST" /usr/src/linux
+cd /usr/src/linux || die "no /usr/src/linux"
+
+header "Seeding defconfig + applying the proven MBA 6,2 config..."
+make defconfig
+
+# --- INTEL ME REMOVAL ---
+./scripts/config -d CONFIG_INTEL_MEI
+./scripts/config -d CONFIG_INTEL_MEI_ME
+./scripts/config -d CONFIG_INTEL_MEI_TXE
+./scripts/config -d CONFIG_INTEL_MEI_HDCP
+./scripts/config -d CONFIG_INTEL_MEI_PXP
+
+# --- MBA 6,2 HARDWARE (incl. the Apple EFI display stack — the boot-blind fix) ---
+./scripts/config -e CONFIG_DRM_I915
+./scripts/config -e CONFIG_DRM_SIMPLEDRM
+./scripts/config -e CONFIG_DRM_FBDEV_EMULATION
+./scripts/config -e CONFIG_SYSFB_SIMPLEFB
+./scripts/config -e CONFIG_FRAMEBUFFER_CONSOLE
+./scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS
+./scripts/config -e CONFIG_HID_APPLE
+./scripts/config -m CONFIG_MOUSE_BCM5974
+./scripts/config -e CONFIG_BT_HCIBTUSB
+./scripts/config -e CONFIG_SATA_AHCI
+./scripts/config -e CONFIG_X86_INTEL_PSTATE
+./scripts/config -e CONFIG_THUNDERBOLT
+./scripts/config -e CONFIG_USB_XHCI_HCD
+./scripts/config -e CONFIG_USB_EHCI_HCD
+# ext4 + SCSI disk built-in so the initramfs can mount root with no modules.
+./scripts/config -e CONFIG_EXT4_FS
+./scripts/config -e CONFIG_BLK_DEV_SD
+
+# --- REMOVABLE MEDIA: exFAT + FUSE ---
+./scripts/config -m CONFIG_EXFAT_FS
+./scripts/config -m CONFIG_FUSE_FS
+
+# --- VIRTUALISATION: KVM + networking for QEMU/libvirt ---
+./scripts/config -e CONFIG_VIRTUALIZATION
+./scripts/config -e CONFIG_KVM
+./scripts/config -e CONFIG_KVM_INTEL
+./scripts/config -e CONFIG_VHOST_NET
+./scripts/config -e CONFIG_TUN
+./scripts/config -e CONFIG_BRIDGE
+
+# --- WAYDROID: Android container (binder) ---
+./scripts/config -e CONFIG_ANDROID_BINDER_IPC
+./scripts/config -e CONFIG_ANDROID_BINDERFS
+./scripts/config --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
+
+# --- BROADCOM-STA (wl) COMPATIBILITY ---
+./scripts/config -d CONFIG_PREEMPT_DYNAMIC
+./scripts/config -d CONFIG_PREEMPT
+./scripts/config -e CONFIG_PREEMPT_NONE
+./scripts/config -d CONFIG_BRCMSMAC
+./scripts/config -d CONFIG_BRCMFMAC
+./scripts/config -d CONFIG_BRCMUTIL
+./scripts/config -d CONFIG_B43
+./scripts/config -d CONFIG_B43LEGACY
+./scripts/config -d CONFIG_SSB
+./scripts/config -d CONFIG_MAC80211
+
+# --- HARDENED SECURITY ---
+./scripts/config -e CONFIG_RANDOMIZE_BASE
+./scripts/config -e CONFIG_RANDOMIZE_MEMORY
+./scripts/config -e CONFIG_PAGE_TABLE_ISOLATION
+./scripts/config -e CONFIG_MITIGATION_RETPOLINE
+./scripts/config -e CONFIG_RETPOLINE
+./scripts/config -e CONFIG_STRICT_KERNEL_RWX
+./scripts/config -e CONFIG_STRICT_MODULE_RWX
+./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM
+./scripts/config -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY
+./scripts/config -d CONFIG_MODULE_SIG_FORCE
+./scripts/config -e CONFIG_INIT_STACK_ALL_ZERO
+./scripts/config -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON
+./scripts/config -e CONFIG_INIT_ON_FREE_DEFAULT_ON
+
+# --- ZSWAP ---
+./scripts/config -e CONFIG_ZSWAP
+./scripts/config -e CONFIG_ZSMALLOC
+./scripts/config -e CONFIG_CRYPTO_LZ4
+./scripts/config -d CONFIG_ZSWAP_COMPRESSOR_DEFAULT_DEFLATE
+./scripts/config -e CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4
+./scripts/config -e CONFIG_ZSWAP_DEFAULT_ON
+
+make olddefconfig
+
+# Verify the boot-critical options actually stuck BEFORE the long build.
+header "Verifying boot-critical options survived olddefconfig..."
+missing=""
+for opt in CONFIG_DRM_SIMPLEDRM CONFIG_SYSFB_SIMPLEFB CONFIG_FRAMEBUFFER_CONSOLE \
+           CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD; do
+  grep -q "^${opt}=y" .config || missing="$missing $opt"
+done
+if [[ -n "$missing" ]]; then
+  warn "These MUST be =y for the Mac to boot with a display + mount root:$missing"
+  warn "Continuing, but if it still boots blind, that's why — check manually."
+else
+  success "Display stack + root drivers are all built-in (=y). Good."
+fi
+
+header "Building kernel (make -j3)..."
+make -j3 && make modules_install && make install || die "kernel build/install failed — fix the error above."
+
+header "Regenerating initramfs + out-of-tree modules..."
+genkernel --no-clean --no-mrproper --kernel-config=/usr/src/linux/.config initramfs \
+  || warn "genkernel failed — initramfs NOT regenerated; do NOT reboot until fixed."
+emerge @module-rebuild 2>/dev/null || warn "@module-rebuild failed — rebuild net-wireless/broadcom-sta."
+KVER=$(make -s kernelrelease)
+depmod -a "$KVER" 2>/dev/null || true
+
+# Repoint rEFInd's initrd= at the (possibly renamed) initramfs.
+NEWINITRD=$(ls -t /boot/initramfs-*"$KVER"*.img 2>/dev/null | head -1)
+if [[ -n "$NEWINITRD" && -f /boot/refind_linux.conf ]]; then
+  sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" \
+    /boot/refind_linux.conf && success "refind_linux.conf initrd -> $(basename "$NEWINITRD")"
+fi
+
+# verify-boot from wherever the repo lives
+for p in /root/legenddots /home/legend/legenddots /legenddots; do
+  [[ -f "$p/gentoo/troubleshooting/verify-boot" ]] && { header "verify-boot"; bash "$p/gentoo/troubleshooting/verify-boot" || true; break; }
+done
+
+header "Done."
+success "Kernel ${KVER} rebuilt from the proven config. Exit the chroot, umount, reboot."
