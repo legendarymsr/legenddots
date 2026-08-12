@@ -399,7 +399,8 @@ if ! step_done kernel; then
   # Pin to the 6.18 longterm — an unpinned emerge now floats to the 7.x series,
   # which net-wireless/broadcom-sta's out-of-tree wl.ko does not build against.
   emerge "=sys-kernel/gentoo-sources-6.18*"
-  emerge sys-kernel/genkernel sys-kernel/linux-firmware sys-firmware/intel-microcode
+  emerge sys-kernel/genkernel sys-kernel/linux-firmware sys-firmware/intel-microcode \
+         sys-firmware/wireless-regdb   # regulatory.db — real WiFi regdomain (5 GHz)
   eselect kernel set 1
   cd /usr/src/linux
   make defconfig
@@ -491,6 +492,11 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_ANDROID_BINDER_IPC
   ./scripts/config -e CONFIG_ANDROID_BINDERFS
   ./scripts/config --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
+
+  # --- WIRELESS: cfg80211 as a MODULE so the kernel can load regulatory.db from
+  # /lib/firmware — needed for a real regdomain (5 GHz WiFi; world/00 blocks it). ---
+  ./scripts/config -m CONFIG_CFG80211
+  ./scripts/config -e CONFIG_CFG80211_WEXT
 
   # --- BROADCOM-STA (wl) COMPATIBILITY ---
   # broadcom-sta refuses to build against CONFIG_PREEMPT_RCU (pulled in by
