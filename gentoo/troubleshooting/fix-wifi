@@ -81,14 +81,23 @@ SAVED=$(nmcli -t -g NAME,TYPE con show 2>/dev/null | awk -F: '$2=="802-11-wirele
 if [[ -n "$SAVED" ]] && nmcli con up "$SAVED" >/dev/null 2>&1; then
   echo ">>> reconnected to saved network: $SAVED"
 else
-  echo "== available networks =="
+  echo "== available networks (SSID and BSSID columns) =="
   nmcli device wifi list 2>/dev/null || echo "  (scan failed — try: doas rfkill unblock all)"
   echo
-  read -rp "Connect to which SSID? (use the EXACT name above; blank to skip) " SSID
-  if [[ -n "${SSID:-}" ]]; then
-    read -rsp "Password for \"$SSID\": " PASS; echo
-    nmcli device wifi connect "$SSID" password "$PASS" \
-      || echo ">>> connect failed — 'could not be found' usually means the name isn't EXACT; copy it off the list and rerun."
+  # nmcli accepts an SSID *or* a BSSID here. If connecting by name keeps failing
+  # ('could not be found'), paste the BSSID (MAC) instead — it skips name-matching.
+  read -rp "Connect to which network? (SSID *or* BSSID from above; blank to skip) " TARGET
+  if [[ -n "${TARGET:-}" ]]; then
+    read -rsp "Password: " PASS; echo
+    if nmcli device wifi connect "$TARGET" password "$PASS"; then
+      echo ">>> connected."; ping -c2 gentoo.org
+    else
+      echo ">>> connect failed:"
+      echo "    • 'could not be found' by NAME  → SSID isn't exact; try the BSSID (MAC) instead."
+      echo "    • fails by BSSID too            → likely regulatory domain (5 GHz blocked):"
+      echo "        iw reg get                    # if 'country 00' and your net is chan 36+:"
+      echo "        doas iw reg set XX             # your country code (US/GB/DE/SE…), then rerun"
+    fi
   fi
 fi
 
