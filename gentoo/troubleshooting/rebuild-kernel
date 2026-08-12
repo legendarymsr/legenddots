@@ -122,6 +122,10 @@ make defconfig
 ./scripts/config -e CONFIG_ANDROID_BINDERFS
 ./scripts/config --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
 
+# --- WIRELESS: cfg80211 as a MODULE so the kernel can load regulatory.db from
+# /lib/firmware — needed for a real regdomain (5 GHz WiFi; world/00 blocks it). ---
+./scripts/config -m CONFIG_CFG80211 -e CONFIG_CFG80211_WEXT
+
 # --- BROADCOM-STA (wl) COMPATIBILITY ---
 ./scripts/config -d CONFIG_PREEMPT_DYNAMIC
 ./scripts/config -d CONFIG_PREEMPT

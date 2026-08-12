@@ -599,6 +599,8 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
   # tree (the missing-scripts/config symptom) by laying down a clean copy.
   emerge --oneshot "=sys-kernel/gentoo-sources-6.18*" \
     || warn "gentoo-sources 6.18 emerge failed — check ACCEPT_KEYWORDS / portage tree"
+  # regulatory.db (real WiFi regdomain for 5 GHz) + genkernel/firmware if missing.
+  emerge --noreplace sys-firmware/wireless-regdb sys-kernel/genkernel sys-kernel/linux-firmware 2>/dev/null || true
 
   # Point /usr/src/linux at the newest 6.18 tree (what eselect kernel set does).
   NEWSRC=$(ls -d /usr/src/linux-6.18.*-gentoo* 2>/dev/null | sort -V | tail -1)
@@ -660,6 +662,27 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     # vndbinder nodes dynamically; name them so a non-binderfs fallback still works.
     ./scripts/config -e CONFIG_ANDROID_BINDER_IPC -e CONFIG_ANDROID_BINDERFS \
                      --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
+    # Full hardware + hardening recipe (mirror of install.sh) so a rebuild enables
+    # EVERYTHING, not just deltas — Intel ME off, Apple audio/HID/BT/Thunderbolt/
+    # USB, broadcom-sta compat (drop in-tree brcm/b43/mac80211), KASLR/PTI/
+    # retpoline/lockdown, zswap, and cfg80211 as a MODULE so the kernel can load
+    # regulatory.db (5 GHz WiFi needs a real regdomain, not world/00).
+    ./scripts/config -d CONFIG_INTEL_MEI -d CONFIG_INTEL_MEI_ME -d CONFIG_INTEL_MEI_TXE \
+                     -d CONFIG_INTEL_MEI_HDCP -d CONFIG_INTEL_MEI_PXP
+    ./scripts/config -e CONFIG_SND_HDA_CODEC_CIRRUS -e CONFIG_HID_APPLE -e CONFIG_BT_HCIBTUSB \
+                     -e CONFIG_X86_INTEL_PSTATE -e CONFIG_THUNDERBOLT \
+                     -e CONFIG_USB_XHCI_HCD -e CONFIG_USB_EHCI_HCD
+    ./scripts/config -m CONFIG_CFG80211 -e CONFIG_CFG80211_WEXT \
+                     -d CONFIG_BRCMSMAC -d CONFIG_BRCMFMAC -d CONFIG_BRCMUTIL \
+                     -d CONFIG_B43 -d CONFIG_B43LEGACY -d CONFIG_SSB -d CONFIG_MAC80211
+    ./scripts/config -e CONFIG_RANDOMIZE_BASE -e CONFIG_RANDOMIZE_MEMORY \
+                     -e CONFIG_PAGE_TABLE_ISOLATION -e CONFIG_MITIGATION_RETPOLINE -e CONFIG_RETPOLINE \
+                     -e CONFIG_STRICT_KERNEL_RWX -e CONFIG_STRICT_MODULE_RWX \
+                     -e CONFIG_SECURITY_LOCKDOWN_LSM -e CONFIG_SECURITY_LOCKDOWN_LSM_EARLY \
+                     -d CONFIG_MODULE_SIG_FORCE
+    ./scripts/config -e CONFIG_ZSWAP -e CONFIG_ZSMALLOC -e CONFIG_CRYPTO_LZ4 \
+                     -d CONFIG_ZSWAP_COMPRESSOR_DEFAULT_DEFLATE \
+                     -e CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4 -e CONFIG_ZSWAP_DEFAULT_ON
     make olddefconfig
     # olddefconfig silently drops any option whose dependency isn't met. Verify
     # the ones we just set survived BEFORE the ~30-min build + reboot, so a missing
