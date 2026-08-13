@@ -473,14 +473,14 @@ if ! step_done kernel; then
   # 'iptables' fails with 'Table does not exist', the container gets no network,
   # and Android never boots. Also veth for the container's virtual interface.
   ./scripts/config -e CONFIG_NETFILTER -e CONFIG_NETFILTER_ADVANCED -e CONFIG_NETFILTER_XTABLES
-  ./scripts/config -m CONFIG_NF_CONNTRACK -m CONFIG_NF_NAT -m CONFIG_NF_TABLES
-  ./scripts/config -m CONFIG_IP_NF_IPTABLES -m CONFIG_IP_NF_FILTER -m CONFIG_IP_NF_NAT \
-                   -m CONFIG_IP_NF_MANGLE -m CONFIG_IP_NF_TARGET_MASQUERADE
-  ./scripts/config -m CONFIG_NETFILTER_XT_TARGET_MASQUERADE \
-                   -m CONFIG_NETFILTER_XT_TARGET_CHECKSUM \
-                   -m CONFIG_NETFILTER_XT_MATCH_CONNTRACK \
-                   -m CONFIG_NETFILTER_XT_MATCH_COMMENT
-  ./scripts/config -m CONFIG_VETH
+  ./scripts/config -e CONFIG_NF_CONNTRACK -e CONFIG_NF_NAT -e CONFIG_NF_TABLES
+  ./scripts/config -e CONFIG_IP_NF_IPTABLES -e CONFIG_IP_NF_FILTER -e CONFIG_IP_NF_NAT \
+                   -e CONFIG_IP_NF_MANGLE -e CONFIG_IP_NF_TARGET_MASQUERADE
+  ./scripts/config -e CONFIG_NETFILTER_XT_TARGET_MASQUERADE \
+                   -e CONFIG_NETFILTER_XT_TARGET_CHECKSUM \
+                   -e CONFIG_NETFILTER_XT_MATCH_CONNTRACK \
+                   -e CONFIG_NETFILTER_XT_MATCH_COMMENT
+  ./scripts/config -e CONFIG_VETH
 
   # --- WAYDROID: Android container (binder) ---
   # Waydroid runs a full Android userspace in an LXC container over the kernel's
