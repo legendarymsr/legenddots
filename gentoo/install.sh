@@ -472,7 +472,7 @@ if ! step_done kernel; then
   # container. defconfig omits the legacy ip_tables stack, so without these
   # 'iptables' fails with 'Table does not exist', the container gets no network,
   # and Android never boots. Also veth for the container's virtual interface.
-  ./scripts/config -e CONFIG_NETFILTER -e CONFIG_NETFILTER_ADVANCED -e CONFIG_NETFILTER_XTABLES
+  ./scripts/config -e CONFIG_NETFILTER -e CONFIG_NETFILTER_ADVANCED -e CONFIG_NETFILTER_XTABLES -e CONFIG_NETFILTER_XTABLES_LEGACY
   ./scripts/config -e CONFIG_NF_CONNTRACK -e CONFIG_NF_NAT -e CONFIG_NF_TABLES
   ./scripts/config -e CONFIG_IP_NF_IPTABLES -e CONFIG_IP_NF_FILTER -e CONFIG_IP_NF_NAT \
                    -e CONFIG_IP_NF_MANGLE -e CONFIG_IP_NF_TARGET_MASQUERADE
