@@ -143,6 +143,37 @@ it isn't. Only the part I wrote is.
 
 ---
 
+## edit — editor switcher (neovim ⇄ emacs)
+
+Both **neovim** and **emacs** are first-class here, and they share one feel:
+neovim natively, emacs via **evil-mode + a `SPC` leader** (`init.el`) — so the
+same muscle memory works in either. Pick whichever suits the task; the system
+follows your choice.
+
+**How it's wired:**
+- `$EDITOR`/`$VISUAL` point at **`edit`** (this script, symlinked to
+  `~/.local/bin/edit`). So `git commit`, `doas -e`, etc. open your *chosen*
+  default editor.
+- The choice lives in `~/.config/legend/editor` (`nvim` or `emacs`; default
+  `nvim`).
+- Emacs runs as a **daemon** (`emacs --fg-daemon`, started by niri at login), so
+  `emacsclient` opens **instantly** — no per-launch startup cost. Terminal-only
+  (no GTK GUI): it lives in alacritty, just like neovim.
+
+**Shell commands** (from `.zshrc`):
+
+| Command | Does |
+|---------|------|
+| `use-nvim` / `use-emacs` | Set the default `$EDITOR` (persists) |
+| `which-editor` | Show the current default |
+| `v` | Always open **neovim** (regardless of default) |
+| `e` | Always open **emacs** (terminal, via the daemon) |
+| `edit <file>` | Open the current default editor |
+
+So `use-emacs` makes git/`doas` open emacs; `use-nvim` flips back. `v`/`e` are
+always there when you want a specific one for a one-off. `init.lua` (neovim) and
+`init.el` (emacs) are both symlinked in by `gentoo/setup`.
+
 ## qute-config.py
 
 Tokyo Night themed [qutebrowser](https://qutebrowser.org) config with Neovim-style keybinds.

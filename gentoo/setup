@@ -137,6 +137,9 @@ if ! step_done package_use; then
   echo "media-libs/libglvnd X"                          > /etc/portage/package.use/libglvnd
   echo "media-libs/mesa -llvm"                          > /etc/portage/package.use/mesa
   echo "sys-auth/seatd server"                          > /etc/portage/package.use/seatd
+  # Terminal-only emacs (no X/GTK GUI) — runs in alacritty like neovim, lighter
+  # deps. tree-sitter for fast syntax. Used via the emacs --daemon + emacsclient.
+  echo "app-editors/emacs -X -gtk tree-sitter"          > /etc/portage/package.use/emacs
   { echo "x11-libs/cairo X"
     echo "x11-libs/pango X"
     echo "x11-libs/libxkbcommon X"
@@ -234,7 +237,7 @@ if ! step_done base_system; then
     sys-auth/seatd net-wireless/broadcom-sta net-wireless/bluez \
     "$PRIV_PKG" sys-apps/dbus sys-auth/polkit \
     sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
-    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim \
+    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     sys-fs/exfatprogs sys-fs/fuse \
     x11-terms/alacritty llvm-core/llvm llvm-core/clang
@@ -307,10 +310,12 @@ if ! step_done localization_user; then
     git clone https://github.com/legendarymsr/legenddots ~/legenddots || \
       (cd ~/legenddots && git pull --ff-only)
     mkdir -p ~/Pictures/Screenshots
-    mkdir -p ~/.config/alacritty ~/.config/niri ~/.config/nvim
+    mkdir -p ~/.config/alacritty ~/.config/niri ~/.config/nvim ~/.config/emacs ~/.local/bin
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
+    ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
+    ln -sfn ~/legenddots/scripts/edit    ~/.local/bin/edit
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
@@ -801,10 +806,12 @@ if id legend &>/dev/null; then
     else
       git clone https://github.com/legendarymsr/legenddots ~/legenddots || true
     fi
-    mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim
+    mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim ~/.config/emacs ~/.local/bin
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
+    ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
+    ln -sfn ~/legenddots/scripts/edit    ~/.local/bin/edit
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel

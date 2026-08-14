@@ -302,6 +302,10 @@ echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 # and it's one of the bigger individual mesa build-time costs.
 echo "media-libs/mesa -llvm" > /etc/portage/package.use/mesa
 
+# Terminal-only emacs (no X/GTK GUI) — runs in alacritty like neovim; used via
+# the emacs --daemon + emacsclient. tree-sitter for fast in-terminal syntax.
+echo "app-editors/emacs -X -gtk tree-sitter" > /etc/portage/package.use/emacs
+
 
 # Desktop X11 libs needed by GTK/pango chain on Wayland
 echo "x11-libs/cairo X" > /etc/portage/package.use/xlibs
@@ -586,6 +590,7 @@ EOF
     app-shells/zsh \
     dev-vcs/git \
     app-editors/neovim \
+    app-editors/emacs \
     media-video/pipewire \
     media-video/wireplumber \
     x11-terms/alacritty \
