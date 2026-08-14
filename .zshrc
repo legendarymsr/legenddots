@@ -247,3 +247,25 @@ else
     alias ls='ls --color=auto --group-directories-first'
     alias nmap='sudo nmap'
 fi
+
+# =============================================================================
+# EDITORS — neovim + emacs, switchable
+# -----------------------------------------------------------------------------
+# $EDITOR points at the `edit` switcher (git, doas -e, etc. all honour it).
+# Default is neovim; flip it any time with `use-nvim` / `use-emacs`. `v` always
+# opens neovim, `e` always opens (terminal) emacs, regardless of the default.
+# =============================================================================
+export PATH="$HOME/.local/bin:$PATH"
+export EDITOR="$HOME/.local/bin/edit"
+export VISUAL="$EDITOR"
+
+alias v='nvim'
+alias vi='nvim'
+alias vim='nvim'
+alias e='emacsclient -t -a ""'     # terminal emacs via the daemon (auto-starts)
+alias ee='emacsclient -t -a "" -e'  # eval elisp in the running emacs
+
+# Switch the default editor (persists in ~/.config/legend/editor):
+use-nvim()  { mkdir -p ~/.config/legend && echo nvim  > ~/.config/legend/editor && echo "default editor → neovim"; }
+use-emacs() { mkdir -p ~/.config/legend && echo emacs > ~/.config/legend/editor && echo "default editor → emacs"; }
+which-editor() { echo "default: $(cat ~/.config/legend/editor 2>/dev/null || echo 'nvim (unset)')"; }

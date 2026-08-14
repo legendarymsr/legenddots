@@ -53,6 +53,8 @@ spawn-at-startup "wireplumber"
 spawn-at-startup "swaybg" "-m" "fill" "-i" "~/.config/wallpapers/6orjlq.jpg"
 spawn-at-startup "waybar"
 spawn-at-startup "dunst"
+// emacs daemon: pre-warm it at login so `e` / emacsclient opens instantly
+spawn-at-startup "emacs" "--fg-daemon"
 
 animations {
     slowdown 0.7

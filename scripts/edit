@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# edit — open whichever editor you've picked as your default (neovim or emacs).
+# This is what $EDITOR / $VISUAL point at, so git, doas -e, etc. all honour the
+# choice. Switch the default any time with `use-nvim` / `use-emacs` (zsh funcs
+# that write the pref file below). Default is neovim.
+#
+# Both editors share the same feel: neovim natively, emacs via evil-mode + a SPC
+# leader — so the muscle memory carries across whichever one opens.
+pref="${XDG_CONFIG_HOME:-$HOME/.config}/legend/editor"
+case "$(cat "$pref" 2>/dev/null)" in
+  emacs)
+    # Terminal emacs through the daemon; -a '' auto-starts a daemon if none runs.
+    exec emacsclient -t -a '' "$@" ;;
+  *)
+    exec nvim "$@" ;;
+esac
