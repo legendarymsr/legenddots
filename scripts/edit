@@ -6,8 +6,10 @@
 #
 # Both editors share the same feel: neovim natively, emacs via evil-mode + a SPC
 # leader — so the muscle memory carries across whichever one opens.
+# Per-user choice wins; else the system default (/etc/legend/editor); else nvim.
 pref="${XDG_CONFIG_HOME:-$HOME/.config}/legend/editor"
-case "$(cat "$pref" 2>/dev/null)" in
+choice="$(cat "$pref" 2>/dev/null || cat /etc/legend/editor 2>/dev/null || echo nvim)"
+case "$choice" in
   emacs)
     # Terminal emacs through the daemon; -a '' auto-starts a daemon if none runs.
     exec emacsclient -t -a '' "$@" ;;

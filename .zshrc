@@ -251,13 +251,15 @@ fi
 # =============================================================================
 # EDITORS — neovim + emacs, switchable
 # -----------------------------------------------------------------------------
-# $EDITOR points at the `edit` switcher (git, doas -e, etc. all honour it).
-# Default is neovim; flip it any time with `use-nvim` / `use-emacs`. `v` always
-# opens neovim, `e` always opens (terminal) emacs, regardless of the default.
+# The default editor is set SYSTEM-WIDE in /etc/env.d/99legend-editor →
+# /usr/local/bin/edit, so git, doas -e, cron, every shell and Mod+E all honour it.
+# `v` always opens neovim, `e` always opens (terminal) emacs; use-nvim/use-emacs
+# flip the default. The two exports below are just a fallback if /etc/profile
+# wasn't sourced — the real source of truth is /etc/env.d.
 # =============================================================================
 export PATH="$HOME/.local/bin:$PATH"
-export EDITOR="$HOME/.local/bin/edit"
-export VISUAL="$EDITOR"
+export EDITOR="${EDITOR:-/usr/local/bin/edit}"
+export VISUAL="${VISUAL:-$EDITOR}"
 
 alias v='nvim'
 alias vi='nvim'
@@ -265,7 +267,7 @@ alias vim='nvim'
 alias e='emacsclient -t -a ""'     # terminal emacs via the daemon (auto-starts)
 alias ee='emacsclient -t -a "" -e'  # eval elisp in the running emacs
 
-# Switch the default editor (persists in ~/.config/legend/editor):
-use-nvim()  { mkdir -p ~/.config/legend && echo nvim  > ~/.config/legend/editor && echo "default editor → neovim"; }
-use-emacs() { mkdir -p ~/.config/legend && echo emacs > ~/.config/legend/editor && echo "default editor → emacs"; }
-which-editor() { echo "default: $(cat ~/.config/legend/editor 2>/dev/null || echo 'nvim (unset)')"; }
+# Switch the default editor via the system `editor` command (per-user pref):
+use-nvim()     { editor nvim; }
+use-emacs()    { editor emacs; }
+which-editor() { editor show; }
