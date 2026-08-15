@@ -60,6 +60,7 @@
 
 (use-package evil-collection
   :after evil
+  :init (setq evil-collection-setup-minibuffer t)  ; vim keys in the minibuffer too
   :config
   (evil-collection-init))
 
@@ -87,6 +88,10 @@
     "vv"  '((lambda () (interactive) (dired obsidian-vault-path)) :which-key "Open Obsidian vault")
     "hm"  '(man :which-key "man page")
     "hi"  '(info :which-key "Info reader")
+    "hf"  '(helpful-callable :which-key "Describe function")
+    "hv"  '(helpful-variable :which-key "Describe variable")
+    "hk"  '(helpful-key :which-key "Describe key")
+    "a"   '(embark-act :which-key "Actions (embark)")
     "ss"  '(legend-show-splash :which-key "Show splash")))
 
 ;; --- 4. BASIC COMPLETION ---
@@ -103,8 +108,7 @@
   :init (marginalia-mode))
 
 ;; --- 5. MAGIT + AUTO-GIT COMMIT ---
-(use-package magit
-  :bind ("C-x g" . magit-status))
+(use-package magit)  ; opened via SPC gg — no emacs chord
 
 (defun legend-auto-git-commit ()
   (when (and (buffer-file-name)
@@ -228,7 +232,12 @@
         centaur-tabs-set-bar 'left
         centaur-tabs-set-modified-marker t
         centaur-tabs-modified-marker "●")
-  (centaur-tabs-mode t))
+  (centaur-tabs-mode t)
+  ;; evil-idiomatic tab nav (alongside SPC bn / SPC bp)
+  (general-define-key
+   :states 'normal
+   "gt" 'centaur-tabs-forward
+   "gT" 'centaur-tabs-backward))
 
 ;; In-buffer completion popup (IDE-style), rendered in the terminal by corfu-terminal
 (use-package corfu
@@ -249,8 +258,7 @@
 ;; Command palette / better search — vertico (minibuffer) is already loaded above;
 ;; consult adds the "fuzzy everything" commands (bound under SPC / , SPC sb , …).
 (use-package consult)
-(use-package embark
-  :bind (("C-." . embark-act)))
+(use-package embark)  ; embark-act is SPC a
 (use-package embark-consult :after (embark consult))
 
 ;; Git gutter — margin mode, because fringes are graphical-only
@@ -270,11 +278,8 @@
 (use-package rainbow-delimiters
   :hook (prog-mode . rainbow-delimiters-mode))
 
-;; Nicer, navigable help buffers
-(use-package helpful
-  :bind (("C-h f" . helpful-callable)
-         ("C-h v" . helpful-variable)
-         ("C-h k" . helpful-key)))
+;; Nicer, navigable help buffers (reached via SPC hf / hv / hk)
+(use-package helpful)
 
 ;; Built-in polish: highlight the current line + show column in the modeline
 (global-hl-line-mode 1)
