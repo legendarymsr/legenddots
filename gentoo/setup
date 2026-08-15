@@ -349,9 +349,13 @@ if ! step_done editor_integration; then
 EDITOR=/usr/local/bin/edit
 VISUAL=/usr/local/bin/edit
 SUDO_EDITOR=/usr/local/bin/edit
+MANPAGER="nvim +Man!"
 EOF
     env-update >/dev/null 2>&1 || warn "env-update failed — run: doas env-update && . /etc/profile"
-    success "System editor = /usr/local/bin/edit (switch with 'editor nvim|emacs')."
+    # vi -> neovim system-wide (/usr/bin/vi), so even muscle-memory `vi` is nvim.
+    emerge --noreplace app-eselect/eselect-vi >/dev/null 2>&1 || true
+    eselect vi set nvim >/dev/null 2>&1 || warn "eselect vi set nvim failed — set it manually later"
+    success "System editor = edit; man→nvim; vi→nvim (switch: 'editor nvim|emacs')."
     mark_step editor_integration
   else
     warn "repo scripts/edit not found — run the dotfiles step first, then rerun."
