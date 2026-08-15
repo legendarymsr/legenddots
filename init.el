@@ -80,6 +80,8 @@
     "tt"  '(eshell :which-key "Open terminal")
     "ou"  '((lambda () (interactive) (eww "https://www.gnu.org/software/emacs/")) :which-key "GNU Emacs website")
     "vv"  '((lambda () (interactive) (dired obsidian-vault-path)) :which-key "Open Obsidian vault")
+    "hm"  '(man :which-key "man page")
+    "hi"  '(info :which-key "Info reader")
     "ss"  '(legend-show-splash :which-key "Show splash")))
 
 ;; --- 4. BASIC COMPLETION ---

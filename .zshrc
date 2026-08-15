@@ -260,6 +260,7 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 export EDITOR="${EDITOR:-/usr/local/bin/edit}"
 export VISUAL="${VISUAL:-$EDITOR}"
+export MANPAGER="${MANPAGER:-nvim +Man!}"   # man pages open in neovim (:Man)
 
 alias v='nvim'
 alias vi='nvim'

@@ -23,6 +23,19 @@ vim.opt.timeoutlen = 300
 vim.opt.clipboard = "unnamedplus" -- Sync with system clipboard for easy C&C
 vim.opt.undofile = true           -- Persistent undo, even after restart
 
+-- GUI-like feel (terminal nvim, but behaves like a graphical IDE)
+vim.opt.mouse = "a"               -- full mouse: click, drag-select, scroll, resize splits
+vim.opt.mousemoveevent = true     -- hover events (bufferline close buttons, etc.)
+vim.opt.signcolumn = "yes"        -- always-on gutter (git/diagnostics) — no text jump
+vim.opt.scrolloff = 8             -- keep context around the cursor
+vim.opt.smoothscroll = true       -- smooth <C-d>/<C-u> on wrapped lines (0.10+)
+vim.opt.pumblend = 10             -- slight transparency on the completion popup
+vim.opt.pumheight = 12            -- cap popup height
+vim.opt.winminwidth = 5
+vim.opt.splitkeep = "screen"
+vim.opt.title = true              -- set the terminal window title to the file
+vim.opt.fillchars = { eob = " ", fold = " ", foldopen = "", foldsep = " ", foldclose = "" }
+
 -- 3. THE PLUGINS
 require("lazy").setup({
   -- THEME: TokyoNight (The classic Red Team glow)
@@ -172,6 +185,86 @@ require("lazy").setup({
       })
     end,
   },
+
+  -- ======================================================================
+  -- GUI-LIKE EYE CANDY — terminal nvim that feels like a graphical IDE
+  -- ======================================================================
+
+  -- Buffer tabs across the top (like GUI editor tabs)
+  {
+    "akinsho/bufferline.nvim",
+    event = "VeryLazy",
+    dependencies = "nvim-tree/nvim-web-devicons",
+    config = function()
+      require("bufferline").setup({
+        options = {
+          diagnostics = "nvim_lsp",
+          separator_style = "slant",
+          offsets = { { filetype = "NvimTree", text = "Files", separator = true } },
+        },
+      })
+    end,
+    keys = {
+      { "]b", "<cmd>BufferLineCycleNext<cr>", desc = "Next buffer" },
+      { "[b", "<cmd>BufferLineCyclePrev<cr>", desc = "Prev buffer" },
+    },
+  },
+
+  -- Fancy cmdline / messages / LSP popups + notifications (the big GUI feel)
+  {
+    "folke/noice.nvim",
+    event = "VeryLazy",
+    dependencies = { "MunifTanjim/nui.nvim", "rcarriga/nvim-notify" },
+    config = function()
+      require("notify").setup({ background_colour = "#1a1b26", stages = "fade_in_slide_out", timeout = 2500 })
+      vim.notify = require("notify")
+      require("noice").setup({
+        lsp = {
+          override = {
+            ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
+            ["vim.lsp.util.stylize_markdown"] = true,
+            ["cmp.entry.get_documentation"] = true,
+          },
+        },
+        presets = {
+          bottom_search = true,       -- classic bottom /search
+          command_palette = true,     -- centered cmdline + popupmenu (GUI palette)
+          long_message_to_split = true,
+          lsp_doc_border = true,
+        },
+      })
+    end,
+  },
+
+  -- Indentation guides + active-scope highlight
+  {
+    "lukas-reineke/indent-blankline.nvim",
+    main = "ibl",
+    event = "VeryLazy",
+    config = function()
+      require("ibl").setup({ indent = { char = "│" }, scope = { enabled = true, show_start = false } })
+    end,
+  },
+
+  -- Git signs in the gutter (add / change / delete)
+  { "lewis6991/gitsigns.nvim", event = "VeryLazy", config = function() require("gitsigns").setup() end },
+
+  -- Prettier vim.ui.select / vim.ui.input popups (rename, code actions, …)
+  { "stevearc/dressing.nvim", event = "VeryLazy" },
+
+  -- Scrollbar with diagnostic + git marks (GUI-style gutter minimap)
+  {
+    "petertriho/nvim-scrollbar",
+    event = "VeryLazy",
+    dependencies = "lewis6991/gitsigns.nvim",
+    config = function()
+      require("scrollbar").setup()
+      require("scrollbar.handlers.gitsigns").setup()
+    end,
+  },
+
+  -- Smooth animated scrolling
+  { "karb94/neoscroll.nvim", event = "VeryLazy", config = function() require("neoscroll").setup() end },
 })
 
 -- 4. RECON FUNCTIONS
