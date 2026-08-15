@@ -168,9 +168,15 @@ follows your choice.
   vim navigation/search; emacs has `SPC h m` (`man`) / `SPC h i` (Info).
 - **`vi` → neovim** system-wide (`eselect vi set nvim`), so even muscle-memory
   `vi` lands in nvim.
-- **neovim's UI is GUI-flavoured** (in `init.lua`): buffer tabs (bufferline), a
-  centered command palette + notifications (noice + nvim-notify), indent guides,
-  git gutter signs, a diagnostic scrollbar, smooth scrolling, and full mouse.
+- **Both UIs are GUI-flavoured, in the terminal:**
+  - *neovim* (`init.lua`): buffer tabs (bufferline), a centered command palette +
+    notifications (noice + nvim-notify), indent guides, git gutter signs, a
+    diagnostic scrollbar, smooth scrolling, full mouse.
+  - *emacs* (`init.el`): Nerd-Font icons everywhere (tabs, completions, dired,
+    modeline), GUI-style buffer tabs (centaur-tabs), IDE autocomplete popups
+    (corfu + corfu-terminal), consult/embark command palette, git gutter
+    (diff-hl margin), indent guides, rainbow brackets, helpful — all rendered in
+    the TUI, no GUI/EXWM.
 
 **Commands:**
 

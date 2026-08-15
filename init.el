@@ -78,6 +78,11 @@
     "bb"  '(consult-buffer :which-key "Buffers")
     "gg"  '(magit-status :which-key "Magit")
     "tt"  '(eshell :which-key "Open terminal")
+    "bn"  '(centaur-tabs-forward :which-key "Next tab")
+    "bp"  '(centaur-tabs-backward :which-key "Prev tab")
+    "/"   '(consult-ripgrep :which-key "Search project (rg)")
+    "sb"  '(consult-line :which-key "Search buffer")
+    "fr"  '(consult-recent-file :which-key "Recent files")
     "ou"  '((lambda () (interactive) (eww "https://www.gnu.org/software/emacs/")) :which-key "GNU Emacs website")
     "vv"  '((lambda () (interactive) (dired obsidian-vault-path)) :which-key "Open Obsidian vault")
     "hm"  '(man :which-key "man page")
@@ -190,3 +195,82 @@
 (add-hook 'emacs-startup-hook
           (lambda ()
             (message "LegendOS Bunker Online v5.0 — GPL-3.0 & Free")))
+
+;; --- 10. GUI-LIKE TUI EYE CANDY ---
+;; Make TERMINAL emacs feel like a graphical IDE — no GUI/EXWM, everything below
+;; renders in the terminal. Icons need a Nerd Font in the terminal, which this
+;; system has (JetBrainsMono Nerd Font in alacritty). Same spirit as init.lua.
+
+;; Icons everywhere (terminal, via the Nerd Font)
+(use-package nerd-icons)
+(use-package nerd-icons-completion
+  :after (marginalia nerd-icons)
+  :config
+  (nerd-icons-completion-mode)
+  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
+(use-package nerd-icons-dired
+  :hook (dired-mode . nerd-icons-dired-mode))
+(setq doom-modeline-icon t)   ; icons in the modeline too
+
+;; GUI-style buffer tabs across the top (renders as text tabs in the terminal)
+(use-package centaur-tabs
+  :demand t
+  :config
+  (setq centaur-tabs-style "bar"
+        centaur-tabs-height 28
+        centaur-tabs-set-icons t
+        centaur-tabs-icon-type 'nerd-icons
+        centaur-tabs-set-bar 'left
+        centaur-tabs-set-modified-marker t
+        centaur-tabs-modified-marker "●")
+  (centaur-tabs-mode t))
+
+;; In-buffer completion popup (IDE-style), rendered in the terminal by corfu-terminal
+(use-package corfu
+  :init
+  (setq corfu-auto t corfu-auto-delay 0.15 corfu-auto-prefix 2 corfu-cycle t)
+  (global-corfu-mode))
+(use-package corfu-terminal
+  :after corfu
+  :config (unless (display-graphic-p) (corfu-terminal-mode +1)))
+(use-package nerd-icons-corfu
+  :after (corfu nerd-icons)
+  :config (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+(use-package cape
+  :init
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  (add-to-list 'completion-at-point-functions #'cape-file))
+
+;; Command palette / better search — vertico (minibuffer) is already loaded above;
+;; consult adds the "fuzzy everything" commands (bound under SPC / , SPC sb , …).
+(use-package consult)
+(use-package embark
+  :bind (("C-." . embark-act)))
+(use-package embark-consult :after (embark consult))
+
+;; Git gutter — margin mode, because fringes are graphical-only
+(use-package diff-hl
+  :hook ((prog-mode . diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode))
+  :config
+  (unless (display-graphic-p) (diff-hl-margin-mode 1))
+  (diff-hl-flydiff-mode 1))
+
+;; Indentation guides (character-based so they show in the terminal)
+(use-package indent-bars
+  :hook (prog-mode . indent-bars-mode)
+  :config (setq indent-bars-prefer-character t))
+
+;; Colored nested brackets
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+
+;; Nicer, navigable help buffers
+(use-package helpful
+  :bind (("C-h f" . helpful-callable)
+         ("C-h v" . helpful-variable)
+         ("C-h k" . helpful-key)))
+
+;; Built-in polish: highlight the current line + show column in the modeline
+(global-hl-line-mode 1)
+(column-number-mode 1)
