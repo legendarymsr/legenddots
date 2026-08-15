@@ -315,7 +315,6 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
-    ln -sfn ~/legenddots/scripts/edit    ~/.local/bin/edit
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel
@@ -325,6 +324,38 @@ if ! step_done localization_user; then
   "
   xdg-user-dirs-update || true
   mark_step localization_user
+fi
+
+# 10b. EDITOR INTEGRATION (system-wide) — make nvim/emacs the OS default editor
+# for EVERY context (root, cron, doas -e, non-login/non-zsh shells, TTY), not just
+# the interactive zsh session. This is what makes the editors feel woven into the
+# OS rather than being a shell alias.
+if ! step_done editor_integration; then
+  header "Wiring editors system-wide (nvim + emacs)..."
+  # Find the repo (cloned to legend's home by the dotfiles step; fall back to root's).
+  EDSRC=""
+  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
+    [[ -f "$d/scripts/edit" && -f "$d/scripts/editor" ]] && { EDSRC="$d"; break; }
+  done
+  if [[ -n "$EDSRC" ]]; then
+    # The switcher + the switch command, in /usr/local/bin (on every user's PATH,
+    # incl. root and cron). Copies (not symlinks) so they don't depend on a home dir.
+    install -m755 "$EDSRC/scripts/edit"   /usr/local/bin/edit
+    install -m755 "$EDSRC/scripts/editor" /usr/local/bin/editor
+    # System default (a per-user ~/.config/legend/editor overrides it).
+    mkdir -p /etc/legend; [[ -f /etc/legend/editor ]] || echo nvim > /etc/legend/editor
+    # The Gentoo way: EDITOR/VISUAL/SUDO_EDITOR for the whole system via /etc/env.d.
+    cat > /etc/env.d/99legend-editor << 'EOF'
+EDITOR=/usr/local/bin/edit
+VISUAL=/usr/local/bin/edit
+SUDO_EDITOR=/usr/local/bin/edit
+EOF
+    env-update >/dev/null 2>&1 || warn "env-update failed — run: doas env-update && . /etc/profile"
+    success "System editor = /usr/local/bin/edit (switch with 'editor nvim|emacs')."
+    mark_step editor_integration
+  else
+    warn "repo scripts/edit not found — run the dotfiles step first, then rerun."
+  fi
 fi
 
 # 11. SYSTEM CONFIG
@@ -811,7 +842,6 @@ if id legend &>/dev/null; then
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
-    ln -sfn ~/legenddots/scripts/edit    ~/.local/bin/edit
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
     ln -sfn ~/legenddots/niri/fuzzel     ~/.config/fuzzel

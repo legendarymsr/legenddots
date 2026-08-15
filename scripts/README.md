@@ -150,29 +150,35 @@ neovim natively, emacs via **evil-mode + a `SPC` leader** (`init.el`) — so the
 same muscle memory works in either. Pick whichever suits the task; the system
 follows your choice.
 
-**How it's wired:**
-- `$EDITOR`/`$VISUAL` point at **`edit`** (this script, symlinked to
-  `~/.local/bin/edit`). So `git commit`, `doas -e`, etc. open your *chosen*
-  default editor.
-- The choice lives in `~/.config/legend/editor` (`nvim` or `emacs`; default
-  `nvim`).
+**How it's wired — system-wide, not just a shell alias:**
+- `EDITOR`/`VISUAL`/`SUDO_EDITOR` are set in **`/etc/env.d/99legend-editor`** (the
+  Gentoo way), pointing at **`/usr/local/bin/edit`**. So `git commit`, `doas -e`,
+  `cron`, non-zsh shells, bare TTY logins, root — *everything* opens your chosen
+  editor, not only your interactive zsh.
+- **`edit`** and the **`editor`** switch command live in `/usr/local/bin` (on
+  every user's PATH, including root). `gentoo/setup` installs them + runs
+  `env-update`.
+- The choice: per-user **`~/.config/legend/editor`** overrides the system default
+  **`/etc/legend/editor`** (default `nvim`). Run `editor` as a normal user to set
+  yours; as root to set the system default.
 - Emacs runs as a **daemon** (`emacs --fg-daemon`, started by niri at login), so
-  `emacsclient` opens **instantly** — no per-launch startup cost. Terminal-only
-  (no GTK GUI): it lives in alacritty, just like neovim.
+  `emacsclient` opens **instantly**. Terminal-only (no GTK GUI): it lives in
+  alacritty, just like neovim.
 
-**Shell commands** (from `.zshrc`):
+**Commands:**
 
 | Command | Does |
 |---------|------|
-| `use-nvim` / `use-emacs` | Set the default `$EDITOR` (persists) |
-| `which-editor` | Show the current default |
+| `editor` | Show the current default (user + system) |
+| `editor nvim` / `editor emacs` | Set the default (user pref; root → system) |
+| `use-nvim` / `use-emacs` / `which-editor` | zsh shortcuts for the above |
 | `v` | Always open **neovim** (regardless of default) |
 | `e` | Always open **emacs** (terminal, via the daemon) |
-| `edit <file>` | Open the current default editor |
+| `edit <file>` | Open the current default editor (what `$EDITOR` runs) |
 
-So `use-emacs` makes git/`doas` open emacs; `use-nvim` flips back. `v`/`e` are
-always there when you want a specific one for a one-off. `init.lua` (neovim) and
-`init.el` (emacs) are both symlinked in by `gentoo/setup`.
+So `editor emacs` makes git/`doas`/`Mod+E` open emacs; `editor nvim` flips back.
+`v`/`e` are always there for a one-off. `init.lua` (neovim) and `init.el` (emacs)
+are both symlinked in by `gentoo/setup`; `Mod+E` opens the default in a terminal.
 
 ## qute-config.py
 

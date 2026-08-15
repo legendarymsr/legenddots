@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# editor — show or switch your default editor (neovim <-> emacs), OS-wide aware.
+#
+#   editor            show the current default
+#   editor nvim       set default to neovim
+#   editor emacs      set default to emacs
+#
+# $EDITOR/$VISUAL/$SUDO_EDITOR (set system-wide in /etc/env.d/99legend-editor)
+# point at `edit`, which honours this choice — so git, doas -e, cron, every shell,
+# and Mod+E all follow it. As a normal user this sets YOUR default
+# (~/.config/legend/editor); as root it sets the SYSTEM default (/etc/legend/editor,
+# the fallback for root/cron/other users).
+set -euo pipefail
+
+userpref="${XDG_CONFIG_HOME:-$HOME/.config}/legend/editor"
+syspref="/etc/legend/editor"
+
+show() {
+  local eff; eff="$(cat "$userpref" 2>/dev/null || cat "$syspref" 2>/dev/null || echo nvim)"
+  echo "default editor: $eff"
+  echo "  user:   $(cat "$userpref" 2>/dev/null || echo '(unset)')"
+  echo "  system: $(cat "$syspref"  2>/dev/null || echo '(unset → nvim)')"
+}
+
+target=""
+case "${1:-show}" in
+  ""|show|status|-h|--help|help) show; exit 0 ;;
+  nvim|neovim|vim|v)             target=nvim ;;
+  emacs|em|e)                    target=emacs ;;
+  *) echo "usage: editor [nvim|emacs|show]" >&2; exit 1 ;;
+esac
+
+if [[ $EUID -eq 0 ]]; then
+  mkdir -p /etc/legend; echo "$target" > "$syspref"
+  echo "system default editor → $target"
+else
+  mkdir -p "$(dirname "$userpref")"; echo "$target" > "$userpref"
+  echo "default editor → $target  (this user)"
+fi
