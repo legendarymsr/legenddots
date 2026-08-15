@@ -116,8 +116,13 @@
 (add-hook 'after-save-hook #'legend-auto-git-commit)
 
 ;; --- 6. THEME + MODELINE ---
+;; doom-tokyo-night = the same Tokyo Night "night" palette neovim uses
+;; (folke/tokyonight, style "night") — bg #1a1b26, so the two editors match.
 (use-package doom-themes
-  :config (load-theme 'doom-one t))
+  :config
+  (setq doom-themes-enable-bold t doom-themes-enable-italic t)
+  (load-theme 'doom-tokyo-night t)
+  (doom-themes-org-config))
 
 (use-package doom-modeline
   :init (doom-modeline-mode 1))
