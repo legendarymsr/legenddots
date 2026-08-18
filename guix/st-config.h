@@ -1,4 +1,4 @@
-/* st (suckless terminal) — Tokyo Night, JetBrainsMono Nerd Font
+/* st (suckless terminal) — Tokyo Night, Fira Code (libre, OFL 1.1)
  *
  * This is the build-time config for the `st-tokyonight` package defined in
  * guix/config.scm. That package copies this file to config.h before compiling
@@ -9,7 +9,7 @@
 /* appearance
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html */
-static char *font = "JetBrainsMono Nerd Font:pixelsize=14:antialias=true:autohint=true";
+static char *font = "Fira Code:pixelsize=14:antialias=true:autohint=true";
 static int borderpx = 12;
 
 /* What program is executed by st depends on these precedence rules:

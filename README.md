@@ -29,7 +29,7 @@ legenddots/
 ├── guix/                      Guix system + home (ratpoison + slock + st, Tokyo Night)
 │   ├── config.scm             Guix system config
 │   ├── home-configuration.scm Guix home config (zsh, emacs, ratpoison, dotfiles)
-│   └── st-config.h            suckless st build config (Tokyo Night, JetBrains Mono)
+│   └── st-config.h            suckless st build config (Tokyo Night, Fira Code)
 │
 ├── init.lua                   Neovim config
 ├── init.el                    Emacs config
