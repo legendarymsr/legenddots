@@ -24,6 +24,32 @@
               (lambda _
                 (copy-file #$(local-file "st-config.h") "config.h")))))))))
 
+;; slock (screen locker) with our Tokyo Night lock colors baked in.
+(define slock-tokyonight
+  (package
+    (inherit slock)
+    (name "slock-tokyonight")
+    (arguments
+     (substitute-keyword-arguments (package-arguments slock)
+       ((#:phases phases '%standard-phases)
+        #~(modify-phases #$phases
+            (add-after 'unpack 'legend-config
+              (lambda _
+                (copy-file #$(local-file "slock-config.h") "config.h")))))))))
+
+;; dmenu (launcher) with our Tokyo Night colors + font baked in.
+(define dmenu-tokyonight
+  (package
+    (inherit dmenu)
+    (name "dmenu-tokyonight")
+    (arguments
+     (substitute-keyword-arguments (package-arguments dmenu)
+       ((#:phases phases '%standard-phases)
+        #~(modify-phases #$phases
+            (add-after 'unpack 'legend-config
+              (lambda _
+                (copy-file #$(local-file "dmenu-config.h") "config.h")))))))))
+
 (operating-system
   (host-name "legend-box")
   (timezone "Europe/Brussels")
@@ -93,8 +119,8 @@
    (cons* (specification->package "nss-certs")
           (specification->package "ratpoison")
           st-tokyonight                          ; st + guix/st-config.h
-          slock                                  ; screen locker (setuid below)
-          dmenu                                  ; launcher (ratpoison `bind d`)
+          slock-tokyonight                       ; screen locker (setuid below)
+          dmenu-tokyonight                        ; launcher (ratpoison `bind d`)
           (specification->package "xdotool")
           (specification->package "scrot")
           (specification->package "xsetroot")
@@ -106,7 +132,7 @@
 
   ;; slock must be setuid-root to authenticate on unlock.
   (setuid-programs
-   (cons (setuid-program (program (file-append slock "/bin/slock")))
+   (cons (setuid-program (program (file-append slock-tokyonight "/bin/slock")))
          %setuid-programs))
 
   (services

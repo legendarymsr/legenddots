@@ -27,9 +27,13 @@ legenddots/
 │   └── nixvim.nix             Neovim via NixVim
 │
 ├── guix/                      Guix system + home (ratpoison + slock + st, Tokyo Night)
+│   ├── README.md              Guix-specific notes
 │   ├── config.scm             Guix system config
-│   ├── home-configuration.scm Guix home config (zsh, emacs, ratpoison, dotfiles)
-│   └── st-config.h            suckless st build config (Tokyo Night, JetBrains Mono)
+│   ├── home-configuration.scm Guix home config (zsh, emacs, dotfiles)
+│   ├── ratpoisonrc            Ratpoison WM config
+│   ├── st-config.h            suckless st build config (Tokyo Night, JetBrains Mono)
+│   ├── slock-config.h         suckless slock build config (Tokyo Night)
+│   └── dmenu-config.h         suckless dmenu build config (Tokyo Night)
 │
 ├── init.lua                   Neovim config
 ├── init.el                    Emacs config
