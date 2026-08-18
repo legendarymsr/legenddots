@@ -30,16 +30,13 @@
           "tcpdump"
           "netcat"
 
-          ;; ratpoison utilities
-          "xterm"
-          "xdotool"
-          "scrot"
-          "xsetroot"
-          "font-jetbrains-mono"
+          ;; NOTE: the X desktop (st + slock + ratpoison + dmenu + scrot +
+          ;; xsetroot + xdotool + fonts) lives in guix/config.scm (system) so the
+          ;; custom st build isn't shadowed and slock can be setuid. This home
+          ;; config keeps the CLI tools + the ratpoison/xinit/emacs config files.
 
           ;; browser
           "icecat"
-          "slock"
 
           ;; emacs
           "emacs"
@@ -137,10 +134,10 @@ set font -misc-fixed-medium-r-normal--14-130-75-75-c-70-iso10646-1
 # padding
 set padding 0 0 0 0
 
-# terminal
-bind c exec alacritty
-bind C-c exec alacritty
-bind x exec xterm
+# terminal (st)
+bind c exec st
+bind C-c exec st
+bind Return exec st
 
 # launcher
 bind d exec dmenu_run -fn 'monospace-11' -nb '#1a1b26' -nf '#c0caf5' -sb '#7aa2f7' -sf '#1a1b26'
@@ -189,14 +186,14 @@ bind ( gmove 9
 # lock screen
 bind Escape exec slock
 
-# splits
+# splits + window management
 bind s hsplit
 bind S vsplit
 bind r remove
 bind R ratrestart
 bind Q quit
 bind q delete
-bind K kill
+bind C-k kill      # force-kill (K alone is exchangeup, above)
 
 # resize
 bind Left resize -w 50
@@ -251,14 +248,7 @@ exec ratpoison
 *color13: #bb9af7
 *color14: #7dcfff
 *color15: #c0caf5
-
-! XTerm
-XTerm*faceName: JetBrainsMono Nerd Font
-XTerm*faceSize: 11
-XTerm*scrollBar: false
-XTerm*saveLines: 10000
-XTerm*borderWidth: 0
-XTerm*internalBorder: 8
+! (st is themed/fonted at build time via guix/st-config.h, not Xresources)
 "))))
 
     ;; ── Emacs ──────────────────────────────────────────────────────────────
