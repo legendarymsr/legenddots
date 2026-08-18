@@ -31,6 +31,7 @@ legenddots/
 │   ├── config.scm             Guix system config
 │   ├── home-configuration.scm Guix home config (zsh, emacs, dotfiles)
 │   ├── ratpoisonrc            Ratpoison WM config
+│   ├── st-config.h            custom minimal st build config (no F13+/keypad/mouse)
 │   ├── slock-config.h         suckless slock build config (Tokyo Night)
 │   └── dmenu-config.h         suckless dmenu build config (Tokyo Night)
 │
