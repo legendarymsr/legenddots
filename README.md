@@ -31,7 +31,6 @@ legenddots/
 │   ├── config.scm             Guix system config
 │   ├── home-configuration.scm Guix home config (zsh, emacs, dotfiles)
 │   ├── ratpoisonrc            Ratpoison WM config
-│   ├── st-config.h            suckless st build config (Tokyo Night, JetBrains Mono)
 │   ├── slock-config.h         suckless slock build config (Tokyo Night)
 │   └── dmenu-config.h         suckless dmenu build config (Tokyo Night)
 │
