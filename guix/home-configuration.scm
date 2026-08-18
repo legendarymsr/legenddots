@@ -264,7 +264,7 @@ exec ratpoison
 (scroll-bar-mode -1)
 (global-display-line-numbers-mode t)
 (setq display-line-numbers-type 'relative)
-(set-face-attribute 'default nil :font \"Fira Code\" :height 110)
+(set-face-attribute 'default nil :font \"JetBrainsMono Nerd Font\" :height 110)
 
 ;; editing
 (setq-default indent-tabs-mode nil)

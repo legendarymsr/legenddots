@@ -9,7 +9,7 @@
              (guix packages)              ; package / inherit
              (guix gexp))                 ; local-file, gexps
 
-;; st (suckless terminal) built with our Tokyo Night / Fira Code config.h.
+;; st (suckless terminal) built with our Tokyo Night / JetBrains Mono config.h.
 ;; config.def.h is copied to config.h only if absent, so dropping ours in before
 ;; the build makes st compile against it — no separate patch needed.
 (define st-tokyonight
@@ -101,7 +101,7 @@
           (specification->package "xwallpaper")
           (specification->package "xclip")
           (specification->package "maim")
-          (specification->package "font-fira-code")   ; libre (OFL 1.1) mono
+          (specification->package "font-jetbrains-mono")
           %base-packages))
 
   ;; slock must be setuid-root to authenticate on unlock.
