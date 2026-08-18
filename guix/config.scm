@@ -3,7 +3,26 @@
              (gnu services networking)
              (gnu services security)
              (gnu services ssh)
-             (gnu services virtualization))
+             (gnu services virtualization)
+             (gnu packages suckless)      ; st, slock, dmenu
+             (gnu system setuid)          ; setuid slock so it can lock
+             (guix packages)              ; package / inherit
+             (guix gexp))                 ; local-file, gexps
+
+;; st (suckless terminal) built with our Tokyo Night / JetBrains Mono config.h.
+;; config.def.h is copied to config.h only if absent, so dropping ours in before
+;; the build makes st compile against it — no separate patch needed.
+(define st-tokyonight
+  (package
+    (inherit st)
+    (name "st-tokyonight")
+    (arguments
+     (substitute-keyword-arguments (package-arguments st)
+       ((#:phases phases '%standard-phases)
+        #~(modify-phases #$phases
+            (add-after 'unpack 'legend-config
+              (lambda _
+                (copy-file #$(local-file "st-config.h") "config.h")))))))))
 
 (operating-system
   (host-name "legend-box")
@@ -69,15 +88,26 @@
            '("wheel" "netdev" "audio" "video" "libvirt" "wireshark" "kvm")))
          %base-user-accounts))
 
+  ;; X desktop: ratpoison WM + st terminal (custom build) + slock lock + dmenu.
   (packages
    (cons* (specification->package "nss-certs")
           (specification->package "ratpoison")
-          (specification->package "alacritty")
-          (specification->package "dmenu")
+          st-tokyonight                          ; st + guix/st-config.h
+          slock                                  ; screen locker (setuid below)
+          dmenu                                  ; launcher (ratpoison `bind d`)
+          (specification->package "xdotool")
+          (specification->package "scrot")
+          (specification->package "xsetroot")
           (specification->package "xwallpaper")
           (specification->package "xclip")
           (specification->package "maim")
+          (specification->package "font-jetbrains-mono")
           %base-packages))
+
+  ;; slock must be setuid-root to authenticate on unlock.
+  (setuid-programs
+   (cons (setuid-program (program (file-append slock "/bin/slock")))
+         %setuid-programs))
 
   (services
    (append

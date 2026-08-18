@@ -26,8 +26,10 @@ legenddots/
 │   ├── packages.nix           Package list
 │   └── nixvim.nix             Neovim via NixVim
 │
-├── config.scm                 Guix system config
-├── home-configuration.scm     Guix home config (ratpoison, zsh, emacs, dotfiles)
+├── guix/                      Guix system + home (ratpoison + slock + st, Tokyo Night)
+│   ├── config.scm             Guix system config
+│   ├── home-configuration.scm Guix home config (zsh, emacs, ratpoison, dotfiles)
+│   └── st-config.h            suckless st build config (Tokyo Night, JetBrains Mono)
 │
 ├── init.lua                   Neovim config
 ├── init.el                    Emacs config
@@ -108,10 +110,10 @@ The Guix setup is the most minimal and principled of the three. GNU Guix enforce
 
 ```bash
 # System
-guix system reconfigure config.scm
+guix system reconfigure guix/config.scm
 
 # Home
-guix home reconfigure home-configuration.scm
+guix home reconfigure guix/home-configuration.scm
 ```
 
 Ratpoison is configured entirely through `~/.ratpoisonrc` (managed by Guix home). The Emacs config in `init.el` is standalone — no package manager bootstrapping, packages are declared in the Guix home config.
