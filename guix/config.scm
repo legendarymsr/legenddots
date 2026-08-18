@@ -9,11 +9,10 @@
              (guix packages)              ; package / inherit
              (guix gexp))                 ; local-file, gexps
 
-;; st (suckless terminal) — Tokyo Night + JetBrains Mono.
-;; A complete st config.h has to redefine st's entire keymap, so rather than
-;; ship a 500-line file we just patch the font and palette into st's own
-;; config.def.h at build time. The fg/bg lines are matched by their comments
-;; (the colour names aren't unique); everything else by quote-anchored token.
+;; st (suckless terminal) built from our custom, trimmed config.h
+;; (guix/st-config.h): Tokyo Night, JetBrains Mono, no F13–F35, no keypad,
+;; no mouse shortcuts. config.def.h -> config.h happens only if config.h is
+;; absent, so dropping ours in before the build makes st compile against it.
 (define st-tokyonight
   (package
     (inherit st)
@@ -22,33 +21,9 @@
      (substitute-keyword-arguments (package-arguments st)
        ((#:phases phases '%standard-phases)
         #~(modify-phases #$phases
-            (add-after 'unpack 'legend-theme
+            (add-after 'unpack 'legend-config
               (lambda _
-                (substitute* "config.def.h"
-                  (("Liberation Mono:pixelsize=12")
-                   "JetBrainsMono Nerd Font:pixelsize=14")
-                  ((".*default foreground colour.*")
-                   "\t\"#c0caf5\", /* default foreground colour */")
-                  ((".*default background colour.*")
-                   "\t\"#1a1b26\", /* default background colour */")
-                  (("\"#cccccc\",") "\"#c0caf5\",")   ; cursor
-                  (("\"#555555\",") "\"#414868\",")   ; reverse cursor
-                  (("\"black\",")    "\"#15161e\",")  ; 0
-                  (("\"red3\",")     "\"#f7768e\",")  ; 1
-                  (("\"green3\",")   "\"#9ece6a\",")  ; 2
-                  (("\"yellow3\",")  "\"#e0af68\",")  ; 3
-                  (("\"blue2\",")    "\"#7aa2f7\",")  ; 4
-                  (("\"magenta3\",") "\"#bb9af7\",")  ; 5
-                  (("\"cyan3\",")    "\"#7dcfff\",")  ; 6
-                  (("\"gray90\",")   "\"#a9b1d6\",")  ; 7
-                  (("\"gray50\",")   "\"#414868\",")  ; 8
-                  (("\"red\",")      "\"#f7768e\",")  ; 9
-                  (("\"green\",")    "\"#9ece6a\",")  ; 10
-                  (("\"yellow\",")   "\"#e0af68\",")  ; 11
-                  (("\"#5c5cff\",")  "\"#7aa2f7\",")  ; 12
-                  (("\"magenta\",")  "\"#bb9af7\",")  ; 13
-                  (("\"cyan\",")     "\"#7dcfff\",")  ; 14
-                  (("\"white\",")    "\"#c0caf5\","))))))))))  ; 15
+                (copy-file #$(local-file "st-config.h") "config.h")))))))))
 
 ;; slock (screen locker) with our Tokyo Night lock colors baked in.
 (define slock-tokyonight
