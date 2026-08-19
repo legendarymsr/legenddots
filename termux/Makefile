@@ -8,7 +8,8 @@
 # wlroots has no stable API and a versioned pkg-config name (wlroots-0.18, ...);
 # discover the actual installed name rather than guessing the suffix.
 WLROOTS := $(shell pkg-config --list-all 2>/dev/null | awk '/^wlroots/{print $$1; exit}')
-PKGS = $(WLROOTS) wayland-server xkbcommon
+# xcb: used to read the Termux:X11 screen size so the output fills it (pocketwl.c).
+PKGS = $(WLROOTS) wayland-server xkbcommon xcb
 
 # wayland-scanner: prefer the pkg-config variable, fall back to $PATH.
 WAYLAND_SCANNER := $(shell pkg-config --variable=wayland_scanner wayland-scanner 2>/dev/null)

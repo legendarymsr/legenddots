@@ -45,6 +45,8 @@
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 #include <linux/input-event-codes.h>
+// Used only to size the X11-backend output to the real Termux:X11 screen (below).
+#include <xcb/xcb.h>
 
 enum pocketwl_cursor_mode {
 	POCKETWL_CURSOR_PASSTHROUGH,
@@ -515,6 +517,30 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	free(output);
 }
 
+// When nested in Termux:X11, wlroots' X11 backend defaults its window to a fixed
+// 1024x768, so the compositor shows up letterboxed in a corner. Read the real
+// screen size straight off the X server (same DISPLAY the X11 backend uses) so
+// we can size the output to fill it. Returns false when not on X11 / on error.
+static bool probe_x11_screen(int *w, int *h) {
+	if (getenv("DISPLAY") == NULL) {
+		return false;   // DRM backend (rooted) — use the panel's preferred mode
+	}
+	xcb_connection_t *conn = xcb_connect(NULL, NULL);
+	if (conn == NULL || xcb_connection_has_error(conn)) {
+		if (conn) xcb_disconnect(conn);
+		return false;
+	}
+	const xcb_setup_t *setup = xcb_get_setup(conn);
+	xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup);
+	bool ok = it.rem > 0 && it.data->width_in_pixels > 0 && it.data->height_in_pixels > 0;
+	if (ok) {
+		*w = it.data->width_in_pixels;
+		*h = it.data->height_in_pixels;
+	}
+	xcb_disconnect(conn);
+	return ok;
+}
+
 static void server_new_output(struct wl_listener *listener, void *data) {
 	struct pocketwl_server *server = wl_container_of(listener, server, new_output);
 	struct wlr_output *wlr_output = data;
@@ -523,9 +549,15 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
 	wlr_output_state_set_enabled(&state, true);
-	struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
-	if (mode != NULL) {
-		wlr_output_state_set_mode(&state, mode);
+	int sw = 0, sh = 0;
+	if (probe_x11_screen(&sw, &sh)) {
+		// Fill the whole Termux:X11 screen instead of the 1024x768 default.
+		wlr_output_state_set_custom_mode(&state, sw, sh, 0);
+	} else {
+		struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
+		if (mode != NULL) {
+			wlr_output_state_set_mode(&state, mode);
+		}
 	}
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
