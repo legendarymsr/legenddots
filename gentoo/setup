@@ -859,10 +859,7 @@ fi
 
 echo -e "\n${GREEN}Done.${NC}"
 echo ""
-echo "To apply wallpaper and audio to your running session, open a terminal in niri and run:"
-echo ""
-echo "  bash ~/legenddots/gentoo/troubleshooting/apply"
-echo ""
+echo "Wallpaper and audio start automatically with niri (spawn-at-startup)."
 echo "If this is a fresh install, reboot first, then start niri with:"
 echo ""
 echo "  bash ~/legenddots/gentoo/niri"

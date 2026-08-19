@@ -10,7 +10,6 @@ Most are read-only diagnostics; the ones that change state say so below.
 
 | Script | Root? | Changes the system? | Use it when |
 |--------|-------|---------------------|-------------|
-| `apply` | no (you) | yes (session only) | Pushing dotfile + wallpaper/audio changes into a running niri session |
 | `audio-debug` | no (you) | no (read-only) | Sound isn't working and you need to see what the hardware/pipewire state is |
 | `verify-boot` | no (you) | no (read-only) | About to reboot after a kernel rebuild — confirm it won't brick |
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
@@ -27,17 +26,6 @@ Most are read-only diagnostics; the ones that change state say so below.
 > [`../waygentoodroid/README.md`](../waygentoodroid/README.md).
 
 ---
-
-## `apply` — push config into a running session
-
-```sh
-bash ~/legenddots/gentoo/troubleshooting/apply
-```
-
-Run it **as yourself, from a terminal inside niri** (not root, not SSH). Pulls
-the latest legenddots, refreshes all dotfile symlinks, restarts `swaybg` with
-the wallpaper, and starts `pipewire`/`pipewire-pulse`/`wireplumber` if they
-aren't already running. The quick way to see config changes without logging out.
 
 ## `audio-debug` — sound diagnostics (read-only)
 
