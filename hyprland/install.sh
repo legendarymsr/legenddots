@@ -67,8 +67,7 @@ link "$REPO_DIR/hyprpaper.conf"      "$HOME/.config/hypr/hyprpaper.conf"
 link "$REPO_DIR/hyprlock.conf"       "$HOME/.config/hypr/hyprlock.conf"
 link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
 link "$REPO_DIR/../alacritty.toml"   "$HOME/.config/alacritty/alacritty.toml"
-
-warn "No wallpaper set — add one at ~/.config/hypr/wallpaper.jpg or edit hyprpaper.conf"
+link "$REPO_DIR/../wallpapers/arch.jpg" "$HOME/.config/hypr/wallpaper.jpg"
 
 info "Enabling pipewire..."
 systemctl --user enable --now pipewire.socket       2>/dev/null && success "pipewire enabled"       || warn "pipewire not found, skipping"
