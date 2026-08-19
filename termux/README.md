@@ -160,17 +160,24 @@ Trisquel doesn't publish a ready proot tarball, so you supply one (e.g.
 debootstrap Trisquel "aramo" arm64, or repack a Trisquel arm64 image). The Guix +
 IceCat steps are identical on top.
 
-### If you just want a working libre browser today
+### If you just want a working libre browser today (`firefox.sh`)
 
 Guix-from-source-in-a-proot is the purist path and can be a yak-shave. The
 reliable free-software browser that works now is Debian's `firefox-esr` (DFSG-free,
-though not the IceCat brand):
+though not the IceCat brand) — it ships a prebuilt aarch64 binary and installs in
+one apt command. `firefox.sh` does the whole thing (Debian proot + install), and
+its `launch` subcommand runs it as a Wayland client in pocketwl, exactly like
+`icecat.sh`:
 
 ```sh
-proot-distro install debian
-proot-distro login debian -- apt-get install -y firefox-esr
-# launch it as a Wayland client the same way icecat.sh's `launch` does.
+bash ~/legenddots/termux/firefox.sh          # set up Debian proot + firefox-esr
+# then, from a terminal INSIDE pocketwl:
+bash ~/legenddots/termux/firefox.sh launch    # run Firefox ESR, displayed in pocketwl
 ```
+
+Override the base distro with `FIREFOX_DISTRO=...` if you keep firefox-esr in a
+different proot. Same software-rendering caveat as IceCat: fine for reading, not
+for video.
 
 ---
 
@@ -207,6 +214,7 @@ dependency means a version bump can need a few lines of adjustment.
 | `setup.sh` | installs Termux deps + builds |
 | `start` | launches Termux:X11 and runs pocketwl nested in it |
 | `icecat.sh` | sets up a proot + GNU Guix and installs genuine GNU IceCat (`launch` subcommand runs it in pocketwl) |
+| `firefox.sh` | sets up a Debian proot and installs Firefox ESR — the reliable browser path (`launch` runs it in pocketwl) |
 
 ---
 
