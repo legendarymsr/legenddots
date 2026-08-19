@@ -59,7 +59,6 @@ gentoo/
 ├── setup                   post-install provisioning / re-apply config on a booted system
 ├── README.md               this file
 └── troubleshooting/        diagnostic & repair scripts (see troubleshooting/README.md)
-    ├── apply               push dotfile/wallpaper/audio changes into a running niri session
     ├── audio-debug         read-only sound diagnostics
     ├── verify-boot         read-only pre-reboot check after a kernel rebuild
     ├── fix-wifi            Broadcom `wl` module / WiFi recovery
