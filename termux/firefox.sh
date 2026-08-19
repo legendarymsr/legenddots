@@ -39,7 +39,7 @@ if [[ "${1:-}" == "launch" ]]; then
   exec proot-distro login "$DISTRO" --shared-tmp -- \
     env XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$WL" \
         MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland \
-        bash -lc 'exec firefox-esr'
+        bash -lc 'exec dbus-run-session firefox-esr'
 fi
 
 # ── setup ─────────────────────────────────────────────────────────────────────
