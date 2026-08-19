@@ -96,6 +96,15 @@ The compositor exports `XDG_CURRENT_DESKTOP=pocketwl` and
 WM/DE detection) can identify it — otherwise there's no Wayland protocol to ask
 "which compositor?".
 
+### Window sizing
+
+On a phone, tiny floating windows are useless, so **every window opens filling
+the output** (sized to the screen on first commit, not left at the client's
+default). Explicit **maximize and fullscreen requests** (e.g. Firefox's `F11`)
+are honored too — the window is resized to cover the whole output and the client
+is told it's fullscreen/maximized. There are no bars or gaps to work around, so
+"maximized" and "fullscreen" both just mean "the whole screen".
+
 ---
 
 ## Genuine GNU IceCat via Guix (`icecat.sh`)

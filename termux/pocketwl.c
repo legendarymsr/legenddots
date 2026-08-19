@@ -547,6 +547,20 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
 }
 
+// Size and position a toplevel to cover the whole output. On a phone a stacking
+// WM with tiny floating windows is useless, so every window fills the screen
+// (and this is also what an explicit maximize/fullscreen request resolves to,
+// since pocketwl has no bars or gaps to work around).
+static void toplevel_fill_output(struct pocketwl_toplevel *toplevel) {
+	struct wlr_box box = {0};
+	wlr_output_layout_get_box(toplevel->server->output_layout, NULL, &box);
+	if (box.width <= 0 || box.height <= 0) {
+		return;
+	}
+	wlr_scene_node_set_position(&toplevel->scene_tree->node, box.x, box.y);
+	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, box.width, box.height);
+}
+
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	struct pocketwl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
@@ -564,7 +578,8 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	struct pocketwl_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
 	if (toplevel->xdg_toplevel->base->initial_commit) {
-		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, 0, 0);
+		// Open filling the output instead of letting the client pick a size.
+		toplevel_fill_output(toplevel);
 	}
 }
 
@@ -618,16 +633,28 @@ static void xdg_toplevel_request_resize(struct wl_listener *listener, void *data
 
 static void xdg_toplevel_request_maximize(struct wl_listener *listener, void *data) {
 	struct pocketwl_toplevel *toplevel = wl_container_of(listener, toplevel, request_maximize);
-	if (toplevel->xdg_toplevel->base->initialized) {
-		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+	if (!toplevel->xdg_toplevel->base->initialized) {
+		return;
 	}
+	bool want = toplevel->xdg_toplevel->requested.maximized;
+	wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, want);
+	if (want) {
+		toplevel_fill_output(toplevel);
+	}
+	wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 }
 
 static void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 	struct pocketwl_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
-	if (toplevel->xdg_toplevel->base->initialized) {
-		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+	if (!toplevel->xdg_toplevel->base->initialized) {
+		return;
 	}
+	bool want = toplevel->xdg_toplevel->requested.fullscreen;
+	wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, want);
+	if (want) {
+		toplevel_fill_output(toplevel);
+	}
+	wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 }
 
 // ── Layer shell (wlr-layer-shell-v1): bars, launchers, wallpapers, notifiers ──
