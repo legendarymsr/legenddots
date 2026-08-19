@@ -10,10 +10,14 @@
 // (wlroots does not promise a stable API) — see termux/README.md.
 //
 // Keybindings (default modifier = Alt):
-//   Alt+Escape  quit          Alt+Return  spawn a terminal ($POCKETWL_TERMINAL)
-//   Alt+F1      cycle windows
+//   Alt+Escape       quit           Alt+Return  spawn a terminal ($POCKETWL_TERMINAL)
+//   Alt+D            launcher        Alt+F1      cycle windows
+//   Alt+h/j/k/l      focus tile in that direction (master-stack tiling)
+//   Alt+Left/Right   shrink/grow the master column
+//   Alt+t            toggle tiling on/off
 //
-// Windows can be moved/resized with Alt + left/right mouse button drag.
+// Windows tile automatically (master-stack). Alt + left/right mouse drag still
+// moves/resizes when tiling is toggled off.
 
 #define _POSIX_C_SOURCE 200112L
 #include <assert.h>
@@ -101,6 +105,10 @@ struct pocketwl_server {
 	struct wlr_output_layout *output_layout;
 	struct wl_list outputs;
 	struct wl_listener new_output;
+
+	// Tiling: master-stack layout. mfact is the master column's fraction of width.
+	bool tiling;
+	double mfact;
 };
 
 struct pocketwl_output {
@@ -171,13 +179,136 @@ static void focus_toplevel(struct pocketwl_toplevel *toplevel, struct wlr_surfac
 		}
 	}
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
+	// Raise for stacking correctness, but DON'T reorder server->toplevels — that
+	// list is the tiling order (head = master), and focusing must not reshuffle it.
 	wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
-	wl_list_remove(&toplevel->link);
-	wl_list_insert(&server->toplevels, &toplevel->link);
 	wlr_xdg_toplevel_set_activated(toplevel->xdg_toplevel, true);
 	if (keyboard != NULL) {
 		wlr_seat_keyboard_notify_enter(seat, toplevel->xdg_toplevel->base->surface,
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+	}
+}
+
+// On-screen box of a toplevel (scene position + its xdg geometry).
+static void toplevel_box(struct pocketwl_toplevel *toplevel, struct wlr_box *box) {
+	struct wlr_box geo;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geo);
+	box->x = toplevel->scene_tree->node.x + geo.x;
+	box->y = toplevel->scene_tree->node.y + geo.y;
+	box->width = geo.width;
+	box->height = geo.height;
+}
+
+// Master-stack tiling: first window (head) is the master column on the left at
+// `mfact` of the width; the rest split the right column into equal rows. One
+// window fills the screen. No-op when tiling is off.
+static void tile(struct pocketwl_server *server) {
+	if (!server->tiling) {
+		return;
+	}
+	struct wlr_box area = {0};
+	wlr_output_layout_get_box(server->output_layout, NULL, &area);
+	int n = wl_list_length(&server->toplevels);
+	if (n == 0 || area.width <= 0 || area.height <= 0) {
+		return;
+	}
+	int master_w = (n == 1) ? area.width : (int)(area.width * server->mfact);
+	if (master_w < 1) master_w = 1;
+	int stack_w = area.width - master_w;
+	int stack_n = n - 1;
+	int stack_y = area.y;
+	int i = 0;
+	struct pocketwl_toplevel *t;
+	wl_list_for_each(t, &server->toplevels, link) {
+		if (i == 0) {
+			wlr_scene_node_set_position(&t->scene_tree->node, area.x, area.y);
+			wlr_xdg_toplevel_set_size(t->xdg_toplevel, master_w, area.height);
+		} else {
+			int idx = i - 1;
+			int h = area.height / stack_n;
+			if (idx == stack_n - 1) {  // last row soaks up the rounding remainder
+				h = area.y + area.height - stack_y;
+			}
+			wlr_scene_node_set_position(&t->scene_tree->node, area.x + master_w, stack_y);
+			wlr_xdg_toplevel_set_size(t->xdg_toplevel, stack_w, h);
+			stack_y += h;
+		}
+		i++;
+	}
+}
+
+// The toplevel that currently holds keyboard focus, or NULL.
+static struct pocketwl_toplevel *focused_toplevel(struct pocketwl_server *server) {
+	struct wlr_surface *fs = server->seat->keyboard_state.focused_surface;
+	if (fs == NULL) {
+		return NULL;
+	}
+	struct pocketwl_toplevel *t;
+	wl_list_for_each(t, &server->toplevels, link) {
+		if (t->xdg_toplevel->base->surface == fs) {
+			return t;
+		}
+	}
+	return NULL;
+}
+
+// Cycle focus through the list (dir > 0 = next/newer→older, wrapping).
+static void focus_relative(struct pocketwl_server *server, int dir) {
+	if (wl_list_length(&server->toplevels) < 2) {
+		return;
+	}
+	struct pocketwl_toplevel *cur = focused_toplevel(server);
+	struct wl_list *node;
+	if (cur == NULL) {
+		node = server->toplevels.next;
+	} else if (dir > 0) {
+		node = cur->link.next;
+		if (node == &server->toplevels) node = server->toplevels.next;
+	} else {
+		node = cur->link.prev;
+		if (node == &server->toplevels) node = server->toplevels.prev;
+	}
+	struct pocketwl_toplevel *t = wl_container_of(node, t, link);
+	focus_toplevel(t, t->xdg_toplevel->base->surface);
+}
+
+// Directional focus (Alt+hjkl): pick the nearest window whose center lies in the
+// requested direction, preferring the axis of travel — i3/sway/hyprland feel.
+static void focus_direction(struct pocketwl_server *server, int dx, int dy) {
+	struct pocketwl_toplevel *cur = focused_toplevel(server);
+	if (cur == NULL) {
+		focus_relative(server, 1);
+		return;
+	}
+	struct wlr_box cb;
+	toplevel_box(cur, &cb);
+	double cx = cb.x + cb.width / 2.0, cy = cb.y + cb.height / 2.0;
+	struct pocketwl_toplevel *best = NULL, *t;
+	double best_dist = 0;
+	wl_list_for_each(t, &server->toplevels, link) {
+		if (t == cur) {
+			continue;
+		}
+		struct wlr_box b;
+		toplevel_box(t, &b);
+		double ddx = (b.x + b.width / 2.0) - cx;
+		double ddy = (b.y + b.height / 2.0) - cy;
+		double adx = ddx < 0 ? -ddx : ddx;
+		double ady = ddy < 0 ? -ddy : ddy;
+		if (dx != 0 && (dx * ddx <= 0 || adx < ady)) {
+			continue;  // not to the requested side, or mostly vertical
+		}
+		if (dy != 0 && (dy * ddy <= 0 || ady < adx)) {
+			continue;
+		}
+		double dist = ddx * ddx + ddy * ddy;
+		if (best == NULL || dist < best_dist) {
+			best = t;
+			best_dist = dist;
+		}
+	}
+	if (best != NULL) {
+		focus_toplevel(best, best->xdg_toplevel->base->surface);
 	}
 }
 
@@ -203,15 +334,38 @@ static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym) 
 		spawn(launcher ? launcher : "fuzzel");
 		break;
 	}
-	case XKB_KEY_F1: {
-		if (wl_list_length(&server->toplevels) < 2) {
-			break;
-		}
-		struct pocketwl_toplevel *next_toplevel =
-			wl_container_of(server->toplevels.prev, next_toplevel, link);
-		focus_toplevel(next_toplevel, next_toplevel->xdg_toplevel->base->surface);
+	case XKB_KEY_F1:
+		focus_relative(server, 1);   // cycle to the next window
 		break;
-	}
+	// Directional focus between tiles (Alt+hjkl), like i3/sway/hyprland.
+	case XKB_KEY_h:
+		focus_direction(server, -1, 0);
+		break;
+	case XKB_KEY_l:
+		focus_direction(server, 1, 0);
+		break;
+	case XKB_KEY_k:
+		focus_direction(server, 0, -1);
+		break;
+	case XKB_KEY_j:
+		focus_direction(server, 0, 1);
+		break;
+	// Grow / shrink the master column (Alt+Left / Alt+Right).
+	case XKB_KEY_Left:
+		server->mfact -= 0.05;
+		if (server->mfact < 0.1) server->mfact = 0.1;
+		tile(server);
+		break;
+	case XKB_KEY_Right:
+		server->mfact += 0.05;
+		if (server->mfact > 0.9) server->mfact = 0.9;
+		tile(server);
+		break;
+	// Toggle tiling on/off (Alt+t) — off leaves windows floating/fullscreen.
+	case XKB_KEY_t:
+		server->tiling = !server->tiling;
+		tile(server);
+		break;
 	default:
 		return false;
 	}
@@ -596,6 +750,7 @@ static void toplevel_fill_output(struct pocketwl_toplevel *toplevel) {
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	struct pocketwl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
+	tile(toplevel->server);   // re-tile now that there's a new window
 	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
 }
 
@@ -605,6 +760,13 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 		reset_cursor_mode(toplevel->server);
 	}
 	wl_list_remove(&toplevel->link);
+	tile(toplevel->server);   // re-tile the remaining windows
+	// Keep something focused after a window closes.
+	if (!wl_list_empty(&toplevel->server->toplevels)) {
+		struct pocketwl_toplevel *top =
+			wl_container_of(toplevel->server->toplevels.next, top, link);
+		focus_toplevel(top, top->xdg_toplevel->base->surface);
+	}
 }
 
 static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
@@ -670,7 +832,10 @@ static void xdg_toplevel_request_maximize(struct wl_listener *listener, void *da
 	}
 	bool want = toplevel->xdg_toplevel->requested.maximized;
 	wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, want);
-	if (want) {
+	// Under tiling the layout already decides size; otherwise fill on maximize.
+	if (toplevel->server->tiling) {
+		tile(toplevel->server);
+	} else if (want) {
 		toplevel_fill_output(toplevel);
 	}
 	wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
@@ -684,7 +849,11 @@ static void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *
 	bool want = toplevel->xdg_toplevel->requested.fullscreen;
 	wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, want);
 	if (want) {
+		// Fullscreen overrides the tiling layout: cover the whole output on top.
+		wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
 		toplevel_fill_output(toplevel);
+	} else {
+		tile(toplevel->server);   // back into the tiled layout
 	}
 	wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 }
@@ -905,6 +1074,8 @@ int main(int argc, char *argv[]) {
 	server.layer_overlay = wlr_scene_tree_create(&server.scene->tree);
 
 	wl_list_init(&server.toplevels);
+	server.tiling = true;
+	server.mfact = 0.5;
 	server.xdg_shell = wlr_xdg_shell_create(server.wl_display, 3);
 	server.new_xdg_toplevel.notify = server_new_xdg_toplevel;
 	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);

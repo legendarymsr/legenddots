@@ -74,13 +74,26 @@ opens automatically.
 |-----|--------|
 | `Alt+Return` | spawn a terminal (`$POCKETWL_TERMINAL`, default `foot`) |
 | `Alt+D` | app launcher (`$POCKETWL_LAUNCHER`, default `fuzzel`) |
+| `Alt+h/j/k/l` | **focus the tile left / down / up / right** |
+| `Alt+Left` / `Alt+Right` | shrink / grow the master column |
+| `Alt+t` | toggle tiling on/off |
 | `Alt+F1` | cycle focus between windows |
 | `Alt+Escape` | quit the compositor |
-| `Alt + left-drag` | move a window |
-| `Alt + right-drag` | resize a window |
+| `Alt + left-drag` | move a window (when tiling is off) |
+| `Alt + right-drag` | resize a window (when tiling is off) |
 
 Change the terminal with `POCKETWL_TERMINAL=st bash start`, or the launcher with
 `POCKETWL_LAUNCHER=wofi`, or edit `start`.
+
+### Tiling
+
+Windows tile automatically in a **master–stack** layout (like dwm): the first
+window is the *master*, taking the left half; each new window joins the *stack*
+that splits the right half into equal rows. One window fills the screen. Move
+focus between tiles with **`Alt+h/j/k/l`** (directional — nearest window in that
+direction), resize the master with `Alt+Left`/`Alt+Right`, and toggle tiling off
+with `Alt+t` (then windows float and `Alt+drag` moves/resizes them). A new window
+becomes the master; close one and the rest re-tile to fill the space.
 
 ### Touch
 
@@ -244,12 +257,14 @@ dependency means a version bump can need a few lines of adjustment.
 
 ## Extending it
 
-pocketwl is deliberately a *stacking* compositor with no tiling, bar, or config
-file — the tinywl skeleton. Natural next steps, all in `pocketwl.c`:
+pocketwl now does master–stack **tiling** (see `tile()` in `pocketwl.c`) on top of
+the tinywl skeleton — no bar or config file yet. Natural next steps, all in
+`pocketwl.c`:
 
-- **Tiling**: on `xdg_toplevel_map`, compute a layout over `server->toplevels`
-  and `wlr_scene_node_set_position` / `wlr_xdg_toplevel_set_size` each window
-  (mirror niri/sway's column idea).
+- **Swap/move windows**: promote the focused tile to master, or swap two tiles,
+  by reordering `server->toplevels` and calling `tile()` (add an `Alt+Shift+hjkl`).
+- **Workspaces**: multiple scene trees / toplevel lists, switched by a keybind.
+- **Layouts**: add a monocle/columns layout and toggle it (extend `tile()`).
 - **More keybindings**: extend `handle_keybinding()` — close window
   (`wlr_xdg_toplevel_send_close`), workspaces (multiple scene trees), app launcher.
 - **Touch input**: Android is a touchscreen — handle `WLR_INPUT_DEVICE_TOUCH`
