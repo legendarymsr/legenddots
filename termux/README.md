@@ -96,14 +96,23 @@ The compositor exports `XDG_CURRENT_DESKTOP=pocketwl` and
 WM/DE detection) can identify it — otherwise there's no Wayland protocol to ask
 "which compositor?".
 
-### Window sizing
+### Window sizing / filling the screen
 
-On a phone, tiny floating windows are useless, so **every window opens filling
-the output** (sized to the screen on first commit, not left at the client's
-default). Explicit **maximize and fullscreen requests** (e.g. Firefox's `F11`)
-are honored too — the window is resized to cover the whole output and the client
-is told it's fullscreen/maximized. There are no bars or gaps to work around, so
-"maximized" and "fullscreen" both just mean "the whole screen".
+Two things had to line up for pocketwl to actually fill the phone screen:
+
+1. **The output.** wlroots' X11 backend defaults its window to a fixed
+   **1024×768**, so the compositor showed up letterboxed in a corner of
+   Termux:X11. pocketwl now reads the real screen size off the X server (via
+   `xcb`, the same `DISPLAY` the backend uses) and sets the output to a **custom
+   mode** matching it — so the compositor covers the whole Termux:X11 canvas.
+   (On the rooted DRM path there's no `DISPLAY`, so it falls back to the panel's
+   preferred mode.)
+2. **The windows.** On a phone, tiny floating windows are useless, so **every
+   window opens filling the output** (sized on first commit, not left at the
+   client's default), and explicit **maximize / fullscreen requests** (e.g.
+   Firefox's `F11`) are honored — resized to cover the output, client told it's
+   fullscreen/maximized. No bars or gaps, so "maximized" and "fullscreen" both
+   just mean "the whole screen".
 
 ---
 
