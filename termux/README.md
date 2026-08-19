@@ -175,10 +175,11 @@ bash ~/legenddots/termux/firefox.sh          # set up Debian proot + firefox-esr
 bash ~/legenddots/termux/firefox.sh launch    # run Firefox ESR, displayed in pocketwl
 ```
 
-Setup also drops a **`firefox` command** into Termux's `$PREFIX/bin`, so it shows
-up in **rofi** (`Alt+D`, `-show run`) and the fzf `launcher` — picking it runs
-`firefox.sh launch`. From a terminal inside pocketwl you can also just type
-`firefox`.
+Setup also drops a **`firefox-esr` command** into Termux's `$PREFIX/bin`, so it
+shows up in **rofi** (`Alt+D`, `-show run`) and the fzf `launcher` — picking it
+runs `firefox.sh launch`. From a terminal inside pocketwl you can also just type
+`firefox-esr`. (Termux has no native Firefox package; this command is only that
+wrapper. Remove it with `rm "$PREFIX/bin/firefox-esr"`.)
 
 Override the base distro with `FIREFOX_DISTRO=...` if you keep firefox-esr in a
 different proot. Same software-rendering caveat as IceCat: fine for reading, not
