@@ -136,17 +136,25 @@ else
   exit 1
 fi
 
-# ── 6. Optional: genuine GNU IceCat (heavy — kept opt-in) ─────────────────────
-# Deliberately NOT part of the core install: it's a proot + Guix stack that can
-# build IceCat from source for hours. Offer it, default No.
+# ── 6. Optional: a Wayland browser in a proot (opt-in) ────────────────────────
+# Neither is part of the core install; both are proot stacks. Offer a choice,
+# default No:
+#   [y] genuine GNU IceCat  — via Guix. Heavy: may build from source (hours).
+#   [f] Firefox ESR         — via Debian proot. DFSG-free, prebuilt aarch64, fast.
 if [[ "${ICECAT:-}" == "1" ]]; then
-  RUN_ICECAT=y
+  BROWSER=y
+elif [[ "${FIREFOX:-}" == "1" ]]; then
+  BROWSER=f
 else
   echo ""
-  echo -e "Set up genuine GNU IceCat now? (proot + Guix — heavy/slow, optional) [y/N]"
-  read -t 15 -r RUN_ICECAT || true; echo
+  echo "Set up a browser now? (optional — both run in a proot inside pocketwl)"
+  echo "  [y] genuine GNU IceCat   (Guix — heavy/slow, may build from source)"
+  echo "  [f] Firefox ESR          (Debian proot — DFSG-free, prebuilt, fast)"
+  echo "  [N] skip"
+  read -t 15 -r BROWSER || true; echo
 fi
-case "${RUN_ICECAT,,}" in
-  y|yes) bash "$DIR/icecat.sh" ;;
-  *) echo ":: Skipping IceCat. Run it later with:  bash $DIR/icecat.sh" ;;
+case "${BROWSER,,}" in
+  y|yes|icecat)  bash "$DIR/icecat.sh" ;;
+  f|firefox)     bash "$DIR/firefox.sh" ;;
+  *) echo ":: Skipping. Later:  bash $DIR/icecat.sh  (IceCat)  |  bash $DIR/firefox.sh  (Firefox ESR)" ;;
 esac
