@@ -1900,6 +1900,8 @@ if ! step_done user_setup; then
     ln -sfn ~/legenddots/niri/dunst             ~/.config/dunst
     ln -sfn ~/legenddots/niri/swaylock          ~/.config/swaylock
     ln -sfn ~/legenddots/wallpapers            ~/.config/wallpapers
+    mkdir -p ~/.config/swaybg
+    ln -sfn ~/legenddots/wallpapers/glfs.jpg    ~/.config/swaybg/wallpaper.jpg
     ln -sfn ~/legenddots/fastfetch/config.jsonc ~/.config/fastfetch/config.jsonc
   "
   mark_step user_setup

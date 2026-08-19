@@ -321,6 +321,8 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
     ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
     ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
+    mkdir -p ~/.config/swaybg
+    ln -sfn ~/legenddots/wallpapers/6orjlq.jpg ~/.config/swaybg/wallpaper.jpg
   "
   xdg-user-dirs-update || true
   mark_step localization_user
@@ -852,6 +854,8 @@ if id legend &>/dev/null; then
     ln -sfn ~/legenddots/niri/dunst      ~/.config/dunst
     ln -sfn ~/legenddots/niri/swaylock   ~/.config/swaylock
     ln -sfn ~/legenddots/wallpapers      ~/.config/wallpapers
+    mkdir -p ~/.config/swaybg
+    ln -sfn ~/legenddots/wallpapers/6orjlq.jpg ~/.config/swaybg/wallpaper.jpg
   ' || warn "dotfiles update had issues (network?) — symlinks may be partial"
 else
   warn "user 'legend' doesn't exist yet — skipping dotfiles (localization/user step must run first)"

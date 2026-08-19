@@ -119,6 +119,13 @@ alias pst='ps aux | grep'
                     (list
                      `(".ratpoisonrc" ,(local-file "ratpoisonrc"))))
 
+    ;; ── Wallpaper (ratpoisonrc runs `xwallpaper` on this at startup) ─────────
+    (simple-service 'wallpaper
+                    home-files-service-type
+                    (list
+                     `(".config/wallpapers/guix.jpg"
+                       ,(local-file "../wallpapers/guix.jpg"))))
+
     ;; ── .xinitrc ───────────────────────────────────────────────────────────
     (simple-service 'xinitrc
                     home-files-service-type

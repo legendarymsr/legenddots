@@ -27,6 +27,7 @@ PACMAN_PKGS=(
     i3lock
     maim
     xclip
+    feh
     xorg-xsetroot
     xorg-setxkbmap
     brightnessctl
@@ -67,6 +68,7 @@ link "$REPO_DIR/polybar"            "$HOME/.config/polybar"
 link "$REPO_DIR/rofi/config.rasi"   "$HOME/.config/rofi/config.rasi"
 link "$REPO_DIR/dunst/dunstrc"      "$HOME/.config/dunst/dunstrc"
 link "$REPO_DIR/../alacritty.toml"  "$HOME/.config/alacritty/alacritty.toml"
+link "$REPO_DIR/../wallpapers/arch.jpg" "$HOME/.config/i3/wallpaper.jpg"
 
 chmod +x "$HOME/.config/polybar/launch.sh"
 

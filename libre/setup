@@ -1314,6 +1314,9 @@ LIBXAU_VER="1.0.11"
 LIBXDMCP_VER="1.1.5"
 XCBPROTO_VER="1.17.0"
 LIBXCB_VER="1.17.0"
+XCB_UTIL_VER="0.4.1"
+XCB_UTIL_IMAGE_VER="0.4.1"
+XWALLPAPER_VER="0.7.5"
 XTRANS_VER="1.5.2"
 LIBEPOXY_VER="1.5.10"
 LIBXKBCOMMON_VER="1.7.0"
@@ -1640,6 +1643,26 @@ if ! step_done ratpoison; then
   bpkg "$a" bash -c "./configure --prefix=/usr --sysconfdir=/etc; make -j${NPROC}; make install"
   mark_step ratpoison
 fi
+# xwallpaper (+ its xcb-util deps) so ratpoison can show an image wallpaper.
+# All non-fatal: if any fails, libre still works — you just get no wallpaper.
+if ! step_done xcb_util; then
+  header "xcb-util ${XCB_UTIL_VER}"
+  a=$(fetch "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-${XCB_UTIL_VER}.tar.xz") \
+    && bpkg "$a" bash -c "./configure --prefix=/usr; make -j${NPROC}; make install" \
+    && mark_step xcb_util || warn "xcb-util failed — wallpaper (xwallpaper) will be skipped"
+fi
+if ! step_done xcb_util_image; then
+  header "xcb-util-image ${XCB_UTIL_IMAGE_VER}"
+  a=$(fetch "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-image-${XCB_UTIL_IMAGE_VER}.tar.xz") \
+    && bpkg "$a" bash -c "./configure --prefix=/usr; make -j${NPROC}; make install" \
+    && mark_step xcb_util_image || warn "xcb-util-image failed — wallpaper will be skipped"
+fi
+if ! step_done xwallpaper; then
+  header "xwallpaper ${XWALLPAPER_VER} (root-window wallpaper setter)"
+  a=$(fetch "https://github.com/stwa/xwallpaper/archive/refs/tags/v${XWALLPAPER_VER}.tar.gz") \
+    && bpkg "$a" bash -c "./autogen.sh --prefix=/usr || ./configure --prefix=/usr; make -j${NPROC}; make install" \
+    && mark_step xwallpaper || warn "xwallpaper failed — ratpoison will start without a wallpaper"
+fi
 if ! step_done ncurses_gnutls_dep; then
   header "GnuTLS ${GNUTLS_VER} (for Emacs network security)"
   a=$(fetch "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-${GNUTLS_VER}.tar.xz")
@@ -1757,6 +1780,8 @@ bind e exec emacs
 bind b exec icecat
 bind w exec ratpoison -c "windows"
 escape C-t
+# wallpaper (harmless no-op if xwallpaper wasn't built)
+exec xwallpaper --zoom ~/.config/wallpapers/libre.jpg
 exec xterm
 EOF
 
@@ -1776,6 +1801,15 @@ if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   exec startx
 fi
 EOF
+
+  # Wallpaper image for ratpoison's xwallpaper (copied from the repo if present).
+  WP_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/wallpapers/libre.jpg"
+  mkdir -p /home/gnu/.config/wallpapers
+  if [ -f "$WP_SRC" ]; then
+    cp "$WP_SRC" /home/gnu/.config/wallpapers/libre.jpg
+  else
+    warn "wallpaper not found at $WP_SRC — put libre.jpg in ~/.config/wallpapers/ by hand"
+  fi
 
   chown -R gnu:gnu /home/gnu
   mark_step user_setup

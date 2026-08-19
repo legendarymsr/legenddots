@@ -20,6 +20,7 @@
   xdg.configFile = {
     "hypr/hyprlock.conf".source  = ../../hyprland/hyprlock.conf;
     "hypr/hyprpaper.conf".source = ../../hyprland/hyprpaper.conf;
+    "hypr/wallpaper.jpg".source  = ../../wallpapers/nixos.jpg;
     "waybar/config.jsonc".source = ../../hyprland/waybar/config.jsonc;
     "waybar/style.css".source    = ../../hyprland/waybar/style.css;
     "alacritty/alacritty.toml".source = ../../alacritty.toml;
