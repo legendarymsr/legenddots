@@ -50,7 +50,9 @@ screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 spawn-at-startup "pipewire"
 spawn-at-startup "pipewire-pulse"
 spawn-at-startup "wireplumber"
-spawn-at-startup "swaybg" "-m" "fill" "-i" "~/.config/wallpapers/6orjlq.jpg"
+// wallpaper: run through sh so ~ expands (niri spawn has no shell). The script
+// is idempotent, so this also works if you re-run it manually.
+spawn-at-startup "sh" "-c" "exec ~/.config/niri/wallpaper.sh"
 spawn-at-startup "waybar"
 spawn-at-startup "dunst"
 // emacs daemon: pre-warm it at login so `e` / emacsclient opens instantly
