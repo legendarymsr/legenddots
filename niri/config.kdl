@@ -50,9 +50,10 @@ screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 spawn-at-startup "pipewire"
 spawn-at-startup "pipewire-pulse"
 spawn-at-startup "wireplumber"
-// wallpaper: run through sh so ~ expands (niri spawn has no shell). The script
-// is idempotent, so this also works if you re-run it manually.
-spawn-at-startup "sh" "-c" "exec ~/.config/niri/wallpaper.sh"
+// wallpaper: swaybg pointed at the symlinked ~/.config/swaybg/ folder. Wrapped
+// in sh -c only because niri's spawn doesn't expand ~ (swaybg has no config file
+// of its own — it's CLI args, so the folder just holds the wallpaper image).
+spawn-at-startup "sh" "-c" "exec swaybg -m fill -i ~/.config/swaybg/wallpaper.jpg"
 spawn-at-startup "waybar"
 spawn-at-startup "dunst"
 // emacs daemon: pre-warm it at login so `e` / emacsclient opens instantly

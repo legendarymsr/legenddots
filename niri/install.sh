@@ -74,7 +74,7 @@ success "Screenshots directory ready."
 info "Linking configs..."
 
 link "$REPO_DIR/config.kdl"          "$HOME/.config/niri/config.kdl"
-link "$REPO_DIR/wallpaper.sh"        "$HOME/.config/niri/wallpaper.sh"
+link "$REPO_DIR/swaybg"              "$HOME/.config/swaybg"
 link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
 link "$REPO_DIR/fuzzel"              "$HOME/.config/fuzzel"
 link "$REPO_DIR/dunst"               "$HOME/.config/dunst"
