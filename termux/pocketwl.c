@@ -13,6 +13,7 @@
 //   Alt+Escape       quit           Alt+Return  spawn a terminal ($POCKETWL_TERMINAL)
 //   Alt+D            launcher        Alt+F1      cycle windows
 //   Alt+h/j/k/l      focus tile in that direction (master-stack tiling)
+//   Alt+Shift+HJKL   move (swap) the focused tile in that direction
 //   Alt+Left/Right   shrink/grow the master column
 //   Alt+t            toggle tiling on/off
 //
@@ -274,12 +275,10 @@ static void focus_relative(struct pocketwl_server *server, int dir) {
 
 // Directional focus (Alt+hjkl): pick the nearest window whose center lies in the
 // requested direction, preferring the axis of travel — i3/sway/hyprland feel.
-static void focus_direction(struct pocketwl_server *server, int dx, int dy) {
-	struct pocketwl_toplevel *cur = focused_toplevel(server);
-	if (cur == NULL) {
-		focus_relative(server, 1);
-		return;
-	}
+// Nearest window whose center lies in the (dx,dy) direction from `cur`,
+// preferring the axis of travel. NULL if there's nothing that way.
+static struct pocketwl_toplevel *nearest_in_direction(struct pocketwl_server *server,
+		struct pocketwl_toplevel *cur, int dx, int dy) {
 	struct wlr_box cb;
 	toplevel_box(cur, &cb);
 	double cx = cb.x + cb.width / 2.0, cy = cb.y + cb.height / 2.0;
@@ -307,9 +306,51 @@ static void focus_direction(struct pocketwl_server *server, int dx, int dy) {
 			best_dist = dist;
 		}
 	}
+	return best;
+}
+
+// Move keyboard focus to the nearest window in a direction (Alt+hjkl).
+static void focus_direction(struct pocketwl_server *server, int dx, int dy) {
+	struct pocketwl_toplevel *cur = focused_toplevel(server);
+	if (cur == NULL) {
+		focus_relative(server, 1);
+		return;
+	}
+	struct pocketwl_toplevel *best = nearest_in_direction(server, cur, dx, dy);
 	if (best != NULL) {
 		focus_toplevel(best, best->xdg_toplevel->base->surface);
 	}
+}
+
+// Swap two nodes in a wl_list, correct even when they're adjacent, using a
+// placeholder to mark `a`'s old slot.
+static void list_swap(struct wl_list *a, struct wl_list *b) {
+	if (a == b) {
+		return;
+	}
+	struct wl_list tmp;
+	wl_list_insert(a, &tmp);   // tmp after a
+	wl_list_remove(a);         // tmp now marks a's old slot
+	wl_list_insert(b, a);      // a after b
+	wl_list_remove(b);         // a now sits where b was
+	wl_list_insert(&tmp, b);   // b into a's old slot
+	wl_list_remove(&tmp);
+}
+
+// Swap the focused window with its neighbor in a direction, then re-tile
+// (Alt+Shift+hjkl). Swapping into the master slot promotes the window.
+static void move_direction(struct pocketwl_server *server, int dx, int dy) {
+	struct pocketwl_toplevel *cur = focused_toplevel(server);
+	if (cur == NULL) {
+		return;
+	}
+	struct pocketwl_toplevel *target = nearest_in_direction(server, cur, dx, dy);
+	if (target == NULL) {
+		return;
+	}
+	list_swap(&cur->link, &target->link);
+	tile(server);
+	focus_toplevel(cur, cur->xdg_toplevel->base->surface);
 }
 
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
@@ -349,6 +390,19 @@ static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym) 
 		break;
 	case XKB_KEY_j:
 		focus_direction(server, 0, 1);
+		break;
+	// Move (swap) the focused window between tiles (Alt+Shift+hjkl).
+	case XKB_KEY_H:
+		move_direction(server, -1, 0);
+		break;
+	case XKB_KEY_L:
+		move_direction(server, 1, 0);
+		break;
+	case XKB_KEY_K:
+		move_direction(server, 0, -1);
+		break;
+	case XKB_KEY_J:
+		move_direction(server, 0, 1);
 		break;
 	// Grow / shrink the master column (Alt+Left / Alt+Right).
 	case XKB_KEY_Left:

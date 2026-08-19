@@ -75,6 +75,7 @@ opens automatically.
 | `Alt+Return` | spawn a terminal (`$POCKETWL_TERMINAL`, default `foot`) |
 | `Alt+D` | app launcher (`$POCKETWL_LAUNCHER`, default `fuzzel`) |
 | `Alt+h/j/k/l` | **focus the tile left / down / up / right** |
+| `Alt+Shift+H/J/K/L` | **move (swap) the focused tile** left / down / up / right |
 | `Alt+Left` / `Alt+Right` | shrink / grow the master column |
 | `Alt+t` | toggle tiling on/off |
 | `Alt+F1` | cycle focus between windows |
@@ -91,9 +92,11 @@ Windows tile automatically in a **master–stack** layout (like dwm): the first
 window is the *master*, taking the left half; each new window joins the *stack*
 that splits the right half into equal rows. One window fills the screen. Move
 focus between tiles with **`Alt+h/j/k/l`** (directional — nearest window in that
-direction), resize the master with `Alt+Left`/`Alt+Right`, and toggle tiling off
-with `Alt+t` (then windows float and `Alt+drag` moves/resizes them). A new window
-becomes the master; close one and the rest re-tile to fill the space.
+direction) and **move/swap** the focused tile with **`Alt+Shift+H/J/K/L`**
+(swapping into the master slot promotes it). Resize the master with
+`Alt+Left`/`Alt+Right`, and toggle tiling off with `Alt+t` (then windows float and
+`Alt+drag` moves/resizes them). A new window becomes the master; close one and the
+rest re-tile to fill the space.
 
 ### Touch
 
