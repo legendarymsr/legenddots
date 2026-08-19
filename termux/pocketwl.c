@@ -12,9 +12,10 @@
 // Keybindings (default modifier = Alt):
 //   Alt+Escape       quit           Alt+Return  spawn a terminal ($POCKETWL_TERMINAL)
 //   Alt+D            launcher        Alt+F1      cycle windows
-//   Alt+h/j/k/l      focus tile in that direction (master-stack tiling)
-//   Alt+Shift+HJKL   move (swap) the focused tile in that direction
-//   Alt+Left/Right   shrink/grow the master column
+//   Alt+h/j/k/l          focus tile in that direction (master-stack tiling)
+//   Alt+Ctrl+hjkl        move (swap) the focused tile in that direction
+//   Alt+Shift+HJKL       same move, for keyboards that have a Shift key
+//   Alt+Left/Right       shrink/grow the master column
 //   Alt+t            toggle tiling on/off
 //
 // Windows tile automatically (master-stack). Alt + left/right mouse drag still
@@ -360,7 +361,9 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
 		&keyboard->wlr_keyboard->modifiers);
 }
 
-static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym) {
+static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym,
+		uint32_t mods) {
+	bool ctrl = mods & WLR_MODIFIER_CTRL;
 	switch (sym) {
 	case XKB_KEY_Escape:
 		wl_display_terminate(server->wl_display);
@@ -378,20 +381,22 @@ static bool handle_keybinding(struct pocketwl_server *server, xkb_keysym_t sym) 
 	case XKB_KEY_F1:
 		focus_relative(server, 1);   // cycle to the next window
 		break;
-	// Directional focus between tiles (Alt+hjkl), like i3/sway/hyprland.
+	// Alt+hjkl focuses the tile in that direction; add Ctrl (Alt+Ctrl+hjkl) to
+	// MOVE/swap it instead. Ctrl is used because phone keyboards (Termux:X11's
+	// extra-keys row) have Ctrl+Alt but usually no Shift.
 	case XKB_KEY_h:
-		focus_direction(server, -1, 0);
+		ctrl ? move_direction(server, -1, 0) : focus_direction(server, -1, 0);
 		break;
 	case XKB_KEY_l:
-		focus_direction(server, 1, 0);
+		ctrl ? move_direction(server, 1, 0) : focus_direction(server, 1, 0);
 		break;
 	case XKB_KEY_k:
-		focus_direction(server, 0, -1);
+		ctrl ? move_direction(server, 0, -1) : focus_direction(server, 0, -1);
 		break;
 	case XKB_KEY_j:
-		focus_direction(server, 0, 1);
+		ctrl ? move_direction(server, 0, 1) : focus_direction(server, 0, 1);
 		break;
-	// Move (swap) the focused window between tiles (Alt+Shift+hjkl).
+	// Same move, via Shift (Alt+Shift+HJKL) for keyboards that do have Shift.
 	case XKB_KEY_H:
 		move_direction(server, -1, 0);
 		break;
@@ -440,7 +445,7 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 	if ((modifiers & WLR_MODIFIER_ALT) && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		for (int i = 0; i < nsyms; i++) {
-			handled = handle_keybinding(server, syms[i]);
+			handled = handle_keybinding(server, syms[i], modifiers);
 		}
 	}
 
