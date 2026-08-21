@@ -18,7 +18,7 @@ bind c exec st
 bind C-c exec st
 bind Return exec st
 
-# launcher (dmenu is themed at build time via guix/dmenu-config.h)
+# launcher (dmenu is themed at build time via suckless/dmenu/config.h)
 bind d exec dmenu_run
 
 # apps

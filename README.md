@@ -30,10 +30,15 @@ legenddots/
 │   ├── README.md              Guix-specific notes
 │   ├── config.scm             Guix system config
 │   ├── home-configuration.scm Guix home config (zsh, emacs, dotfiles)
-│   ├── ratpoisonrc            Ratpoison WM config
-│   ├── st-config.h            custom minimal st build config (no F13+/keypad/mouse)
-│   ├── slock-config.h         suckless slock build config (Tokyo Night)
-│   └── dmenu-config.h         suckless dmenu build config (Tokyo Night)
+│   └── ratpoisonrc            Ratpoison WM config
+│
+├── suckless/                  suckless config.h files (compile-time), Tokyo Night
+│   ├── st/config.h            terminal (trimmed: no F13+/keypad/mouse)
+│   ├── slock/config.h         screen locker
+│   ├── dmenu/config.h         launcher
+│   ├── dwm/config.h           X11 tiling WM (Super, hjkl)
+│   ├── dwl/config.h           Wayland tiling WM (Super, foot + fuzzel)
+│   └── surf/config.h          WebKit browser
 │
 ├── init.lua                   Neovim config
 ├── init.el                    Emacs config
