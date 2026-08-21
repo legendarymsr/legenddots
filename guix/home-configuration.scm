@@ -165,7 +165,7 @@ exec ratpoison
 *color13: #bb9af7
 *color14: #7dcfff
 *color15: #c0caf5
-! (st is themed/fonted at build time via guix/st-config.h, not Xresources)
+! (st is themed/fonted at build time via suckless/st/config.h, not Xresources)
 "))))
 
     ;; ── Emacs ──────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
              (guix gexp))                 ; local-file, gexps
 
 ;; st (suckless terminal) built from our custom, trimmed config.h
-;; (guix/st-config.h): Tokyo Night, JetBrains Mono, no F13–F35, no keypad,
+;; (suckless/st/config.h): Tokyo Night, JetBrains Mono, no F13–F35, no keypad,
 ;; no mouse shortcuts. config.def.h -> config.h happens only if config.h is
 ;; absent, so dropping ours in before the build makes st compile against it.
 (define st-tokyonight
@@ -23,7 +23,7 @@
         #~(modify-phases #$phases
             (add-after 'unpack 'legend-config
               (lambda _
-                (copy-file #$(local-file "st-config.h") "config.h")))))))))
+                (copy-file #$(local-file "../suckless/st/config.h") "config.h")))))))))
 
 ;; slock (screen locker) with our Tokyo Night lock colors baked in.
 (define slock-tokyonight
@@ -36,7 +36,7 @@
         #~(modify-phases #$phases
             (add-after 'unpack 'legend-config
               (lambda _
-                (copy-file #$(local-file "slock-config.h") "config.h")))))))))
+                (copy-file #$(local-file "../suckless/slock/config.h") "config.h")))))))))
 
 ;; dmenu (launcher) with our Tokyo Night colors + font baked in.
 (define dmenu-tokyonight
@@ -49,7 +49,7 @@
         #~(modify-phases #$phases
             (add-after 'unpack 'legend-config
               (lambda _
-                (copy-file #$(local-file "dmenu-config.h") "config.h")))))))))
+                (copy-file #$(local-file "../suckless/dmenu/config.h") "config.h")))))))))
 
 (operating-system
   (host-name "legend-box")
@@ -119,7 +119,7 @@
   (packages
    (cons* (specification->package "nss-certs")
           (specification->package "ratpoison")
-          st-tokyonight                          ; st + guix/st-config.h
+          st-tokyonight                          ; st + suckless/st/config.h
           slock-tokyonight                       ; screen locker (setuid below)
           dmenu-tokyonight                        ; launcher (ratpoison `bind d`)
           (specification->package "xdotool")
