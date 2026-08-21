@@ -33,6 +33,12 @@ legenddots/
 │   └── ratpoisonrc            Ratpoison WM config
 │
 ├── suckless/                  suckless config.h files (compile-time), Tokyo Night
+│   ├── README.md              deps per distro (gentoo/nixos/arch/lfs/guix) + build
+│   ├── flake.nix              Nix flake: builds each tool with our config.h
+│   ├── home.nix               home-manager module (legend.suckless.enable)
+│   ├── default.nix            shared Nix package set (flake + home.nix import it)
+│   ├── config.scm             Guix manifest / system packages
+│   ├── home-configuration.scm Guix Home config
 │   ├── st/config.h            terminal (trimmed: no F13+/keypad/mouse)
 │   ├── slock/config.h         screen locker
 │   ├── dmenu/config.h         launcher
