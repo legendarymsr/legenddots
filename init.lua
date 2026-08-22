@@ -152,6 +152,22 @@ require("lazy").setup({
 
       vim.lsp.config("*", { capabilities = require("cmp_nvim_lsp").default_capabilities() })
 
+      -- Teach lua_ls about the Neovim runtime: `vim` is a known global (no more
+      -- "Undefined global `vim`" spam) and the nvim API gets completion/docs.
+      vim.lsp.config("lua_ls", {
+        settings = {
+          Lua = {
+            runtime = { version = "LuaJIT" },
+            diagnostics = { globals = { "vim" } },
+            workspace = {
+              library = vim.api.nvim_get_runtime_file("", true),
+              checkThirdParty = false,
+            },
+            telemetry = { enable = false },
+          },
+        },
+      })
+
       vim.api.nvim_create_autocmd("LspAttach", {
         callback = function(ev)
           local buf = ev.buf
