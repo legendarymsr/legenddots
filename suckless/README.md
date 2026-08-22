@@ -105,12 +105,61 @@ guix shell gcc-toolchain make pkg-config libx11 libxft libxinerama libxext \
 
 ### LFS / BLFS
 
-Build the deps from source per the [BLFS book](https://www.linuxfromscratch.org/blfs/).
-The X stack (libX11, libXft, libXinerama, libXext, libXrandr, fontconfig,
-freetype) and — for dwl — the Wayland stack (wayland, wayland-protocols,
-wlroots, libinput, libxkbcommon, pixman) are already built by this repo's
-`blfs/setup` and `libre/setup`. Extra for **surf**: webkit2gtk (a large BLFS
-package) + gtk3 + gcr. Extra for **dwl**: fcft.
+No package manager — build from source per the
+[BLFS book](https://www.linuxfromscratch.org/blfs/). Two of this repo's own LFS
+builds already cover most of it, so start from whichever base you're on:
+
+- **`libre/setup`** (X11 base) already builds the X client libs for the X11
+  tools — **st, dmenu, dwm, slock** need nothing more (libX11, libXft,
+  libXinerama, libXext, libXrandr, fontconfig, freetype are all there).
+- **`blfs/setup`** (Wayland base) already builds the Wayland stack (wayland,
+  wayland-protocols, libxkbcommon, pixman, libdrm, mesa, seatd) plus GLib +
+  GTK+3 — but **not** wlroots/libinput (its niri compositor doesn't use them).
+
+So only **dwl** and **surf** need extra packages. Standard build pattern:
+autotools → `./configure --prefix=/usr && make && sudo make install`;
+meson → `meson setup --prefix=/usr build && ninja -C build && sudo ninja -C build install`.
+
+**dwl** — on top of `blfs/setup`'s Wayland stack, build fcft (text), its tllist
+dep, libinput, and wlroots:
+
+```sh
+# tllist — header-only list lib fcft needs
+curl -LO https://codeberg.org/dnkl/tllist/archive/1.1.0.tar.gz
+tar xf 1.1.0.tar.gz && cd tllist
+meson setup --prefix=/usr build && ninja -C build && sudo ninja -C build install && cd ..
+
+# fcft — font/text rendering (freetype + fontconfig + pixman already built)
+curl -LO https://codeberg.org/dnkl/fcft/archive/3.3.1.tar.gz
+tar xf 3.3.1.tar.gz && cd fcft
+meson setup --prefix=/usr -Dgrapheme-shaping=disabled -Drun-shaping=disabled build
+ninja -C build && sudo ninja -C build install && cd ..
+
+# libinput — input backend (BLFS: also needs libevdev + mtdev, build those first)
+curl -LO https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.27.1/libinput-1.27.1.tar.gz
+tar xf libinput-1.27.1.tar.gz && cd libinput-1.27.1
+meson setup --prefix=/usr -Dtests=false -Ddebug-gui=false -Ddocumentation=false build
+ninja -C build && sudo ninja -C build install && cd ..
+
+# wlroots 0.18 — the compositor library dwl links against
+curl -LO https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/0.18.2/wlroots-0.18.2.tar.gz
+tar xf wlroots-0.18.2.tar.gz && cd wlroots-0.18.2
+meson setup --prefix=/usr -Dexamples=false build && ninja -C build && sudo ninja -C build install && cd ..
+```
+
+**surf** — GTK+3 + GLib already come from `blfs/setup`; add gcr and webkit2gtk.
+webkit2gtk is a multi-hour build with a deep chain of its own (cmake, ICU,
+libsoup, libgcrypt, …) — follow its BLFS page for that:
+
+```sh
+# gcr — cert/crypto lib surf links
+curl -LO https://download.gnome.org/sources/gcr/3.41/gcr-3.41.2.tar.xz
+tar xf gcr-3.41.2.tar.xz && cd gcr-3.41.2
+meson setup --prefix=/usr -Dgtk_doc=false build && ninja -C build && sudo ninja -C build install && cd ..
+
+# webkit2gtk — the browser engine. LARGE. See:
+#   https://www.linuxfromscratch.org/blfs/view/stable/x/webkit2gtk.html
+```
 
 ---
 
