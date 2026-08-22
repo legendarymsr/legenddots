@@ -75,6 +75,17 @@ deliberate; there is no history/bookmark store to leak.
 - Cookie/consent banners auto-**rejected** (clicks "reject all" where it can) and
   hidden via CSS.
 
+**Hardening (anti-fingerprint + anti-leak):**
+- **WebRTC** locked to `default_public_interface_only` — no local/private-IP leak
+  (the classic VPN de-anonymiser).
+- **Canvas read-back blocked** (`ReadingFromCanvasEnabled=false`, Qt 6.6+) — kills
+  the #1 fingerprinting vector; **UA Client-Hints off** and **Accept-Language
+  frozen** to `en-US` so locale/UA can't be profiled.
+- **Every capability prompt auto-denied**: geolocation, camera, mic, notifications.
+- **Off:** JS clipboard reads, screen capture (`getDisplayMedia`), autoplay,
+  insecure (mixed) content, and Chromium background phone-home (`<a ping>`,
+  component/variations updates, Translate, OptimizationHints).
+
 **Keys — qutebrowser-style, focus-aware** (typing in a page input never triggers
 them):
 

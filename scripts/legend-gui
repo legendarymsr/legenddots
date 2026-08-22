@@ -6,6 +6,12 @@ cookies, no cache), all third-party cookies blocked, DNT + GPC sent, cookie
 banners auto-rejected. Plus tabs, network ad-blocking, YouTube ad-skipping, and
 qutebrowser-style keys: `f` to hint links, `.m` to send the page to mpv.
 
+Hardened against fingerprinting + leaks: WebRTC can't expose local IPs, canvas
+read-back is blocked, UA client-hints are off, Accept-Language is frozen, and
+every capability prompt (camera/mic/geolocation/notifications) is auto-denied.
+Clipboard reads, screen capture, autoplay, insecure content and background
+phone-home (pings, component updates, Translate/OptimizationHints) are all off.
+
 Deps:  pip install PyQt6 PyQt6-WebEngine   (and `mpv` for `.m`)
 Run:   python legend-gui  [url]
 
@@ -22,7 +28,15 @@ from pathlib import Path
 
 os.environ.setdefault(
     "QTWEBENGINE_CHROMIUM_FLAGS",
-    "--blink-settings=forceDarkModeEnabled=true",
+    " ".join((
+        "--blink-settings=forceDarkModeEnabled=true",
+        # WebRTC must never expose local/private IPs (STUN leaks them past a VPN).
+        "--force-webrtc-ip-handling-policy=default_public_interface_only",
+        # Drop UA Client Hints (Sec-CH-UA) + Google phone-home features.
+        "--disable-features=UserAgentClientHint,Translate,OptimizationHints",
+        "--no-pings",                      # ignore <a ping> hyperlink auditing
+        "--disable-background-networking",  # no component/variations phone-home
+    )),
 )
 
 from PyQt6.QtCore import QUrl, QThread, pyqtSignal
@@ -238,12 +252,31 @@ class LegendPage(QWebEnginePage):
         super().__init__(profile, window)
         self.window = window
         s = self.settings()
-        s.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
-        s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
-        s.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, True)
-        s.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)
+        A = QWebEngineSettings.WebAttribute
+        s.setAttribute(A.FullScreenSupportEnabled, True)
+        s.setAttribute(A.JavascriptCanOpenWindows, True)
+        s.setAttribute(A.ScrollAnimatorEnabled, True)
+        s.setAttribute(A.PdfViewerEnabled, True)
+        # ── hardening ────────────────────────────────────────────────────────
+        s.setAttribute(A.JavascriptCanAccessClipboard, False)  # no clipboard reads
+        s.setAttribute(A.JavascriptCanPaste, False)
+        s.setAttribute(A.ScreenCaptureEnabled, False)          # no getDisplayMedia
+        s.setAttribute(A.LocalContentCanAccessFileUrls, False)
+        s.setAttribute(A.LocalContentCanAccessRemoteUrls, False)
+        s.setAttribute(A.AllowRunningInsecureContent, False)
+        s.setAttribute(A.PlaybackRequiresUserGesture, True)    # no autoplay
+        if hasattr(A, "ReadingFromCanvasEnabled"):             # Qt 6.6+
+            s.setAttribute(A.ReadingFromCanvasEnabled, False)  # canvas-FP defense
+        # Auto-deny every capability prompt: location, camera, mic, notifications…
+        if hasattr(self, "featurePermissionRequested"):
+            self.featurePermissionRequested.connect(self._deny_feature)
         self.fullScreenRequested.connect(lambda req: (req.accept(),
             self.window.showNormal() if self.window.isFullScreen() else self.window.showFullScreen()))
+
+    def _deny_feature(self, origin, feature):
+        self.setFeaturePermission(
+            origin, feature,
+            QWebEnginePage.PermissionPolicy.PermissionDeniedByUser)
 
     def createWindow(self, _type):
         return self.window.add_tab().page()
@@ -272,6 +305,12 @@ class LegendChrome(QMainWindow):
         self.profile.setHttpUserAgent(
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/126.0.0.0 Safari/537.36")
+        # Belt-and-suspenders on top of the off-the-record profile: never persist,
+        # and freeze Accept-Language so per-site locale fingerprinting is neutered.
+        self.profile.setPersistentCookiesPolicy(
+            QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies)
+        self.profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
+        self.profile.setHttpAcceptLanguage("en-US,en;q=0.9")
         # Simple by default — just the core list. The 🛡 button extends it.
         self.interceptor = AdBlocker(set(SIMPLE_BLOCKLIST))
         self._extended = False
