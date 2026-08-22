@@ -110,6 +110,15 @@ runs directly. On a venv install, run it with that venv active.
 
 ### Watching video (YouTube & friends)
 
+**No proprietary codecs out of the box.** legend-gui ships *no* codecs of its own —
+it plays whatever the underlying QtWebEngine was built with, and QtWebEngine built
+from source (Gentoo's `dev-qt/qtwebengine`, the libre-friendly default) omits the
+patent-encumbered **H.264/AAC** entirely. Out of the box you get only the free
+codecs — **VP8/VP9/AV1** video, **Opus/Vorbis** audio. YouTube serves VP9/AV1 to
+most clients so a lot of it just works; H.264-only sites/streams stay silent until
+you opt in. (The one exception is the pip `PyQt6-WebEngine` wheels — they bundle
+the official Qt binaries, which *do* include H.264/AAC.)
+
 There are two ways to watch, and legend-gui does both.
 
 **1. In the browser tab** — this needs QtWebEngine built with the **proprietary
