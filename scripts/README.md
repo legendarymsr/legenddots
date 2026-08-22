@@ -161,8 +161,13 @@ sudo emerge -av media-video/mpv net-misc/yt-dlp
 > If you want to watch proprietary garbage without selling your soul to Google,
 > install mpv too.
 
-The mpv route is the recommended one — you get the video without ever loading
-YouTube's player, its ads, or its telemetry.
+**Recommendation: watch through mpv, always — don't feed the proprietary garbage.**
+Even if you installed the pip wheel (codecs and all), you never have to *use* them:
+route video to mpv with `.m` / `F` and the browser's bundled H.264/AAC — along with
+Google's player, its ads, and its telemetry — are simply never loaded. yt-dlp hands
+the raw stream to mpv; what mpv decodes it with is your own `ffmpeg`'s business, not
+the browser's. So the codec question is really only about the *in-tab* player — skip
+that player and it doesn't matter what the wheel shipped with.
 
 **Amnesic:** off-the-record profile — **no history, no on-disk cookies, no
 cache.** Session cookies live in RAM and vanish the instant you close it. This is
