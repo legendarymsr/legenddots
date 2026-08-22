@@ -34,7 +34,7 @@ vim.opt.pumheight = 12            -- cap popup height
 vim.opt.winminwidth = 5
 vim.opt.splitkeep = "screen"
 vim.opt.title = true              -- set the terminal window title to the file
-vim.opt.fillchars = { eob = " ", fold = " ", foldopen = "", foldsep = " ", foldclose = "" }
+vim.opt.fillchars = { eob = " ", fold = " ", foldopen = "▾", foldsep = " ", foldclose = "▸" }
 
 -- 3. THE PLUGINS
 require("lazy").setup({
