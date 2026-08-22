@@ -12,6 +12,9 @@ Run:   python legend-gui  [url]
 Optional big blocklist: hosts-format file at ~/.config/legendchrome/blocklist.txt
 (read only — no browsing data is ever written there).
 """
+# PyQt6 is a runtime dep installed via pip (see Deps above); editors without it
+# in their analysis env flag "could not be resolved" — silence that false positive.
+# pyright: reportMissingImports=false, reportMissingModuleSource=false
 import sys
 import os
 import subprocess
