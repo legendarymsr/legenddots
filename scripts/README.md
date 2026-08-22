@@ -108,6 +108,38 @@ runs directly. On a venv install, run it with that venv active.
 > force XWayland: `QT_QPA_PLATFORM=xcb legend-gui`. (QtWebEngine is happiest on
 > XWayland.) The `QTWEBENGINE_CHROMIUM_FLAGS` the script sets are applied either way.
 
+### Watching video (YouTube & friends)
+
+There are two ways to watch, and legend-gui does both.
+
+**1. In the browser tab** — this needs QtWebEngine built with the **proprietary
+codecs** (H.264 / AAC). YouTube serves royalty-free **VP9/AV1** to most clients, so
+a lot of it plays with no codecs at all; but plenty of streams/sites are H.264-only.
+On a **Portage** QtWebEngine you enable those by dropping `bindist` (the USE flag
+that strips patent-encumbered code):
+
+```sh
+echo "dev-qt/qtwebengine -bindist" | sudo tee /etc/portage/package.use/qtwebengine
+sudo emerge -av --newuse dev-qt/qtwebengine        # rebuilds with H.264/AAC
+```
+
+(The **pip** `PyQt6-WebEngine` wheels already ship with proprietary codecs, so the
+venv route needs nothing extra here.)
+
+**2. Hand it to mpv** — the `.m` key (whole page) and `F` (hint a single link) pipe
+the URL to **mpv**, which uses **yt-dlp** to fetch the real stream. No embedded
+Google player, no ads, no tracking, and it's far lighter than the in-page player:
+
+```sh
+sudo emerge -av media-video/mpv net-misc/yt-dlp
+```
+
+> If you want to watch proprietary garbage without selling your soul to Google,
+> install mpv too.
+
+The mpv route is the recommended one — you get the video without ever loading
+YouTube's player, its ads, or its telemetry.
+
 **Amnesic:** off-the-record profile — **no history, no on-disk cookies, no
 cache.** Session cookies live in RAM and vanish the instant you close it. This is
 deliberate; there is no history/bookmark store to leak.
