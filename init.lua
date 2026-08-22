@@ -116,6 +116,7 @@ require("lazy").setup({
     "williamboman/mason.nvim",
     dependencies = {
       "williamboman/mason-lspconfig.nvim",
+      "neovim/nvim-lspconfig",           -- ships the lsp/<server>.lua definitions
       "hrsh7th/nvim-cmp",
       "hrsh7th/cmp-nvim-lsp",
       "hrsh7th/cmp-buffer",
@@ -125,7 +126,7 @@ require("lazy").setup({
     config = function()
       require("mason").setup()
       require("mason-lspconfig").setup({
-        ensure_installed = { "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer" },
+        ensure_installed = { "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer", "zls" },
       })
 
       vim.lsp.config("*", { capabilities = require("cmp_nvim_lsp").default_capabilities() })
@@ -149,7 +150,7 @@ require("lazy").setup({
         end,
       })
 
-      vim.lsp.enable({ "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer" })
+      vim.lsp.enable({ "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer", "zls" })
 
       vim.diagnostic.config({
         virtual_text    = { prefix = "●" },
