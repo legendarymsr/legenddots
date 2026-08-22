@@ -115,7 +115,6 @@ require("lazy").setup({
   {
     "williamboman/mason.nvim",
     dependencies = {
-      "williamboman/mason-lspconfig.nvim",
       "neovim/nvim-lspconfig",           -- ships the lsp/<server>.lua definitions
       "hrsh7th/nvim-cmp",
       "hrsh7th/cmp-nvim-lsp",
@@ -125,9 +124,31 @@ require("lazy").setup({
     },
     config = function()
       require("mason").setup()
-      require("mason-lspconfig").setup({
-        ensure_installed = { "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer", "zls" },
-      })
+
+      -- Install the LSP binaries via mason's registry, by MASON package name.
+      -- (mason-lspconfig's ensure_installed validates lspconfig names and rejects
+      --  entries like "nixd"/"zls" across versions — this sidesteps that entirely.)
+      local mr = require("mason-registry")
+      local packages = {
+        "lua-language-server", "pyright", "bash-language-server",
+        "nixd", "rust-analyzer", "zls",
+      }
+      local function install_missing()
+        for _, name in ipairs(packages) do
+          local ok, pkg = pcall(mr.get_package, name)
+          if ok and not pkg:is_installed() then pkg:install() end
+        end
+      end
+      -- mason ships prebuilt glibc Linux binaries; they don't run on Termux/
+      -- Android (bionic libc). Skip auto-install there — install servers with
+      -- `pkg`/`npm`/`pip` instead and vim.lsp.enable picks them up from PATH.
+      if os.getenv("TERMUX_VERSION") then
+        -- Termux: mason auto-install skipped (see above).
+      elseif mr.refresh then
+        mr.refresh(install_missing)
+      else
+        install_missing()
+      end
 
       vim.lsp.config("*", { capabilities = require("cmp_nvim_lsp").default_capabilities() })
 
