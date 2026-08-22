@@ -59,11 +59,54 @@ A custom Qt6 browser (`LegendChrome`) — **amnesic by design**, with tabs,
 network-level ad blocking, YouTube ad-skipping, and qutebrowser-style keys.
 Tokyo Night themed.
 
-**Dependencies:** `PyQt6`, `PyQt6-WebEngine` (and `mpv` for `.m`)
+**Dependencies:** `PyQt6`, `PyQt6-WebEngine` (and `mpv` for `.m`).
+
+### Install on Gentoo
+
+**Option A — Portage (system-wide).** Emerges the bindings + mpv. Note that
+`dev-python/PyQt6-WebEngine` pulls in **`dev-qt/qtwebengine:6`**, a Chromium-based
+package — it's a long compile and wants a lot of RAM/disk:
 
 ```sh
-python legend-gui [url]
+sudo emerge -av dev-python/PyQt6 dev-python/PyQt6-WebEngine media-video/mpv
+# sanity-check PyQt6 has the modules the browser uses (gui, widgets, network):
+emerge -pv dev-python/PyQt6
 ```
+
+**Option B — Python venv + pip (faster, skips the qtwebengine compile).** pip ships
+prebuilt Qt wheels, so this avoids building `dev-qt/qtwebengine` from source:
+
+```sh
+python -m venv ~/.venvs/legend-gui
+source ~/.venvs/legend-gui/bin/activate
+pip install PyQt6 PyQt6-WebEngine
+sudo emerge -av media-video/mpv          # mpv still comes from Portage
+```
+
+### Run it
+
+```sh
+# Portage install — system python already has the bindings:
+python ~/legenddots/scripts/legend-gui                 # opens the home page
+python ~/legenddots/scripts/legend-gui example.com     # opens a URL
+
+# venv install — activate first (or call the venv's python directly):
+source ~/.venvs/legend-gui/bin/activate && python ~/legenddots/scripts/legend-gui
+```
+
+Make it a first-class command:
+
+```sh
+chmod +x ~/legenddots/scripts/legend-gui
+ln -sf ~/legenddots/scripts/legend-gui ~/.local/bin/legend-gui   # then just: legend-gui
+```
+
+The shebang is `#!/usr/bin/env python3`, so on a Portage install `./legend-gui`
+runs directly. On a venv install, run it with that venv active.
+
+> **Wayland (niri) note:** if the window misbehaves or won't start under Wayland,
+> force XWayland: `QT_QPA_PLATFORM=xcb legend-gui`. (QtWebEngine is happiest on
+> XWayland.) The `QTWEBENGINE_CHROMIUM_FLAGS` the script sets are applied either way.
 
 **Amnesic:** off-the-record profile — **no history, no on-disk cookies, no
 cache.** Session cookies live in RAM and vanish the instant you close it. This is
