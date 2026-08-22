@@ -119,6 +119,21 @@ most clients so a lot of it just works; H.264-only sites/streams stay silent unt
 you opt in. (The one exception is the pip `PyQt6-WebEngine` wheels — they bundle
 the official Qt binaries, which *do* include H.264/AAC.)
 
+**Want pip but *not* the codecs?** You can't strip them from the prebuilt wheel —
+they're compiled into the bundled Qt libs. Either use the distro bindings
+(`dev-python/PyQt6-WebEngine`, built against Gentoo's codec-free `dev-qt/qtwebengine`
+— the cleanest libre route), or build the bindings from source against that system
+Qt instead of downloading the wheel:
+
+```sh
+pip install --no-binary PyQt6,PyQt6-WebEngine PyQt6 PyQt6-WebEngine
+```
+
+That needs the Qt6 + QtWebEngine dev libs, `qmake`, and `sip` present — i.e. you've
+emerged `dev-qt/qtwebengine` anyway, at which point the distro's own bindings are
+simpler. Either way: codec-free means a *source* build; the binary wheel always
+carries H.264/AAC.
+
 There are two ways to watch, and legend-gui does both.
 
 **1. In the browser tab** — this needs QtWebEngine built with the **proprietary
