@@ -103,62 +103,102 @@ guix shell gcc-toolchain make pkg-config libx11 libxft libxinerama libxext \
   libxrandr fontconfig freetype -- make
 ```
 
-### LFS / BLFS
+### LFS / BLFS — full from-source
 
-No package manager — build from source per the
-[BLFS book](https://www.linuxfromscratch.org/blfs/). Two of this repo's own LFS
-builds already cover most of it, so start from whichever base you're on:
+No package manager: everything is built from source. This repo already ships two
+complete LFS builders — **run one first** as your base, then build the delta below.
 
-- **`libre/setup`** (X11 base) already builds the X client libs for the X11
-  tools — **st, dmenu, dwm, slock** need nothing more (libX11, libXft,
-  libXinerama, libXext, libXrandr, fontconfig, freetype are all there).
-- **`blfs/setup`** (Wayland base) already builds the Wayland stack (wayland,
-  wayland-protocols, libxkbcommon, pixman, libdrm, mesa, seatd) plus GLib +
-  GTK+3 — but **not** wlroots/libinput (its niri compositor doesn't use them).
+- **`libre/setup`** (X11 base) builds the whole toolchain + X client libs
+  (libX11, libXft, libXinerama, libXext, libXrandr), freetype, fontconfig,
+  pixman, libevdev, mtdev, libtasn1, p11-kit, cairo. After it, **st, dmenu, dwm,
+  slock need nothing more** — skip to *The tools* at the bottom.
+- **`blfs/setup`** (Wayland base) builds the toolchain + wayland,
+  wayland-protocols, libxkbcommon, pixman, libdrm, mesa, seatd, GLib, GTK+3,
+  cairo, pango, gdk-pixbuf, harfbuzz, libwebp, at-spi2. Everything below is what
+  it *doesn't* build, needed for **dwl** and **surf**.
 
-So only **dwl** and **surf** need extra packages. Standard build pattern:
-autotools → `./configure --prefix=/usr && make && sudo make install`;
-meson → `meson setup --prefix=/usr build && ninja -C build && sudo ninja -C build install`.
+**Build patterns** (run each package's block, then `cd ..`):
 
-**dwl** — on top of `blfs/setup`'s Wayland stack, build fcft (text), its tllist
-dep, libinput, and wlroots:
+- autotools — `./configure --prefix=/usr --disable-static && make && sudo make install`
+- meson — `meson setup --prefix=/usr --buildtype=release build && ninja -C build && sudo ninja -C build install`
+- cmake — `cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release && ninja -C build && sudo ninja -C build install`
+
+Fetch with `curl -LO <url>` then `tar xf <file> && cd <dir>`. Versions are a
+known-good set — bump to match your LFS release.
+
+#### dwl deps (on the `blfs/setup` base), in order
 
 ```sh
-# tllist — header-only list lib fcft needs
-curl -LO https://codeberg.org/dnkl/tllist/archive/1.1.0.tar.gz
-tar xf 1.1.0.tar.gz && cd tllist
-meson setup --prefix=/usr build && ninja -C build && sudo ninja -C build install && cd ..
+# libevdev  (meson)  https://www.freedesktop.org/software/libevdev/libevdev-1.13.3.tar.xz
+# mtdev     (autotools) https://bitmath.org/code/mtdev/mtdev-1.1.7.tar.bz2
+# libinput  (meson, -Dtests=false -Ddebug-gui=false -Ddocumentation=false)
+#           https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.27.1/libinput-1.27.1.tar.gz
+# tllist    (meson)  https://codeberg.org/dnkl/tllist/archive/1.1.0.tar.gz
+# fcft      (meson, -Dgrapheme-shaping=disabled -Drun-shaping=disabled)
+#           https://codeberg.org/dnkl/fcft/archive/3.3.1.tar.gz
+# wlroots   (meson, -Dexamples=false)  0.18 — matches dwl 0.7
+#           https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/0.18.2/wlroots-0.18.2.tar.gz
 
-# fcft — font/text rendering (freetype + fontconfig + pixman already built)
-curl -LO https://codeberg.org/dnkl/fcft/archive/3.3.1.tar.gz
-tar xf 3.3.1.tar.gz && cd fcft
-meson setup --prefix=/usr -Dgrapheme-shaping=disabled -Drun-shaping=disabled build
-ninja -C build && sudo ninja -C build install && cd ..
-
-# libinput — input backend (BLFS: also needs libevdev + mtdev, build those first)
-curl -LO https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.27.1/libinput-1.27.1.tar.gz
-tar xf libinput-1.27.1.tar.gz && cd libinput-1.27.1
-meson setup --prefix=/usr -Dtests=false -Ddebug-gui=false -Ddocumentation=false build
-ninja -C build && sudo ninja -C build install && cd ..
-
-# wlroots 0.18 — the compositor library dwl links against
+# e.g. wlroots:
 curl -LO https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/0.18.2/wlroots-0.18.2.tar.gz
 tar xf wlroots-0.18.2.tar.gz && cd wlroots-0.18.2
-meson setup --prefix=/usr -Dexamples=false build && ninja -C build && sudo ninja -C build install && cd ..
+meson setup --prefix=/usr --buildtype=release -Dexamples=false build
+ninja -C build && sudo ninja -C build install && cd ..
 ```
 
-**surf** — GTK+3 + GLib already come from `blfs/setup`; add gcr and webkit2gtk.
-webkit2gtk is a multi-hour build with a deep chain of its own (cmake, ICU,
-libsoup, libgcrypt, …) — follow its BLFS page for that:
+#### surf deps (on the `blfs/setup` base), in order
+
+GTK+3, GLib, cairo, pango, gdk-pixbuf, harfbuzz and libwebp already come from
+`blfs/setup`. Build the crypto stack, then the engine:
 
 ```sh
-# gcr — cert/crypto lib surf links
-curl -LO https://download.gnome.org/sources/gcr/3.41/gcr-3.41.2.tar.xz
-tar xf gcr-3.41.2.tar.xz && cd gcr-3.41.2
-meson setup --prefix=/usr -Dgtk_doc=false build && ninja -C build && sudo ninja -C build install && cd ..
+# --- crypto / gcr chain ---
+# libgpg-error 1.51        (autotools)  https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.51.tar.bz2
+# libgcrypt 1.11.0         (autotools, --with-libgpg-error-prefix=/usr)
+#                          https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.0.tar.bz2
+# libtasn1 4.20.0          (autotools)  https://ftp.gnu.org/gnu/libtasn1/libtasn1-4.20.0.tar.gz
+# p11-kit 0.25.5           (meson)      https://github.com/p11-glue/p11-kit/releases/download/0.25.5/p11-kit-0.25.5.tar.xz
+# gcr 3.41.2               (meson, -Dgtk_doc=false)  https://download.gnome.org/sources/gcr/3.41/gcr-3.41.2.tar.xz
 
-# webkit2gtk — the browser engine. LARGE. See:
-#   https://www.linuxfromscratch.org/blfs/view/stable/x/webkit2gtk.html
+# --- webkit2gtk engine chain ---
+# ICU 76.1                 (autotools, build in the source/ subdir)
+#                          https://github.com/unicode-org/icu/releases/download/release-76-1/icu4c-76_1-src.tgz
+#                          cd icu/source && ./configure --prefix=/usr && make && sudo make install
+# sqlite 3.47.2            (autotools)  https://sqlite.org/2024/sqlite-autoconf-3470200.tar.gz
+# libpsl 0.21.5            (meson)      https://github.com/rockdaboot/libpsl/releases/download/0.21.5/libpsl-0.21.5.tar.gz
+# libsoup 3.6.0            (meson, -Dvapi=disabled -Dgssapi=disabled -Dtests=false -Dsysprof=disabled)
+#                          https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.0.tar.xz
+# woff2 1.0.2              (cmake; needs brotli, present via freetype)  https://github.com/google/woff2/archive/v1.0.2/woff2-1.0.2.tar.gz
+# libwpe 1.16.0            (meson)      https://wpewebkit.org/releases/libwpe-1.16.0.tar.xz
+# wpebackend-fdo 1.14.2    (meson)      https://wpewebkit.org/releases/wpebackend-fdo-1.14.2.tar.xz
+# webkit2gtk 2.46.x        (cmake — LARGE, a multi-hour build):
+curl -LO https://webkitgtk.org/releases/webkitgtk-2.46.5.tar.xz
+tar xf webkitgtk-2.46.5.tar.xz && cd webkitgtk-2.46.5
+cmake -B build -G Ninja -DPORT=GTK -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+  -DENABLE_GAMEPAD=OFF -DENABLE_MINIBROWSER=ON -DUSE_SYSTEMD=OFF -DUSE_JPEGXL=OFF -DUSE_LIBBACKTRACE=OFF -Wno-dev
+ninja -C build && sudo ninja -C build install && cd ..
+```
+
+> webkit2gtk's exact flags/deps drift between releases — cross-check the
+> [BLFS webkit2gtk page](https://www.linuxfromscratch.org/blfs/view/stable/x/webkit2gtk.html)
+> for your version.
+
+#### The tools
+
+With the deps above in place, build each suckless program against our `config.h`.
+Most live on suckless git; **dwl** is on codeberg:
+
+```sh
+build() {   # build <name> <git-url>
+  git clone "$2" "/tmp/$1" && cp ~/legenddots/suckless/$1/config.h "/tmp/$1/config.h"
+  ( cd "/tmp/$1" && sudo make clean install )
+}
+build st    https://git.suckless.org/st
+build slock https://git.suckless.org/slock
+build dmenu https://git.suckless.org/dmenu
+build dwm   https://git.suckless.org/dwm
+build surf  https://git.suckless.org/surf
+build dwl   https://codeberg.org/dwl/dwl
 ```
 
 ---
