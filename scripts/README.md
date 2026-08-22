@@ -110,29 +110,30 @@ runs directly. On a venv install, run it with that venv active.
 
 ### Watching video (YouTube & friends)
 
-**No proprietary codecs out of the box.** legend-gui ships *no* codecs of its own —
-it plays whatever the underlying QtWebEngine was built with, and QtWebEngine built
-from source (Gentoo's `dev-qt/qtwebengine`, the libre-friendly default) omits the
-patent-encumbered **H.264/AAC** entirely. Out of the box you get only the free
-codecs — **VP8/VP9/AV1** video, **Opus/Vorbis** audio. YouTube serves VP9/AV1 to
-most clients so a lot of it just works; H.264-only sites/streams stay silent until
-you opt in. (The one exception is the pip `PyQt6-WebEngine` wheels — they bundle
-the official Qt binaries, which *do* include H.264/AAC.)
+**No proprietary codecs — enforced two ways.**
 
-**Want pip but *not* the codecs?** You can't strip them from the prebuilt wheel —
-they're compiled into the bundled Qt libs. Either use the distro bindings
-(`dev-python/PyQt6-WebEngine`, built against Gentoo's codec-free `dev-qt/qtwebengine`
-— the cleanest libre route), or build the bindings from source against that system
-Qt instead of downloading the wheel:
+1. **Build level.** legend-gui ships *no* codecs of its own; it uses whatever
+   QtWebEngine was built with. Built from source (Gentoo's `dev-qt/qtwebengine`,
+   the libre default) it omits the patent-encumbered **H.264/AAC/HEVC** entirely —
+   only free **VP8/VP9/AV1** + **Opus/Vorbis**. The pip `PyQt6-WebEngine` wheels
+   are the exception: they bundle the official Qt binaries, which *do* include
+   H.264/AAC and can't be stripped from a binary wheel.
+
+2. **Usage level (default — this is what covers the wheels).** Regardless of the
+   build, legend-gui **refuses the proprietary codecs at the JS layer**: it patches
+   `canPlayType` / `MediaSource.isTypeSupported` / `mediaCapabilities` so
+   H.264/AAC/HEVC/Dolby report as *unsupported*. So even on the pip wheel, sites
+   feature-detect and serve free VP9/AV1+Opus, and the encumbered decoders never
+   fire. Opt back in with `LEGENDCHROME_ALLOW_PROPRIETARY=1`.
+
+So a pip install is fine for staying free — the codecs are present but unused.
+If you want them *truly absent* from the build too, use the distro bindings
+(`dev-python/PyQt6-WebEngine` against codec-free `dev-qt/qtwebengine`) or compile
+against system Qt instead of the wheel:
 
 ```sh
 pip install --no-binary PyQt6,PyQt6-WebEngine PyQt6 PyQt6-WebEngine
 ```
-
-That needs the Qt6 + QtWebEngine dev libs, `qmake`, and `sip` present — i.e. you've
-emerged `dev-qt/qtwebengine` anyway, at which point the distro's own bindings are
-simpler. Either way: codec-free means a *source* build; the binary wheel always
-carries H.264/AAC.
 
 There are two ways to watch, and legend-gui does both.
 

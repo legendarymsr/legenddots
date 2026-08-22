@@ -12,6 +12,10 @@ every capability prompt (camera/mic/geolocation/notifications) is auto-denied.
 Clipboard reads, screen capture, autoplay, insecure content and background
 phone-home (pings, component updates, Translate/OptimizationHints) are all off.
 
+Proprietary codecs (H.264/AAC/HEVC/Dolby) are refused at the JS layer by default,
+so even a QtWebEngine built WITH them (the pip wheels) can't use them — sites fall
+back to free VP9/AV1 + Opus. Set LEGENDCHROME_ALLOW_PROPRIETARY=1 to opt back in.
+
 Deps:  pip install PyQt6 PyQt6-WebEngine   (and `mpv` for `.m`)
 Run:   python legend-gui  [url]
 
@@ -135,6 +139,38 @@ class AdBlocker(QWebEngineUrlRequestInterceptor):
         if "facebook.com/tr" in info.requestUrl().toString():
             info.block(True)
 
+
+# Refuse the patent-encumbered codecs at the JS layer, so even a QtWebEngine that
+# was BUILT with them (e.g. the pip PyQt6-WebEngine wheels) can't actually use
+# H.264/AAC/HEVC/Dolby. Sites that feature-detect (YouTube) fall back to free
+# VP9/AV1 video + Opus/Vorbis audio. Runs at document CREATION, before the page's
+# own player probes support. Opt back in with LEGENDCHROME_ALLOW_PROPRIETARY=1.
+CODEC_BLOCK_JS = r"""
+(function() {
+    if (window.__legendNoProp) return; window.__legendNoProp = true;
+    // avc/h264, aac (mp4a), ac-3/ec-3 (Dolby), hevc/h265, Dolby Vision.
+    const BAD = /avc1|avc3|avc|h\.?264|mp4a|ac-3|ec-3|hev1|hvc1|hevc|h\.?265|dolby|dvh1|dva1/i;
+
+    const canPlay = HTMLMediaElement.prototype.canPlayType;
+    HTMLMediaElement.prototype.canPlayType = function(t) {
+        return (t && BAD.test(t)) ? "" : canPlay.call(this, t);
+    };
+    if (window.MediaSource && MediaSource.isTypeSupported) {
+        const s = MediaSource.isTypeSupported.bind(MediaSource);
+        MediaSource.isTypeSupported = function(t) { return (t && BAD.test(t)) ? false : s(t); };
+    }
+    const mc = navigator.mediaCapabilities;
+    if (mc && mc.decodingInfo) {
+        const di = mc.decodingInfo.bind(mc);
+        mc.decodingInfo = function(c) {
+            const ct = c && ((c.video && c.video.contentType) || (c.audio && c.audio.contentType));
+            return (ct && BAD.test(ct))
+                ? Promise.resolve({ supported: false, smooth: false, powerEfficient: false })
+                : di(c);
+        };
+    }
+})();
+"""
 
 # CSS/JS: fonts, hide ad + banner chrome, YouTube ad-skip, auto-reject consent.
 SILENCER_JS = r"""
@@ -451,6 +487,16 @@ class LegendChrome(QMainWindow):
         self.current().setUrl(QUrl(url))
 
     def _install_scripts(self):
+        # Codec block first: at DocumentCreation (before the page's media probes),
+        # in subframes too (embedded players). Opt out with the env var.
+        if not os.environ.get("LEGENDCHROME_ALLOW_PROPRIETARY"):
+            cb = QWebEngineScript()
+            cb.setName("CodecBlock")
+            cb.setSourceCode(CODEC_BLOCK_JS)
+            cb.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+            cb.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            cb.setRunsOnSubFrames(True)
+            self.profile.scripts().insert(cb)
         for name, src in (("Silencer", SILENCER_JS), ("Keymap", KEYMAP_JS)):
             s = QWebEngineScript()
             s.setName(name)
