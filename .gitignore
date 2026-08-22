@@ -8,3 +8,7 @@ caulklinux/installer/install
 caulklinux/*.iso
 caulklinux/OVMF_VARS.fd
 caulklinux/test.qcow2
+
+# Python bytecode
+__pycache__/
+*.pyc
