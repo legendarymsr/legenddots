@@ -44,10 +44,10 @@ require("lazy").setup({
     lazy = false,
     priority = 1000,
     config = function()
-      require("tokyonight").setup({ 
-        style = "night", 
-        transparent = false, 
-        terminal_colors = true 
+      require("tokyonight").setup({
+        style = "night",
+        transparent = false,
+        terminal_colors = true
       })
       vim.cmd[[colorscheme tokyonight-night]]
     end,
@@ -103,7 +103,7 @@ require("lazy").setup({
     'nvim-lualine/lualine.nvim',
     config = function() require('lualine').setup({ options = { theme = 'tokyonight' } }) end
   },
-  
+
   -- FILE BROWSER
   {
     "nvim-tree/nvim-tree.lua",
@@ -181,8 +181,8 @@ require("lazy").setup({
           map("<leader>rn", vim.lsp.buf.rename,        "Rename symbol")
           map("<leader>ca", vim.lsp.buf.code_action,   "Code action")
           map("<leader>dd", vim.diagnostic.open_float, "Diagnostics float")
-          map("[d",         vim.diagnostic.goto_prev,  "Prev diagnostic")
-          map("]d",         vim.diagnostic.goto_next,  "Next diagnostic")
+          map("[d",         function() vim.diagnostic.jump({ count = -1 }) end, "Prev diagnostic")
+          map("]d",         function() vim.diagnostic.jump({ count = 1 })  end, "Next diagnostic")
           map("<leader>dl", "<cmd>Telescope diagnostics<cr>", "Diagnostics list")
         end,
       })
@@ -311,11 +311,11 @@ vim.api.nvim_create_user_command("ReconLocal", function()
 end, { desc = "Perform local network discovery" })
 
 -- 5. THE TOKYO OVERRIDES (The Glow)
-vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" }) 
-vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })   
-vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })    
-vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })   
-vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" }) 
+vim.api.nvim_set_hl(0, "DashboardHeader", { fg = "#bb9af7" })
+vim.api.nvim_set_hl(0, "DashboardIcon", { fg = "#7aa2f7" })
+vim.api.nvim_set_hl(0, "DashboardKey", { fg = "#9ece6a" })
+vim.api.nvim_set_hl(0, "DashboardDesc", { fg = "#c0caf5" })
+vim.api.nvim_set_hl(0, "DashboardFooter", { fg = "#565f89" })
 
 -- 6. KEYMAPS (Pure Efficiency)
 vim.keymap.set("n", "<leader>sc", "<cmd>e $MYVIMRC<CR>", { desc = "Edit Config" })
