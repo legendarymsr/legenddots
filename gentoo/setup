@@ -358,11 +358,26 @@ EOF
     emerge --noreplace app-eselect/eselect-vi >/dev/null 2>&1 || true
     eselect vi set nvim >/dev/null 2>&1 || warn "eselect vi set nvim failed — set it manually later"
 
-    # GUI/desktop side: make nvim a real application + the OS default for text
-    # files, so opening one from a file manager / xdg-open / "open with" lands in
-    # neovim — woven into the desktop, not just the shell.
+    success "System editor = edit; man→nvim; vi→nvim (switch: 'editor nvim|emacs')."
+    mark_step editor_integration
+  else
+    warn "repo scripts/edit not found — run the dotfiles step first, then rerun."
+  fi
+fi
+
+# 10c. NEOVIM AS THE DESKTOP TEXT EDITOR — a .desktop app entry + default MIME
+# handler, so opening a file from a file manager / xdg-open / "open with" lands in
+# neovim. Its own step (not folded into 10b) so a rerun on an already-provisioned
+# system still applies it.
+if ! step_done nvim_desktop; then
+  header "Making neovim the desktop default for text files..."
+  DSRC=""
+  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
+    [[ -f "$d/niri/applications/nvim.desktop" ]] && { DSRC="$d"; break; }
+  done
+  if [[ -n "$DSRC" ]]; then
     emerge --noreplace x11-misc/xdg-utils dev-util/desktop-file-utils >/dev/null 2>&1 || true
-    install -Dm644 "$EDSRC/niri/applications/nvim.desktop" /usr/share/applications/nvim.desktop
+    install -Dm644 "$DSRC/niri/applications/nvim.desktop" /usr/share/applications/nvim.desktop
     mkdir -p /etc/xdg
     cat > /etc/xdg/mimeapps.list << 'EOF'
 [Default Applications]
@@ -382,11 +397,10 @@ application/toml=nvim.desktop
 application/x-yaml=nvim.desktop
 EOF
     update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
-
-    success "System editor = edit; man→nvim; vi→nvim; nvim is the desktop text-file default."
-    mark_step editor_integration
+    success "neovim is the desktop default for text files (file-manager / xdg-open)."
+    mark_step nvim_desktop
   else
-    warn "repo scripts/edit not found — run the dotfiles step first, then rerun."
+    warn "niri/applications/nvim.desktop not found — run the dotfiles step first, then rerun."
   fi
 fi
 
