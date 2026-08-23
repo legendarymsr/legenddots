@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Neovim
+GenericName=Text Editor
+Comment=Edit text with Neovim
+# alacritty IS the terminal, so Terminal=false — don't let the DE wrap it again.
+Exec=alacritty --class nvim -e nvim %F
+Terminal=false
+Icon=nvim
+Categories=Utility;TextEditor;Development;IDE;
+Keywords=vim;nvim;edit;text;code;
+StartupNotify=true
+MimeType=text/plain;text/markdown;text/x-python;text/x-lua;text/x-shellscript;application/x-shellscript;text/x-csrc;text/x-chdr;text/x-c++src;text/x-rust;text/x-zig;application/json;application/toml;application/x-yaml;text/x-readme;text/english;
