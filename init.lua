@@ -98,7 +98,21 @@ require("lazy").setup({
   -- WEAPONRY
   { "kdheepak/lazygit.nvim", cmd = { "LazyGit" }, keys = { { "<leader>gg", "<cmd>LazyGit<CR>" } } },
   { 'nvim-telescope/telescope.nvim', tag = '0.1.8', dependencies = { 'nvim-lua/plenary.nvim' } },
-  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
+  {
+    "nvim-treesitter/nvim-treesitter",
+    build = ":TSUpdate",
+    config = function()
+      require("nvim-treesitter.configs").setup({
+        ensure_installed = {
+          "python", "lua", "bash", "nix", "rust", "zig", "c",
+          "vim", "vimdoc", "markdown", "markdown_inline", "json", "toml", "yaml",
+        },
+        auto_install = true,                -- pull a parser on demand (needs a C compiler)
+        highlight = { enable = true },       -- the actual syntax colouring
+        indent = { enable = true },
+      })
+    end,
+  },
   {
     'nvim-lualine/lualine.nvim',
     config = function() require('lualine').setup({ options = { theme = 'tokyonight' } }) end

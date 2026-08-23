@@ -129,7 +129,19 @@ binds {
     Mod+BracketLeft  { consume-or-expel-window-left; }
     Mod+BracketRight { consume-or-expel-window-right; }
     Mod+v { toggle-window-floating; }   // move the window between floating & tiling
+    Mod+Shift+v { switch-focus-between-floating-and-tiling; }
     Mod+o { toggle-overview; }           // open niri's overview
+
+    // vertical workspaces: down/up scroll (you also have Mod+1-9 for direct jumps)
+    Mod+Page_Down { focus-workspace-down; }
+    Mod+Page_Up   { focus-workspace-up; }
+    Mod+Shift+Page_Down { move-column-to-workspace-down; }
+    Mod+Shift+Page_Up   { move-column-to-workspace-up; }
+
+    // show this hotkey overlay
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    // neovim as a first-class OS app (Mod+E is the editor switcher; Mod+N is always nvim)
+    Mod+n { spawn "alacritty" "-e" "nvim"; }
 
     Mod+minus { set-column-width "-10%"; }
     Mod+equal { set-column-width "+10%"; }
