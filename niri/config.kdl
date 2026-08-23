@@ -125,6 +125,12 @@ binds {
     Mod+Shift+f { fullscreen-window; }
     Mod+c { center-column; }
 
+    // pull a window into / push it out of the current column (niri's core move)
+    Mod+BracketLeft  { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+    Mod+v { toggle-window-floating; }   // move the window between floating & tiling
+    Mod+o { toggle-overview; }           // open niri's overview
+
     Mod+minus { set-column-width "-10%"; }
     Mod+equal { set-column-width "+10%"; }
     Mod+Shift+minus { set-window-height "-10%"; }
