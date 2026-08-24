@@ -453,6 +453,13 @@ if ! step_done kernel; then
   ./scripts/config -e CONFIG_IKCONFIG
   ./scripts/config -e CONFIG_IKCONFIG_PROC
 
+  # --- CUSTOM KERNEL IDENTITY ---
+  # gentoo-sources already appends "-gentoo"; add "-legend" so uname -r is
+  # "<ver>-gentoo-legend" and the vmlinuz/modules are named to match (that's what
+  # rEFInd/GRUB display). AUTO off so no git hash gets appended.
+  ./scripts/config --set-str CONFIG_LOCALVERSION "-legend"
+  ./scripts/config -d CONFIG_LOCALVERSION_AUTO
+
   # --- REMOVABLE MEDIA: exFAT + FUSE ---
   # exFAT is the norm on large USB sticks and SD cards (and Ventoy's data
   # partition); FUSE backs userspace filesystems (ntfs-3g, sshfs, mtpfs, etc.).

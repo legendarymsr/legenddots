@@ -705,6 +705,11 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
         make defconfig
       fi
     fi
+    # Custom kernel identity: gentoo-sources already appends "-gentoo", so this
+    # makes uname -r = "<ver>-gentoo-legend" and names the vmlinuz/modules the same
+    # (what rEFInd/GRUB show). LOCALVERSION_AUTO off so no git hash is appended.
+    ./scripts/config --set-str CONFIG_LOCALVERSION "-legend" \
+                     -d CONFIG_LOCALVERSION_AUTO
     # Hardening options (in case the hardening step was skipped).
     ./scripts/config -e CONFIG_INIT_STACK_ALL_ZERO \
                      -e CONFIG_INIT_ON_ALLOC_DEFAULT_ON \

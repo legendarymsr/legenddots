@@ -60,6 +60,12 @@ success "building from $NEWEST"
 header "Seeding defconfig + applying the proven MBA 6,2 config..."
 make defconfig
 
+# --- CUSTOM KERNEL IDENTITY ---
+# gentoo-sources appends "-gentoo"; add "-legend" -> uname "<ver>-gentoo-legend"
+# (and vmlinuz/modules named to match, which is what rEFInd/GRUB display).
+./scripts/config --set-str CONFIG_LOCALVERSION "-legend"
+./scripts/config -d CONFIG_LOCALVERSION_AUTO
+
 # --- INTEL ME REMOVAL ---
 ./scripts/config -d CONFIG_INTEL_MEI
 ./scripts/config -d CONFIG_INTEL_MEI_ME
