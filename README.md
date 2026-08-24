@@ -190,7 +190,7 @@ Config lives in `init.lua` (lazy.nvim) and `modules/home/nixvim.nix` (NixVim dec
 
 ### LSP
 
-Six language servers, installed automatically via Mason on first launch:
+Eight language servers, installed automatically via Mason on first launch:
 
 | Server | Language |
 |--------|----------|
@@ -200,6 +200,8 @@ Six language servers, installed automatically via Mason on first launch:
 | `nixd` | Nix |
 | `rust_analyzer` | Rust |
 | `zls` | Zig |
+| `clangd` | C / C++ |
+| `omnisharp` | C# |
 
 Uses Neovim's built-in LSP client (0.11+): `nvim-lspconfig` supplies the per-server definitions (cmd/filetypes/root markers) that `vim.lsp.enable` consumes, Mason installs the binaries, and mason-lspconfig bridges the two.
 
