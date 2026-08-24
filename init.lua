@@ -320,6 +320,22 @@ require("lazy").setup({
 
   -- Smooth animated scrolling
   { "karb94/neoscroll.nvim", event = "VeryLazy", config = function() require("neoscroll").setup() end },
+
+  -- Inline colour swatches for hex/rgb/hsl codes in EVERY file (not LSP-dependent,
+  -- so "#1a1b26" gets a swatch in Python, sh, kdl — anything, unlike lua_ls colours).
+  {
+    "catgoose/nvim-colorizer.lua",
+    event = "VeryLazy",
+    opts = {
+      filetypes = { "*" },
+      user_default_options = {
+        names = false,                        -- don't colour the word "red"/"blue"
+        RGB = true, RRGGBB = true, RRGGBBAA = true,
+        rgb_fn = true, hsl_fn = true, css = true, css_fn = true,
+        mode = "background",                  -- swatch = the hex code's background
+      },
+    },
+  },
 })
 
 -- 4. RECON FUNCTIONS
