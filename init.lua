@@ -325,16 +325,19 @@ require("lazy").setup({
   -- so "#1a1b26" gets a swatch in Python, sh, kdl — anything, unlike lua_ls colours).
   {
     "catgoose/nvim-colorizer.lua",
-    event = "VeryLazy",
-    opts = {
-      filetypes = { "*" },
-      user_default_options = {
-        names = false,                        -- don't colour the word "red"/"blue"
-        RGB = true, RRGGBB = true, RRGGBBAA = true,
-        rgb_fn = true, hsl_fn = true, css = true, css_fn = true,
-        mode = "background",                  -- swatch = the hex code's background
-      },
-    },
+    event = { "BufReadPost", "BufNewFile" },
+    main = "colorizer",   -- the module is `colorizer`, not the repo name — lazy needs telling
+    config = function()
+      require("colorizer").setup({
+        filetypes = { "*" },
+        user_default_options = {
+          names = false,                        -- don't colour the word "red"/"blue"
+          RGB = true, RRGGBB = true, RRGGBBAA = true,
+          rgb_fn = true, hsl_fn = true, css = true, css_fn = true,
+          mode = "background",                  -- swatch = the hex code's background
+        },
+      })
+    end,
   },
 })
 
