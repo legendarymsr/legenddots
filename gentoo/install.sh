@@ -772,14 +772,16 @@ EOF
   #       kill the DRI render node, breaking Wayland compositors like niri.
   #       Early boot may flicker while i915 initialises; that is normal.
   KVER=$(basename "$(readlink -f /usr/src/linux)" | sed 's/^linux-//')
+  BASEVER=${KVER%%-gentoo*}   # upstream version only, e.g. 6.18.42
   INITRAMFS=$(ls /boot/initramfs-*"${KVER}"* 2>/dev/null | head -1 | sed 's|/boot/||')
   ROOT_UUID=$(blkid -s UUID -o value /dev/sda3)
   if [[ -n "$INITRAMFS" && -n "$ROOT_UUID" ]]; then
     # i915.enable_psr=0  : panel self-refresh causes display glitches on
     #                      Haswell (Intel HD 5000) -- must be off.
     # i915.enable_dc=0   : display power-gating, same Haswell quirk family.
-    printf '"Boot Gentoo"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= pcie_aspm=off i915.enable_psr=0 i915.enable_dc=0"\n' \
-      "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
+    # The first field is the rEFInd menu label — the custom kernel's name.
+    printf '"gentoo %s legend"  "ro root=UUID=%s initrd=/boot/%s rootfstype=ext4 acpi_osi= pcie_aspm=off i915.enable_psr=0 i915.enable_dc=0"\n' \
+      "$BASEVER" "$ROOT_UUID" "$INITRAMFS" > /boot/refind_linux.conf
   fi
 
   # OpenRC init script for seatd (the ebuild may not install one).

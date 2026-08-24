@@ -786,10 +786,12 @@ partition, but its heuristics don't match genkernel's
 boots the kernel without an initramfs, which causes a silent kernel panic at
 root mount (UUID lookup fails).
 
-The finalize step generates `/boot/refind_linux.conf` to make it explicit:
+The finalize step generates `/boot/refind_linux.conf` to make it explicit. The
+first field is the rEFInd menu label — the custom kernel's name, `gentoo <upstream
+version> legend` (the kernel-rebuild step keeps the version current):
 
 ```
-"Boot Gentoo"  "ro root=UUID=<sda3-uuid> initrd=/boot/initramfs-genkernel-x86_64-<kver>-gentoo"
+"gentoo 6.18.42 legend"  "ro root=UUID=<sda3-uuid> initrd=/boot/initramfs-genkernel-x86_64-<kver>-gentoo-legend"
 ```
 
 ---

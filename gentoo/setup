@@ -814,6 +814,10 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
         sed -i "s|initrd=/boot/initramfs-[^ \"]*|initrd=/boot/$(basename "$NEWINITRD")|" \
           /boot/refind_linux.conf \
           && echo "  → refind_linux.conf initrd set to $(basename "$NEWINITRD")"
+        # Keep the rEFInd label (first field) = "gentoo <upstream ver> legend".
+        NEWBASE=${NEWVER%%-gentoo*}
+        sed -i "s|^\"[^\"]*\"|\"gentoo ${NEWBASE} legend\"|" /boot/refind_linux.conf \
+          && echo "  → refind_linux.conf label set to 'gentoo ${NEWBASE} legend'"
       fi
       echo -e "${GREEN}Kernel $NEWVER rebuilt. Run 'bash gentoo/troubleshooting/verify-boot'${NC}"
       echo -e "${GREEN}before rebooting into it.${NC}"
