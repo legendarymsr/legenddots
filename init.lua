@@ -146,7 +146,7 @@ require("lazy").setup({
       local packages = {
         "lua-language-server", "pyright", "bash-language-server",
         "nixd", "rust-analyzer", "zls",
-        "clangd", "omnisharp",   -- C / C++ (clangd) and C# (omnisharp)
+        "clangd", "csharp-language-server",   -- C / C++ (clangd) and C# (csharp_ls)
       }
       local function install_missing()
         for _, name in ipairs(packages) do
@@ -203,7 +203,7 @@ require("lazy").setup({
       })
 
       vim.lsp.enable({ "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer", "zls",
-                       "clangd", "omnisharp" })
+                       "clangd", "csharp_ls" })
 
       vim.diagnostic.config({
         virtual_text    = { prefix = "●" },

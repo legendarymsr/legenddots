@@ -201,7 +201,7 @@ Eight language servers, installed automatically via Mason on first launch:
 | `rust_analyzer` | Rust |
 | `zls` | Zig |
 | `clangd` | C / C++ |
-| `omnisharp` | C# |
+| `csharp_ls` | C# |
 
 Uses Neovim's built-in LSP client (0.11+): `nvim-lspconfig` supplies the per-server definitions (cmd/filetypes/root markers) that `vim.lsp.enable` consumes, Mason installs the binaries, and mason-lspconfig bridges the two.
 
