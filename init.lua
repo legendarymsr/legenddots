@@ -104,7 +104,7 @@ require("lazy").setup({
     config = function()
       require("nvim-treesitter.configs").setup({
         ensure_installed = {
-          "python", "lua", "bash", "nix", "rust", "zig", "c", "cpp", "c_sharp",
+          "python", "lua", "bash", "nix", "rust", "zig", "c", "cpp",
           "vim", "vimdoc", "markdown", "markdown_inline", "json", "toml", "yaml",
         },
         auto_install = true,                -- pull a parser on demand (needs a C compiler)
@@ -146,7 +146,7 @@ require("lazy").setup({
       local packages = {
         "lua-language-server", "pyright", "bash-language-server",
         "nixd", "rust-analyzer", "zls",
-        "clangd", "csharp-language-server",   -- C / C++ (clangd) and C# (csharp_ls)
+        "clangd",   -- C / C++
       }
       local function install_missing()
         for _, name in ipairs(packages) do
@@ -203,7 +203,7 @@ require("lazy").setup({
       })
 
       vim.lsp.enable({ "lua_ls", "pyright", "bashls", "nixd", "rust_analyzer", "zls",
-                       "clangd", "csharp_ls" })
+                       "clangd" })
 
       vim.diagnostic.config({
         virtual_text    = { prefix = "●" },
