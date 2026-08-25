@@ -1,9 +1,11 @@
--- Hyprland config in Lua (the hl.* API). Converted from hyprland.conf.
+-- Hyprland config in Lua (the hl.* API). A faithful 1:1 port of hyprland.conf —
+-- same monitors, autostart, env, settings, animations, window rules, and binds.
 -- Tokyo Night. Docs: https://wiki.hypr.land/
 --
--- Lines flagged "VERIFY" use dispatchers the reference sample didn't demonstrate,
--- so double-check them against the wiki if a keybind misbehaves. The original
--- hyprland.conf is kept untouched as a fallback.
+-- Dispatchers the reference sample demonstrated use native hl.dsp.*; the few it
+-- didn't (cyclenext, fullscreen, layoutmsg, directional movewindow, resizeactive)
+-- go through `hyprctl dispatch` so they behave byte-identically to the .conf.
+-- The original hyprland.conf is kept untouched as a fallback.
 
 ------------------
 ---- MONITORS ----
@@ -129,9 +131,11 @@ hl.bind(mod .. " + SHIFT + Q",     hl.dsp.window.close())
 hl.bind(mod .. " + SHIFT + E",     hl.dsp.exit())
 hl.bind(mod .. " + SHIFT + Space", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + P",             hl.dsp.window.pseudo())
-hl.bind(mod .. " + Tab",           hl.dsp.focus({ cycle = "next" }))         -- VERIFY (was: cyclenext)
-hl.bind(mod .. " + F",             hl.dsp.window.fullscreen({ mode = 0 }))   -- VERIFY (was: fullscreen, 0)
-hl.bind(mod .. " + T",             hl.dsp.layoutmsg("togglesplit"))          -- VERIFY (was: layoutmsg, togglesplit)
+-- These map to classic dispatchers the reference sample didn't show, so they go
+-- through `hyprctl dispatch` — byte-identical to the hyprland.conf behaviour.
+hl.bind(mod .. " + Tab", hl.dsp.exec_cmd("hyprctl dispatch cyclenext"))               -- was: cyclenext
+hl.bind(mod .. " + F",   hl.dsp.exec_cmd("hyprctl dispatch fullscreen 0"))            -- was: fullscreen, 0
+hl.bind(mod .. " + T",   hl.dsp.exec_cmd("hyprctl dispatch layoutmsg togglesplit"))  -- was: layoutmsg, togglesplit
 
 -- focus (hjkl)
 hl.bind(mod .. " + h", hl.dsp.focus({ direction = "left" }))
@@ -139,17 +143,17 @@ hl.bind(mod .. " + l", hl.dsp.focus({ direction = "right" }))
 hl.bind(mod .. " + k", hl.dsp.focus({ direction = "up" }))
 hl.bind(mod .. " + j", hl.dsp.focus({ direction = "down" }))
 
--- move window (Shift+hjkl)  -- VERIFY the directional move form
-hl.bind(mod .. " + SHIFT + h", hl.dsp.window.move({ direction = "left" }))
-hl.bind(mod .. " + SHIFT + l", hl.dsp.window.move({ direction = "right" }))
-hl.bind(mod .. " + SHIFT + k", hl.dsp.window.move({ direction = "up" }))
-hl.bind(mod .. " + SHIFT + j", hl.dsp.window.move({ direction = "down" }))
+-- move window (Shift+hjkl) — classic `movewindow l/r/u/d`
+hl.bind(mod .. " + SHIFT + h", hl.dsp.exec_cmd("hyprctl dispatch movewindow l"))
+hl.bind(mod .. " + SHIFT + l", hl.dsp.exec_cmd("hyprctl dispatch movewindow r"))
+hl.bind(mod .. " + SHIFT + k", hl.dsp.exec_cmd("hyprctl dispatch movewindow u"))
+hl.bind(mod .. " + SHIFT + j", hl.dsp.exec_cmd("hyprctl dispatch movewindow d"))
 
--- resize active (Ctrl+hjkl)  -- VERIFY the resize form
-hl.bind(mod .. " + CTRL + h", hl.dsp.window.resize({ delta = "-40 0" }))
-hl.bind(mod .. " + CTRL + l", hl.dsp.window.resize({ delta = "40 0" }))
-hl.bind(mod .. " + CTRL + k", hl.dsp.window.resize({ delta = "0 -40" }))
-hl.bind(mod .. " + CTRL + j", hl.dsp.window.resize({ delta = "0 40" }))
+-- resize active (Ctrl+hjkl) — classic `resizeactive <dx> <dy>`
+hl.bind(mod .. " + CTRL + h", hl.dsp.exec_cmd("hyprctl dispatch resizeactive -40 0"))
+hl.bind(mod .. " + CTRL + l", hl.dsp.exec_cmd("hyprctl dispatch resizeactive 40 0"))
+hl.bind(mod .. " + CTRL + k", hl.dsp.exec_cmd("hyprctl dispatch resizeactive 0 -40"))
+hl.bind(mod .. " + CTRL + j", hl.dsp.exec_cmd("hyprctl dispatch resizeactive 0 40"))
 
 -- workspaces 1-9 (focus) + move active window to workspace
 for i = 1, 9 do
