@@ -1,3 +1,7 @@
+---@diagnostic disable: undefined-global
+-- `hl` is injected by Hyprland's Lua runtime, so lua_ls can't see it — the line
+-- above silences the "undefined global `hl`" warnings for this file.
+
 -- Hyprland config in Lua (the hl.* API). A faithful 1:1 port of hyprland.conf —
 -- same monitors, autostart, env, settings, animations, window rules, and binds.
 -- Tokyo Night. Docs: https://wiki.hypr.land/
