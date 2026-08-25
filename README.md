@@ -66,7 +66,8 @@ legenddots/
 │   └── install.sh
 │
 └── hyprland/                  Hyprland rice (Wayland)
-    ├── hyprland.conf
+    ├── hyprland.lua           main config (Lua — Hyprland's current config format)
+    ├── hl.meta.lua            lua_ls type stub for the hl.* API (editor only)
     ├── hyprpaper.conf
     ├── hyprlock.conf
     ├── waybar/

@@ -1,15 +1,12 @@
----@diagnostic disable: undefined-global
--- `hl` is injected by Hyprland's Lua runtime, so lua_ls can't see it — the line
--- above silences the "undefined global `hl`" warnings for this file.
-
--- Hyprland config in Lua (the hl.* API). A faithful 1:1 port of hyprland.conf —
--- same monitors, autostart, env, settings, animations, window rules, and binds.
--- Tokyo Night. Docs: https://wiki.hypr.land/
+-- Hyprland config in Lua (the hl.* API) — Hyprland's config format in current
+-- versions (hyprlang/.conf is gone). Tokyo Night. Docs: https://wiki.hypr.land/
+--
+-- `hl` is injected by Hyprland at runtime; hl.meta.lua in this folder gives lua_ls
+-- its shape, so editing this file gets completion/hover on hl.* and no warnings.
 --
 -- Dispatchers the reference sample demonstrated use native hl.dsp.*; the few it
 -- didn't (cyclenext, fullscreen, layoutmsg, directional movewindow, resizeactive)
--- go through `hyprctl dispatch` so they behave byte-identically to the .conf.
--- The original hyprland.conf is kept untouched as a fallback.
+-- go through `hyprctl dispatch`.
 
 ------------------
 ---- MONITORS ----
@@ -136,7 +133,7 @@ hl.bind(mod .. " + SHIFT + E",     hl.dsp.exit())
 hl.bind(mod .. " + SHIFT + Space", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + P",             hl.dsp.window.pseudo())
 -- These map to classic dispatchers the reference sample didn't show, so they go
--- through `hyprctl dispatch` — byte-identical to the hyprland.conf behaviour.
+-- through `hyprctl dispatch` — byte-identical to the classic dispatcher behaviour.
 hl.bind(mod .. " + Tab", hl.dsp.exec_cmd("hyprctl dispatch cyclenext"))               -- was: cyclenext
 hl.bind(mod .. " + F",   hl.dsp.exec_cmd("hyprctl dispatch fullscreen 0"))            -- was: fullscreen, 0
 hl.bind(mod .. " + T",   hl.dsp.exec_cmd("hyprctl dispatch layoutmsg togglesplit"))  -- was: layoutmsg, togglesplit
