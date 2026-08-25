@@ -62,7 +62,7 @@ link() {
 }
 
 info "Linking configs..."
-link "$REPO_DIR/hyprland.conf"       "$HOME/.config/hypr/hyprland.conf"
+link "$REPO_DIR/hyprland.lua"        "$HOME/.config/hypr/hyprland.lua"
 link "$REPO_DIR/hyprpaper.conf"      "$HOME/.config/hypr/hyprpaper.conf"
 link "$REPO_DIR/hyprlock.conf"       "$HOME/.config/hypr/hyprlock.conf"
 link "$REPO_DIR/waybar"              "$HOME/.config/waybar"
