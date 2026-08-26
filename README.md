@@ -260,6 +260,8 @@ On niri, **`Super+F`** launches `alacritty -e tmux new-session -- nvim -c Yazi`,
 
 > **Gentoo note:** `yazi` isn't in the main tree — it's `app-misc/yazi` in the **GURU** overlay (already enabled by `gentoo/setup`). `tmux` is `app-misc/tmux` in the main tree. Both are installed by the setup script.
 
+Runs on **Termux** too — the same config branches on `$TERMUX_VERSION` (falls back to `screen-256color`, drops the `Alt+h/l` window keys that pocketwl claims). Install/symlink steps: `termux/README.md` → *Editor & tmux*.
+
 ---
 
 ## Keybinds
