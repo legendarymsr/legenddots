@@ -46,9 +46,10 @@ legenddots/
 │   ├── dwl/config.h           Wayland tiling WM (Super, foot + fuzzel)
 │   └── surf/config.h          WebKit browser
 │
-├── init.lua                   Neovim config
+├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
 ├── init.el                    Emacs config
 ├── alacritty.toml             Terminal (Tokyo Night, 95% opacity)
+├── tmux.conf                  tmux (Tokyo Night, vi-mode, hjkl — mirrors nvim)
 │
 ├── niri/                      Niri rice (Wayland)
 │   ├── config.kdl
@@ -238,6 +239,26 @@ nvim-cmp with sources: LSP → LuaSnip snippets → buffer words.
 ## Terminal
 
 `alacritty.toml` — Tokyo Night, JetBrainsMono Nerd Font, 95% opacity.
+
+---
+
+## tmux
+
+Terminal multiplexing that mirrors the Neovim setup — same **Tokyo Night** palette, `hjkl` navigation, and vi copy-mode. Config in `tmux.conf` (symlinked to `~/.config/tmux/tmux.conf`; tmux 3.1+ reads it there, no `~/.tmux.conf` needed).
+
+| Key | Action |
+|-----|--------|
+| `Alt+Space` | Prefix (echoes nvim's Space leader) |
+| `prefix s` / `prefix v` | Split horizontal / vertical (vim mnemonics), in the current pane's dir |
+| `prefix h/j/k/l` | Focus pane (like nvim window moves) |
+| `prefix H/J/K/L` | Resize pane (repeatable) |
+| `Alt+h` / `Alt+l` | Prev / next window (no prefix) |
+| `prefix Enter` | Copy mode — then `v` select, `y` yank |
+| `prefix r` | Reload config |
+
+On niri, **`Super+F`** launches `alacritty -e tmux new-session -- nvim -c Yazi`, dropping you straight into the [yazi](https://github.com/sxyazi/yazi) file manager (via `yazi.nvim`) inside a fresh tmux session — split off more panes around it as needed. The `--` stops tmux from swallowing nvim's `-c` flag.
+
+> **Gentoo note:** `yazi` isn't in the main tree — it's `app-misc/yazi` in the **GURU** overlay (already enabled by `gentoo/setup`). `tmux` is `app-misc/tmux` in the main tree. Both are installed by the setup script.
 
 ---
 

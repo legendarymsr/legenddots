@@ -240,7 +240,7 @@ if ! step_done base_system; then
     net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     sys-fs/exfatprogs sys-fs/fuse \
-    x11-terms/alacritty llvm-core/llvm llvm-core/clang
+    x11-terms/alacritty llvm-core/llvm llvm-core/clang app-misc/tmux
   mark_step base_system
 fi
 
@@ -275,7 +275,8 @@ if ! step_done desktop; then
     gui-apps/swaybg gui-apps/grim gui-apps/slurp gui-apps/wl-clipboard \
     x11-misc/dunst gui-libs/xdg-desktop-portal-gtk gnome-extra/polkit-gnome \
     media-sound/pavucontrol x11-misc/xdg-utils x11-misc/xdg-user-dirs \
-    media-fonts/nerdfonts sys-apps/brightnessctl www-client/brave-browser-nightly
+    media-fonts/nerdfonts sys-apps/brightnessctl www-client/brave-browser-nightly \
+    app-misc/yazi
   mark_step desktop
 fi
 
@@ -314,6 +315,8 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
+    mkdir -p ~/.config/tmux
+    ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
     ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar
@@ -896,6 +899,8 @@ if id legend &>/dev/null; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
+    mkdir -p ~/.config/tmux
+    ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
     ln -sfn ~/legenddots/init.el         ~/.config/emacs/init.el
     ln -sfn ~/legenddots/niri/config.kdl ~/.config/niri/config.kdl
     ln -sfn ~/legenddots/niri/waybar     ~/.config/waybar

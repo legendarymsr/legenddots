@@ -97,6 +97,20 @@ require("lazy").setup({
 
   -- WEAPONRY
   { "kdheepak/lazygit.nvim", cmd = { "LazyGit" }, keys = { { "<leader>gg", "<cmd>LazyGit<CR>" } } },
+  -- FILE MANAGER: yazi over the current buffer's directory (<leader>y)
+  {
+    "mikavilpas/yazi.nvim",
+    cmd = "Yazi",
+    keys = {
+      { "<leader>y", "<cmd>Yazi<CR>", desc = "Yazi (file's dir)" },
+    },
+    opts = {
+      open_for_directories = false,
+      -- fill the whole nvim window (no small float) so it reads as a tiled pane
+      floating_window_scaling_factor = 1.0,
+      yazi_floating_window_border = "none",
+    },
+  },
   { 'nvim-telescope/telescope.nvim', tag = '0.1.8', dependencies = { 'nvim-lua/plenary.nvim' } },
   {
     "nvim-treesitter/nvim-treesitter",

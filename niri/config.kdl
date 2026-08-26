@@ -121,9 +121,12 @@ binds {
     Mod+Shift+9 { move-column-to-workspace 9; }
 
     Mod+r { switch-preset-column-width; }
-    Mod+f { maximize-column; }
+    // Super+F drops straight into yazi: alacritty -> tmux -> nvim -> :Yazi.
+    // '--' stops tmux from eating nvim's -c flag as its own start-directory.
+    Mod+f { spawn "alacritty" "-e" "tmux" "new-session" "--" "nvim" "-c" "Yazi"; }
     Mod+Shift+f { fullscreen-window; }
     Mod+c { center-column; }
+    Mod+m { maximize-column; }   // relocated off Mod+f (now the yazi launcher)
 
     // pull a window into / push it out of the current column (niri's core move)
     Mod+BracketLeft  { consume-or-expel-window-left; }
