@@ -135,6 +135,41 @@ Two things had to line up for pocketwl to actually fill the phone screen:
 
 ---
 
+## Editor & tmux (dotfiles on the phone)
+
+The repo is already cloned at `~/legenddots` (the build step above). Neovim and
+tmux read their configs straight from it, so a `git pull` updates them in place.
+
+```sh
+pkg install neovim tmux git
+
+# nvim — the same init.lua as the desktop (Mason/LSP installs self-skip on Termux)
+mkdir -p ~/.config/nvim && ln -sfn ~/legenddots/init.lua ~/.config/nvim/init.lua
+
+# tmux — tmux 3.1+ reads ~/.config/tmux/tmux.conf
+mkdir -p ~/.config/tmux && ln -sfn ~/legenddots/tmux.conf ~/.config/tmux/tmux.conf
+```
+
+Update later with `cd ~/legenddots && git pull` — both are symlinks, so they pick
+up changes with no re-copy.
+
+**Termux specifics** (handled automatically — `tmux.conf` branches on `$TERMUX_VERSION`):
+
+- **terminfo** — Termux often ships no `tmux-256color` entry, which makes tmux
+  refuse to start. The config falls back to `screen-256color` on Termux (always
+  present) and keeps `tmux-256color` on the desktop. Truecolor still works via the
+  `*:RGB` override.
+- **prefix** — `Alt+Space`, same as desktop. Termux's extra-keys row has `Alt`
+  (swipe it up if hidden).
+- **window keys** — the desktop's no-prefix `Alt+h`/`Alt+l` window cycle is
+  disabled on Termux, because **pocketwl claims `Alt+hjkl`** for tile focus. Use
+  the prefix there instead: `Alt+Space` then `n` / `p` (next / prev window).
+
+To land straight in tmux under pocketwl, run `tmux` in the `Alt+Return` terminal,
+or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens into it.
+
+---
+
 ## Genuine GNU IceCat via Guix (`icecat.sh`)
 
 A libre desktop browser running inside pocketwl. **Read this first — it's the
