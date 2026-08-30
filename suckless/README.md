@@ -35,6 +35,18 @@ Packages — **screen**: `app-misc/screen` (Gentoo), `screen` (Arch / nixpkgs / 
 or any `vi` already on the box. The `.exrc` uses only POSIX ex options (no vim-isms
 like `expandtab`/`syntax`), so a real vi won't reject it.
 
+**Declaratively you don't symlink by hand** — both come with the tools:
+
+- **home-manager** (`legend.suckless.enable = true`) installs `screen` + `nvi` and
+  links `~/.screenrc` / `~/.exrc`. Turn either off with
+  `legend.suckless.screen.enable = false` / `legend.suckless.vi.enable = false`,
+  or swap the editor with `legend.suckless.vi.package = pkgs.vim;`.
+- **Guix Home** (`home-configuration.scm`) installs `screen` + `nvi` and places
+  the same two dotfiles via `home-files-service-type`. The `config.scm` manifest
+  also carries both packages (dotfiles are Home-only).
+
+The manual `ln -sfn` above is only for non-declarative setups.
+
 ---
 
 ## Declarative builds (NixOS / Guix)
