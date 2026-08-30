@@ -14,6 +14,27 @@ dotfiles — edit one, then rebuild that program. All themed **Tokyo Night**,
 | **dwl** | Wayland tiling WM (dwm-alike) | `dwl/config.h` — Super mod, foot + fuzzel |
 | **surf** | WebKit browser | `surf/config.h` — behaviour/keybinds (colors via user CSS) |
 
+### Also here — not suckless, but same spirit
+
+Minimal **screen** and **vi** configs, kept for the minimalist collection. Unlike
+everything above, these are **runtime dotfiles**, not compile-time `config.h` — so
+you *symlink* them, no rebuild.
+
+| Tool | What | file | symlink to |
+|------|------|------|-----------|
+| **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
+| **vi** | classic editor (nvi / traditional / busybox) | `vi/exrc` | `~/.exrc` |
+
+```sh
+ln -sfn "$PWD/screen/screenrc" ~/.screenrc
+ln -sfn "$PWD/vi/exrc"         ~/.exrc
+```
+
+Packages — **screen**: `app-misc/screen` (Gentoo), `screen` (Arch / nixpkgs / Guix).
+**vi**: `app-editors/nvi` (Gentoo), `nvi` or `busybox` (Arch), `nvi` (nixpkgs / Guix),
+or any `vi` already on the box. The `.exrc` uses only POSIX ex options (no vim-isms
+like `expandtab`/`syntax`), so a real vi won't reject it.
+
 ---
 
 ## Declarative builds (NixOS / Guix)
