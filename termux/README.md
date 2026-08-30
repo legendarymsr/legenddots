@@ -204,9 +204,15 @@ export EXINIT='set autoindent ignorecase showmatch tabstop=4'   # dotfiles.sh ad
 `number` / `shiftwidth` / `wrapscan` aren't in busybox vi, so they're dropped. (If you
 later get real nvi via TUR, delete the `EXINIT` line so nvi uses the full `~/.exrc`.)
 
-**Debian proot / source** — `apt install nvi` inside the proot (`firefox.sh`/`icecat.sh`
-set one up; its own `$HOME`, so copy `.exrc` in there), or build
-[nvi2](https://github.com/lichray/nvi2) from source (`pkg install clang make ncurses bmake`).
+**Debian proot** (reliable) — `apt install nvi` inside the proot (`firefox.sh`/`icecat.sh`
+set one up; it's glibc, so nvi Just Works). The proot has its own `$HOME`, so recreate
+`~/.exrc` in there (it's tiny) or bind the repo in on login.
+
+**Build nvi2 from source** (advanced) — [nvi2](https://github.com/lichray/nvi2) is a
+**CMake** build needing ncurses **and a db1 (Berkeley DB 1.85) library** — that db1 is
+the fiddly part on Android/bionic. `pkg install git cmake clang make ncurses`, then
+follow nvi2's wiki *Porting* page and issue #84 ("linux build recommendations") for the
+exact db1 source and the `-DDB_INCLUDE_DIR` / `-DCMAKE_EXE_LINKER_FLAGS` values.
 
 ---
 
