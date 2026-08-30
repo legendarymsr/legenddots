@@ -8,7 +8,7 @@
 #   init.lua                 -> ~/.config/nvim/init.lua   (Neovim)
 #   tmux.conf                -> ~/.config/tmux/tmux.conf   (tmux 3.1+ reads it there)
 #   suckless/screen/screenrc -> ~/.screenrc                (GNU Screen)
-#   suckless/vi/exrc         -> ~/.exrc                    (classic / busybox vi)
+#   suckless/vi/exrc         -> ~/.exrc                    (vi config, any real vi)
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -46,25 +46,6 @@ link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
 link "$REPO/suckless/vi/exrc"          "$HOME/.exrc"
 
-# 4. busybox vi can't read ~/.exrc (that path is unimplemented in busybox) — it
-#    only honours the EXINIT env var (one ':' command). Mirror the .exrc's core
-#    options into EXINIT via the shell rc, using the subset busybox vi supports.
-#    (A real nvi still reads the ~/.exrc linked above; this just fixes busybox vi.)
-EXINIT_LINE="export EXINIT='set autoindent ignorecase showmatch tabstop=4'  # busybox vi; real nvi reads ~/.exrc"
-rc_done=0
-for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-  [ -e "$rc" ] || continue
-  rc_done=1
-  grep -q 'EXINIT=' "$rc" 2>/dev/null && continue
-  printf '\n%s\n' "$EXINIT_LINE" >> "$rc"
-  say "added EXINIT to $(basename "$rc") (busybox vi config)"
-done
-if [ "$rc_done" = 0 ]; then
-  printf '%s\n' "$EXINIT_LINE" >> "$HOME/.bashrc"
-  say "created ~/.bashrc with EXINIT (busybox vi config)"
-fi
-
 echo
-say "Done. Packages: pkg install neovim tmux screen git   (+ busybox for a minimal vi)"
-say "Open a new shell (or 'source ~/.bashrc') so EXINIT takes effect for busybox vi."
-say "Real nvi that reads ~/.exrc? Try TUR:  pkg install tur-repo && pkg search nvi"
+say "Done. Packages: pkg install neovim tmux screen git"
+say "~/.exrc is your vi config — read by any vi that reads .exrc (see README)."

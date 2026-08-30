@@ -237,7 +237,7 @@ if ! step_done base_system; then
     sys-auth/seatd net-wireless/broadcom-sta net-wireless/bluez \
     "$PRIV_PKG" sys-apps/dbus sys-auth/polkit \
     sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
-    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs app-editors/nvi \
+    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     sys-fs/exfatprogs sys-fs/fuse \
     x11-terms/alacritty llvm-core/llvm llvm-core/clang app-misc/tmux app-misc/screen

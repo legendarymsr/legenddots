@@ -174,45 +174,14 @@ links are stable it's idempotent.
 To land straight in tmux under pocketwl, run `tmux` in the `Alt+Return` terminal,
 or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens into it.
 
-### A classic vi for the `.exrc`
+### The `.exrc` (your vi config)
 
-Termux's **main repo** has no `nvi`, and `nvim` reads `init.lua`, not `~/.exrc`.
-
-**Check TUR first.** The [Termux User Repository](https://github.com/termux-user-repository/tur)
-— Termux's AUR-like repo of prebuilt third-party packages — is the cleanest route: if
-it carries nvi, you get the **real editor that reads `~/.exrc` directly**, no workaround.
-
-```sh
-pkg install tur-repo && pkg update
-pkg search nvi        # confirm it's listed for your arch/mirror
-pkg install nvi       # if so: done — nvi reads the ~/.exrc linked above
-```
-
-If TUR doesn't have it, two fallbacks:
-
-**busybox vi** — native and tiny, but it does **not** read `~/.exrc` (that path is
-*unimplemented* in busybox); it only honours the **`EXINIT`** env var (one `:` command).
-`dotfiles.sh` sets that up, translating the `.exrc`'s core options into the subset
-busybox supports:
-
-```sh
-pkg install busybox
-ln -sfn "$PREFIX/bin/busybox" "$PREFIX/bin/vi"                   # optional: vi = busybox vi
-export EXINIT='set autoindent ignorecase showmatch tabstop=4'   # dotfiles.sh adds this to your shell rc
-```
-
-`number` / `shiftwidth` / `wrapscan` aren't in busybox vi, so they're dropped. (If you
-later get real nvi via TUR, delete the `EXINIT` line so nvi uses the full `~/.exrc`.)
-
-**Debian proot** (reliable) — `apt install nvi` inside the proot (`firefox.sh`/`icecat.sh`
-set one up; it's glibc, so nvi Just Works). The proot has its own `$HOME`, so recreate
-`~/.exrc` in there (it's tiny) or bind the repo in on login.
-
-**Build nvi2 from source** (advanced) — [nvi2](https://github.com/lichray/nvi2) is a
-**CMake** build needing ncurses **and a db1 (Berkeley DB 1.85) library** — that db1 is
-the fiddly part on Android/bionic. `pkg install git cmake clang make ncurses`, then
-follow nvi2's wiki *Porting* page and issue #84 ("linux build recommendations") for the
-exact db1 source and the `-DDB_INCLUDE_DIR` / `-DCMAKE_EXE_LINKER_FLAGS` values.
+`dotfiles.sh` links `~/.exrc` — that's the config, which is all this is meant to be. It's
+a plain POSIX `.exrc`, so **any vi that reads `.exrc` picks it up**. On a stock phone
+nothing does — `nvim` reads `init.lua`, and busybox's `vi` doesn't read config files —
+so the `.exrc` just sits there as your shipped vi config and takes effect the moment you
+run a vi that honours it (a real nvi / traditional vi, if you ever add one). No editor is
+installed for it on purpose.
 
 ---
 

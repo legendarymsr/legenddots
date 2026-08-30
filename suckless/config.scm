@@ -14,8 +14,7 @@
              (guix profiles)
              (gnu packages suckless)   ; st, slock, dmenu, dwm
              (gnu packages wm)         ; dwl
-             (gnu packages screen)     ; screen (stock — configured via ~/.screenrc)
-             (gnu packages nvi))       ; nvi   (stock — configured via ~/.exrc)
+             (gnu packages screen))    ; screen (stock — configured via ~/.screenrc)
 
 ;; Rebuild BASE (a suckless package) so it compiles against CONFIG (a local-file).
 ;; config.def.h -> config.h only happens when config.h is absent, so dropping
@@ -42,7 +41,7 @@
 (define %suckless-packages
   (list st-legend slock-legend dmenu-legend dwm-legend dwl-legend))
 
-;; screen + nvi are stock Guix packages (not rebuilt) — the dotfiles that
-;; configure them (~/.screenrc, ~/.exrc) are placed by home-configuration.scm.
-;; Returned value: a manifest, so this file works directly with `guix shell -m`.
-(packages->manifest (append %suckless-packages (list screen nvi)))
+;; screen is a stock Guix package (not rebuilt); its ~/.screenrc is placed by
+;; home-configuration.scm. vi is config-only (~/.exrc, also placed there) — no vi
+;; is installed. Returned value: a manifest, so `guix shell -m` works directly.
+(packages->manifest (append %suckless-packages (list screen)))
