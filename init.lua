@@ -117,6 +117,22 @@ require("lazy").setup({
     branch = "master",              -- the classic configs.setup() API (main = rewrite, no configs module)
     build = ":TSUpdate",
     config = function()
+      -- SELF-HEAL: a clone stuck on the 'main' rewrite has no configs.lua, so the
+      -- require() below would throw a wall of errors on every launch. Detect that
+      -- (file missing), delete the stale clone so lazy re-clones the pinned
+      -- 'master' next launch, and skip setup this run — one restart replaces a
+      -- manual `rm -rf ~/.local/share/nvim/lazy/nvim-treesitter`.
+      local ts_dir = vim.fn.stdpath("data") .. "/lazy/nvim-treesitter"
+      if vim.fn.filereadable(ts_dir .. "/lua/nvim-treesitter/configs.lua") == 0 then
+        vim.fn.delete(ts_dir, "rf")
+        vim.schedule(function()
+          vim.notify(
+            "nvim-treesitter was on the wrong branch (main) — removed it. "
+              .. "Restart nvim: lazy re-clones 'master' and treesitter works.",
+            vim.log.levels.WARN)
+        end)
+        return
+      end
       require("nvim-treesitter.configs").setup({
         ensure_installed = {
           "python", "lua", "bash", "nix", "rust", "zig", "c", "cpp",
