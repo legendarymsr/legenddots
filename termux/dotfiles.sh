@@ -67,3 +67,4 @@ fi
 echo
 say "Done. Packages: pkg install neovim tmux screen git   (+ busybox for a minimal vi)"
 say "Open a new shell (or 'source ~/.bashrc') so EXINIT takes effect for busybox vi."
+say "Real nvi that reads ~/.exrc? Try TUR:  pkg install tur-repo && pkg search nvi"

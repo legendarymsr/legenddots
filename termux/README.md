@@ -176,32 +176,37 @@ or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens int
 
 ### A classic vi for the `.exrc`
 
-Termux has **no `nvi` package**, and `nvim` reads `init.lua`, not `~/.exrc`. The
-lightweight native option is **busybox**'s built-in vi:
+Termux's **main repo** has no `nvi`, and `nvim` reads `init.lua`, not `~/.exrc`.
+
+**Check TUR first.** The [Termux User Repository](https://github.com/termux-user-repository/tur)
+— Termux's AUR-like repo of prebuilt third-party packages — is the cleanest route: if
+it carries nvi, you get the **real editor that reads `~/.exrc` directly**, no workaround.
+
+```sh
+pkg install tur-repo && pkg update
+pkg search nvi        # confirm it's listed for your arch/mirror
+pkg install nvi       # if so: done — nvi reads the ~/.exrc linked above
+```
+
+If TUR doesn't have it, two fallbacks:
+
+**busybox vi** — native and tiny, but it does **not** read `~/.exrc` (that path is
+*unimplemented* in busybox); it only honours the **`EXINIT`** env var (one `:` command).
+`dotfiles.sh` sets that up, translating the `.exrc`'s core options into the subset
+busybox supports:
 
 ```sh
 pkg install busybox
-ln -sfn "$PREFIX/bin/busybox" "$PREFIX/bin/vi"   # optional: make `vi` = busybox vi
+ln -sfn "$PREFIX/bin/busybox" "$PREFIX/bin/vi"                   # optional: vi = busybox vi
+export EXINIT='set autoindent ignorecase showmatch tabstop=4'   # dotfiles.sh adds this to your shell rc
 ```
 
-**Important:** busybox vi does **not** read `~/.exrc` — that path is *unimplemented*
-in busybox. It only honours the **`EXINIT`** environment variable (a single `:`
-command). So `dotfiles.sh` adds this line to your shell rc, translating the `.exrc`'s
-core settings into the subset busybox vi supports:
+`number` / `shiftwidth` / `wrapscan` aren't in busybox vi, so they're dropped. (If you
+later get real nvi via TUR, delete the `EXINIT` line so nvi uses the full `~/.exrc`.)
 
-```sh
-export EXINIT='set autoindent ignorecase showmatch tabstop=4'
-```
-
-Open a new shell (or `source ~/.bashrc`) and busybox `vi` picks those up. It's a
-minimal subset — `number` / `shiftwidth` / `wrapscan` aren't in busybox vi, so they're
-left out.
-
-Want a vi that genuinely reads the `~/.exrc` **file**? Use real **nvi** — either
-`apt install nvi` inside the Debian proot (`firefox.sh`/`icecat.sh` set one up; the
-proot has its own `$HOME`, so copy `.exrc` in there), or build
-[nvi2](https://github.com/lichray/nvi2) from source (`pkg install clang make ncurses
-bmake`, then follow its README).
+**Debian proot / source** — `apt install nvi` inside the proot (`firefox.sh`/`icecat.sh`
+set one up; its own `$HOME`, so copy `.exrc` in there), or build
+[nvi2](https://github.com/lichray/nvi2) from source (`pkg install clang make ncurses bmake`).
 
 ---
 
