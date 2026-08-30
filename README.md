@@ -44,7 +44,9 @@ legenddots/
 │   ├── dmenu/config.h         launcher
 │   ├── dwm/config.h           X11 tiling WM (Super, hjkl)
 │   ├── dwl/config.h           Wayland tiling WM (Super, foot + fuzzel)
-│   └── surf/config.h          WebKit browser
+│   ├── surf/config.h          WebKit browser
+│   ├── screen/screenrc        GNU Screen — runtime dotfile → ~/.screenrc
+│   └── vi/exrc                classic vi (nvi/POSIX) — runtime dotfile → ~/.exrc
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
 ├── init.el                    Emacs config
