@@ -137,28 +137,27 @@ Two things had to line up for pocketwl to actually fill the phone screen:
 
 ## Editor & tmux (dotfiles on the phone)
 
-The repo is already cloned at `~/legenddots` (the build step above). Neovim and
-tmux read their configs straight from it, so a `git pull` updates them in place.
+The repo is already cloned at `~/legenddots` (the build step above). One script
+pulls it and symlinks all the phone configs — no hand-copying individual `ln`
+lines, and it **skips any target missing from the clone so you never get a
+dangling link**:
 
 ```sh
 pkg install neovim tmux screen git
-
-# nvim — the same init.lua as the desktop (Mason/LSP installs self-skip on Termux)
-mkdir -p ~/.config/nvim && ln -sfn ~/legenddots/init.lua ~/.config/nvim/init.lua
-
-# tmux — tmux 3.1+ reads ~/.config/tmux/tmux.conf
-mkdir -p ~/.config/tmux && ln -sfn ~/legenddots/tmux.conf ~/.config/tmux/tmux.conf
-
-# screen — reads ~/.screenrc (home dir, not ~/.config)
-ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
-
-# vi — symlink ~/.exrc. Termux has no nvi package and nvim reads init.lua (not
-# .exrc), so a POSIX vi picks this up — see "A classic vi for the .exrc" below.
-ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
+bash ~/legenddots/termux/dotfiles.sh
 ```
 
-Update later with `cd ~/legenddots && git pull` — both are symlinks, so they pick
-up changes with no re-copy.
+`dotfiles.sh` links (creating config dirs, backing up any real file in the way):
+
+| repo file | → linked to |
+|-----------|-------------|
+| `init.lua` | `~/.config/nvim/init.lua` — same as desktop (Mason/LSP self-skips on Termux) |
+| `tmux.conf` | `~/.config/tmux/tmux.conf` — tmux 3.1+ reads it there |
+| `suckless/screen/screenrc` | `~/.screenrc` — home dir, not `~/.config` |
+| `suckless/vi/exrc` | `~/.exrc` — for a POSIX vi (see "A classic vi for the `.exrc`" below) |
+
+Re-run it any time to update — it does the `git pull` for you, and because the
+links are stable it's idempotent.
 
 **Termux specifics** (handled automatically — `tmux.conf` branches on `$TERMUX_VERSION`):
 
