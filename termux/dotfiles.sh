@@ -46,6 +46,18 @@ link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
 link "$REPO/suckless/vi/exrc"          "$HOME/.exrc"
 
+# 4. cleanup: an earlier version of this script appended a busybox-vi EXINIT line
+#    to the shell rc. vi is config-only now, so strip it back out. Matches both the
+#    commented line the script wrote and the bare one-liner from the old README.
+EXINIT_PAT="export EXINIT='set autoindent ignorecase showmatch tabstop=4'"
+for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  [ -e "$rc" ] || continue
+  if grep -qF "$EXINIT_PAT" "$rc" 2>/dev/null; then
+    sed -i "\|$EXINIT_PAT|d" "$rc"
+    say "removed the old busybox-vi EXINIT line from $(basename "$rc")"
+  fi
+done
+
 echo
 say "Done. Packages: pkg install neovim tmux screen git"
 say "~/.exrc is your vi config — read by any vi that reads .exrc (see README)."
