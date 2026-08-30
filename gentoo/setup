@@ -240,7 +240,7 @@ if ! step_done base_system; then
     net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     sys-fs/exfatprogs sys-fs/fuse \
-    x11-terms/alacritty llvm-core/llvm llvm-core/clang app-misc/tmux
+    x11-terms/alacritty llvm-core/llvm llvm-core/clang app-misc/tmux app-misc/screen
   mark_step base_system
 fi
 
@@ -314,6 +314,7 @@ if ! step_done localization_user; then
     mkdir -p ~/.config/alacritty ~/.config/niri ~/.config/nvim ~/.config/emacs ~/.local/bin
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+    ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
@@ -898,6 +899,7 @@ if id legend &>/dev/null; then
     mkdir -p ~/Pictures/Screenshots ~/.config/alacritty ~/.config/niri ~/.config/nvim ~/.config/emacs ~/.local/bin
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
+    ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
