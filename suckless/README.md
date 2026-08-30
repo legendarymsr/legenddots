@@ -23,27 +23,26 @@ you *symlink* them, no rebuild.
 | Tool | What | file | symlink to |
 |------|------|------|-----------|
 | **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
-| **vi** | classic editor (nvi / traditional / busybox) | `vi/exrc` | `~/.exrc` |
+| **vi** | classic-vi config (read by any real vi) | `vi/exrc` | `~/.exrc` |
 
 ```sh
 ln -sfn "$PWD/screen/screenrc" ~/.screenrc
 ln -sfn "$PWD/vi/exrc"         ~/.exrc
 ```
 
-Packages — **screen**: `app-misc/screen` (Gentoo), `screen` (Arch / nixpkgs / Guix).
-**vi**: `app-editors/nvi` (Gentoo), `nvi` or `busybox` (Arch), `nvi` (nixpkgs / Guix),
-or any `vi` already on the box. The `.exrc` uses only POSIX ex options (no vim-isms
-like `expandtab`/`syntax`), so a real vi won't reject it.
+**screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
+Arch / nixpkgs / Guix). **vi is config-only** — we ship the `.exrc` but install *no*
+editor; it's read by whatever `vi` you already have (a real `nvi`, traditional vi, …).
+The `.exrc` uses only POSIX ex options (no vim-isms like `expandtab`/`syntax`), so a
+real vi won't reject it.
 
-**Declaratively you don't symlink by hand** — both come with the tools:
+**Declaratively you don't symlink by hand:**
 
-- **home-manager** (`legend.suckless.enable = true`) installs `screen` + `nvi` and
-  links `~/.screenrc` / `~/.exrc`. Turn either off with
-  `legend.suckless.screen.enable = false` / `legend.suckless.vi.enable = false`,
-  or swap the editor with `legend.suckless.vi.package = pkgs.vim;`.
-- **Guix Home** (`home-configuration.scm`) installs `screen` + `nvi` and places
-  the same two dotfiles via `home-files-service-type`. The `config.scm` manifest
-  also carries both packages (dotfiles are Home-only).
+- **home-manager** (`legend.suckless.enable = true`) installs `screen`, links
+  `~/.screenrc`, and links `~/.exrc` (config only, no editor). Turn either off with
+  `legend.suckless.screen.enable = false` / `legend.suckless.vi.enable = false`.
+- **Guix Home** (`home-configuration.scm`) installs `screen` and places both dotfiles
+  via `home-files-service-type`. The `config.scm` manifest also carries `screen`.
 
 The manual `ln -sfn` above is only for non-declarative setups.
 

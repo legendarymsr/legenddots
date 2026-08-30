@@ -22,36 +22,29 @@ in
       description = "Which suckless tools to install (each built with our config.h).";
     };
 
-    # Not suckless, but shipped alongside for the minimalist collection: minimal
-    # screen + vi, configured via runtime dotfiles (~/.screenrc, ~/.exrc) rather
-    # than a compile-time config.h. Installed when `enable = true`; turn either
-    # off individually below.
+    # Not suckless, but shipped alongside for the minimalist collection, configured
+    # via runtime dotfiles rather than a compile-time config.h. screen is installed
+    # and configured; vi is config-only (we link the .exrc, install no editor).
+    # Both come along when `enable = true`; turn either off individually below.
     screen.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Install GNU Screen and link suckless/screen/screenrc to ~/.screenrc.";
     };
 
-    vi = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Install a classic vi and link suckless/vi/exrc to ~/.exrc.";
-      };
-      package = lib.mkOption {
-        type = lib.types.package;
-        default = pkgs.nvi;
-        defaultText = lib.literalExpression "pkgs.nvi";
-        description = "The vi implementation to install (nvi by default; swap for pkgs.vim, etc.).";
-      };
+    # vi is config-only: we link the .exrc but install no vi — it's read by
+    # whatever vi you already have (a real nvi, traditional vi, etc.).
+    vi.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Link suckless/vi/exrc to ~/.exrc (config only — no vi is installed).";
     };
   };
 
   config = lib.mkIf cfg.enable {
     home.packages =
       cfg.tools
-      ++ lib.optional cfg.screen.enable pkgs.screen
-      ++ lib.optional cfg.vi.enable cfg.vi.package;
+      ++ lib.optional cfg.screen.enable pkgs.screen;
 
     # Runtime dotfiles for the two non-config.h tools.
     home.file.".screenrc" = lib.mkIf cfg.screen.enable { source = ./screen/screenrc; };

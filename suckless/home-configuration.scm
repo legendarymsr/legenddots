@@ -14,8 +14,7 @@
              (guix gexp)
              (gnu packages suckless)   ; st, slock, dmenu, dwm
              (gnu packages wm)         ; dwl
-             (gnu packages screen)     ; screen (stock — configured via ~/.screenrc)
-             (gnu packages nvi))       ; nvi   (stock — configured via ~/.exrc)
+             (gnu packages screen))    ; screen (stock — configured via ~/.screenrc)
 
 (define (with-config base new-name config)
   (package
@@ -39,10 +38,11 @@
 (define %suckless-packages
   (list st-legend slock-legend dmenu-legend dwm-legend dwl-legend))
 
-;; screen + nvi are stock Guix packages (not rebuilt); the dotfiles that
-;; configure them are placed into $HOME by the service below.
+;; screen is a stock Guix package (not rebuilt); its ~/.screenrc is placed below.
+;; vi is config-only — the ~/.exrc is placed too, but no editor is installed
+;; (whatever vi you already have reads it).
 (home-environment
-  (packages (append %suckless-packages (list screen nvi)))
+  (packages (append %suckless-packages (list screen)))
   (services
    (list
     (simple-service 'legend-suckless-dotfiles
