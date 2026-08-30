@@ -237,7 +237,7 @@ if ! step_done base_system; then
     sys-auth/seatd net-wireless/broadcom-sta net-wireless/bluez \
     "$PRIV_PKG" sys-apps/dbus sys-auth/polkit \
     sys-power/acpid sys-power/tlp sys-apps/lm-sensors \
-    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs \
+    net-misc/wget app-shells/zsh dev-vcs/git app-editors/neovim app-editors/emacs app-editors/nvi \
     media-video/pipewire media-video/wireplumber media-sound/alsa-utils \
     sys-fs/exfatprogs sys-fs/fuse \
     x11-terms/alacritty llvm-core/llvm llvm-core/clang app-misc/tmux app-misc/screen
@@ -315,6 +315,7 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
+    ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
@@ -900,6 +901,7 @@ if id legend &>/dev/null; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
+    ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
