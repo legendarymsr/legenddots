@@ -141,13 +141,16 @@ The repo is already cloned at `~/legenddots` (the build step above). Neovim and
 tmux read their configs straight from it, so a `git pull` updates them in place.
 
 ```sh
-pkg install neovim tmux git
+pkg install neovim tmux screen git
 
 # nvim — the same init.lua as the desktop (Mason/LSP installs self-skip on Termux)
 mkdir -p ~/.config/nvim && ln -sfn ~/legenddots/init.lua ~/.config/nvim/init.lua
 
 # tmux — tmux 3.1+ reads ~/.config/tmux/tmux.conf
 mkdir -p ~/.config/tmux && ln -sfn ~/legenddots/tmux.conf ~/.config/tmux/tmux.conf
+
+# screen — reads ~/.screenrc (home dir, not ~/.config)
+ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
 ```
 
 Update later with `cd ~/legenddots && git pull` — both are symlinks, so they pick
