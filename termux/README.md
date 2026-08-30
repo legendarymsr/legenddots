@@ -176,24 +176,32 @@ or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens int
 
 ### A classic vi for the `.exrc`
 
-Termux has **no `nvi` package**, and `nvim` reads `init.lua`, not `~/.exrc`. For a
-real POSIX vi that *does* honour the symlinked `~/.exrc`, use **busybox**'s built-in
-vi — tiny, native, no build, very much in the suckless spirit:
+Termux has **no `nvi` package**, and `nvim` reads `init.lua`, not `~/.exrc`. The
+lightweight native option is **busybox**'s built-in vi:
 
 ```sh
 pkg install busybox
 ln -sfn "$PREFIX/bin/busybox" "$PREFIX/bin/vi"   # optional: make `vi` = busybox vi
 ```
 
-Now `vi file` (or `busybox vi file`) reads `~/.exrc` — `autoindent`,
-`tabstop`/`shiftwidth`, `number`, `showmatch`, etc. It's a minimal subset of vi, not
-full nvi; any `set` option it doesn't implement is simply ignored (the `.exrc` sticks
-to widely supported ones, so it loads clean).
+**Important:** busybox vi does **not** read `~/.exrc` — that path is *unimplemented*
+in busybox. It only honours the **`EXINIT`** environment variable (a single `:`
+command). So `dotfiles.sh` adds this line to your shell rc, translating the `.exrc`'s
+core settings into the subset busybox vi supports:
 
-Want genuine nvi instead? It isn't packaged for Termux — either `apt install nvi`
-inside the Debian proot (`firefox.sh`/`icecat.sh` set one up; the proot has its own
-`$HOME`, so copy `.exrc` in there), or build [nvi2](https://github.com/lichray/nvi2)
-from source (`pkg install clang make ncurses bmake`, then follow its README).
+```sh
+export EXINIT='set autoindent ignorecase showmatch tabstop=4'
+```
+
+Open a new shell (or `source ~/.bashrc`) and busybox `vi` picks those up. It's a
+minimal subset — `number` / `shiftwidth` / `wrapscan` aren't in busybox vi, so they're
+left out.
+
+Want a vi that genuinely reads the `~/.exrc` **file**? Use real **nvi** — either
+`apt install nvi` inside the Debian proot (`firefox.sh`/`icecat.sh` set one up; the
+proot has its own `$HOME`, so copy `.exrc` in there), or build
+[nvi2](https://github.com/lichray/nvi2) from source (`pkg install clang make ncurses
+bmake`, then follow its README).
 
 ---
 
