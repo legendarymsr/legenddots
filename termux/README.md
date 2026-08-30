@@ -151,6 +151,10 @@ mkdir -p ~/.config/tmux && ln -sfn ~/legenddots/tmux.conf ~/.config/tmux/tmux.co
 
 # screen — reads ~/.screenrc (home dir, not ~/.config)
 ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
+
+# vi — symlink ~/.exrc. Termux has no nvi package and nvim reads init.lua (not
+# .exrc), so this only takes effect if you add a POSIX vi (e.g. via busybox).
+ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
 ```
 
 Update later with `cd ~/legenddots && git pull` — both are symlinks, so they pick
