@@ -153,7 +153,7 @@ mkdir -p ~/.config/tmux && ln -sfn ~/legenddots/tmux.conf ~/.config/tmux/tmux.co
 ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
 
 # vi — symlink ~/.exrc. Termux has no nvi package and nvim reads init.lua (not
-# .exrc), so this only takes effect if you add a POSIX vi (e.g. via busybox).
+# .exrc), so a POSIX vi picks this up — see "A classic vi for the .exrc" below.
 ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
 ```
 
@@ -174,6 +174,27 @@ up changes with no re-copy.
 
 To land straight in tmux under pocketwl, run `tmux` in the `Alt+Return` terminal,
 or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens into it.
+
+### A classic vi for the `.exrc`
+
+Termux has **no `nvi` package**, and `nvim` reads `init.lua`, not `~/.exrc`. For a
+real POSIX vi that *does* honour the symlinked `~/.exrc`, use **busybox**'s built-in
+vi — tiny, native, no build, very much in the suckless spirit:
+
+```sh
+pkg install busybox
+ln -sfn "$PREFIX/bin/busybox" "$PREFIX/bin/vi"   # optional: make `vi` = busybox vi
+```
+
+Now `vi file` (or `busybox vi file`) reads `~/.exrc` — `autoindent`,
+`tabstop`/`shiftwidth`, `number`, `showmatch`, etc. It's a minimal subset of vi, not
+full nvi; any `set` option it doesn't implement is simply ignored (the `.exrc` sticks
+to widely supported ones, so it loads clean).
+
+Want genuine nvi instead? It isn't packaged for Termux — either `apt install nvi`
+inside the Debian proot (`firefox.sh`/`icecat.sh` set one up; the proot has its own
+`$HOME`, so copy `.exrc` in there), or build [nvi2](https://github.com/lichray/nvi2)
+from source (`pkg install clang make ncurses bmake`, then follow its README).
 
 ---
 
