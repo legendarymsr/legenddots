@@ -46,6 +46,14 @@ real vi won't reject it.
 
 The manual `ln -sfn` above is only for non-declarative setups.
 
+**Want an actual traditional vi** that reads the `.exrc` (not vim/nvim/busybox)?
+`bash suckless/vi/build-exvi.sh` builds **Traditional Vi** (ex-vi — Gunnar Ritter's
+port of the original AT&T/BSD ex/vi) from source and installs `ex`/`vi`/`view`. It's
+self-contained (bundles its own termlib + regex — no ncurses/termcap), so it builds
+with just `make` + a C compiler. Installs into `~/.local` by default
+(`PREFIX=/usr/local doas bash …/build-exvi.sh` for system-wide; on Termux it uses the
+Termux prefix). Then `ln -sfn "$PWD/vi/exrc" ~/.exrc` and it reads your config natively.
+
 ---
 
 ## Declarative builds (NixOS / Guix)

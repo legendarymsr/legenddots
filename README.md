@@ -46,7 +46,8 @@ legenddots/
 │   ├── dwl/config.h           Wayland tiling WM (Super, foot + fuzzel)
 │   ├── surf/config.h          WebKit browser
 │   ├── screen/screenrc        GNU Screen — runtime dotfile → ~/.screenrc
-│   └── vi/exrc                classic vi (nvi/POSIX) — runtime dotfile → ~/.exrc
+│   ├── vi/exrc                traditional-vi config (POSIX ex) → ~/.exrc
+│   └── vi/build-exvi.sh       builds Traditional Vi (ex-vi) from source
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
 ├── init.el                    Emacs config
