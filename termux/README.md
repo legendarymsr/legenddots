@@ -154,7 +154,7 @@ bash ~/legenddots/termux/dotfiles.sh
 | `init.lua` | `~/.config/nvim/init.lua` — same as desktop (Mason/LSP self-skips on Termux) |
 | `tmux.conf` | `~/.config/tmux/tmux.conf` — tmux 3.1+ reads it there |
 | `suckless/screen/screenrc` | `~/.screenrc` — home dir, not `~/.config` |
-| `suckless/vi/exrc` | `~/.exrc` — for a POSIX vi (see "A classic vi for the `.exrc`" below) |
+| `suckless/vim/vimrc` | `~/.vimrc` — minimal vim config (see "vi on the phone" below) |
 
 Re-run it any time to update — it does the `git pull` for you, and because the
 links are stable it's idempotent.
@@ -176,22 +176,16 @@ or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens int
 
 ### vi on the phone
 
-The no-fuss answer is **vim** — it's a vi, it's in Termux's main repo, and `dotfiles.sh`
-links a very minimal `~/.vimrc` (`suckless/vi/vimrc`) for it:
+**vim** — it's a vi, it's in Termux's main repo, and `dotfiles.sh` links a very minimal
+`~/.vimrc` (`suckless/vim/vimrc`) for it:
 
 ```sh
 pkg install vim
 ```
 
-That's a working vi with sensible minimal settings, today. (`nvim` reads `init.lua` and
-busybox's `vi` reads no config file at all, so vim is the one that actually uses a config
-here.)
-
-The repo also links `~/.exrc` for a **real traditional vi**, but nothing on a stock phone
-reads `.exrc`, so it's dormant until you add one. If you want the genuine original ex/vi,
-`bash ~/legenddots/suckless/vi/build-exvi.sh` builds [ex-vi](https://ex-vi.sourceforge.net/)
-from source — but it's **untested on Android/bionic and may not compile there** (it builds
-fine on glibc desktops). On the phone, **vim is the reliable choice**.
+That's a working, minimal vi today. (`nvim` reads `init.lua` and busybox's `vi` reads no
+config file, so vim is the one that actually uses a config here.) To type `vi` instead of
+`vim`: `ln -sfn "$PREFIX/bin/vim" "$PREFIX/bin/vi"`.
 
 ---
 

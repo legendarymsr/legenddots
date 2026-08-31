@@ -39,8 +39,8 @@
   (list st-legend slock-legend dmenu-legend dwm-legend dwl-legend))
 
 ;; screen is a stock Guix package (not rebuilt); its ~/.screenrc is placed below.
-;; vi is config-only — the ~/.exrc is placed too, but no editor is installed
-;; (whatever vi you already have reads it).
+;; vim is config-only — a minimal ~/.vimrc is placed too, but vim itself isn't
+;; installed here (add it yourself).
 (home-environment
   (packages (append %suckless-packages (list screen)))
   (services
@@ -48,4 +48,4 @@
     (simple-service 'legend-suckless-dotfiles
                     home-files-service-type
                     (list `(".screenrc" ,(local-file "screen/screenrc"))
-                          `(".exrc"     ,(local-file "vi/exrc")))))))
+                          `(".vimrc"    ,(local-file "vim/vimrc")))))))
