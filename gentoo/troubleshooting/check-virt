@@ -136,6 +136,15 @@ if command -v waydroid >/dev/null 2>&1; then
   elif khas CONFIG_ANDROID_BINDERFS; then
     info "binderfs not mounted yet — waydroid mounts it on start; that's normal when stopped"
   fi
+  # lxc built without apparmor is a silent Waydroid killer: its config sets
+  # 'lxc.apparmor.profile = unconfined', which a non-apparmor lxc refuses to parse.
+  if command -v lxc-start >/dev/null 2>&1 && ! ldd "$(command -v lxc-start)" 2>/dev/null | grep -q libapparmor; then
+    bad "lxc built WITHOUT apparmor — Waydroid's LXC config won't parse; container fails to start."
+    info "fix: echo 'app-containers/lxc apparmor' | doas tee /etc/portage/package.use/lxc"
+    info "     doas emerge --changed-use app-containers/lxc   (or just: doas bash fix-virt)"
+  elif command -v lxc-start >/dev/null 2>&1; then
+    ok "lxc has apparmor support (Waydroid's config will parse)"
+  fi
   ST="$(waydroid status 2>/dev/null)"; [[ -n "$ST" ]] && echo "$ST" | sed 's/^/    /'
   pgrep -f waydroid-container >/dev/null 2>&1 && ok "waydroid-container service running" \
     || warn "waydroid-container not running.  start:  doas systemctl --no-pager start waydroid-container 2>/dev/null || doas rc-service waydroid-container start 2>/dev/null || doas waydroid container start"

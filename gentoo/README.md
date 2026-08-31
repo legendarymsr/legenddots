@@ -967,6 +967,13 @@ instead of failing halfway through.
   waydroid show-full-ui
   ```
 
+  > **`app-containers/lxc` needs the `apparmor` USE flag.** Waydroid's generated
+  > LXC config always contains `lxc.apparmor.profile = unconfined`, and an lxc built
+  > *without* apparmor rejects that line (`Built without AppArmor support`) — so the
+  > container dies at "container failed to start" with binder/kernel all fine.
+  > `setup` sets the flag; `check-virt` detects a plain lxc and `fix-virt` rebuilds
+  > it. The flag only links `libapparmor` — it does **not** enable AppArmor enforcement.
+
   **Rooted, GApps-free image:** once Waydroid runs, `gentoo/waygentoodroid/`
   builds a **rooted LineageOS** image in one command — Magisk (root) + ARM
   translation (auto: houdini/Intel, ndk/AMD) + microG instead of GApps. See
