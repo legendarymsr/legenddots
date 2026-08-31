@@ -17,6 +17,7 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
 | `check-virt` | yes (`doas`) | no (read-only) | QEMU/KVM or Waydroid won't work — pinpoints whether it's the kernel config, a group, firmware VT-x, or lockdown |
 | `fix-virt` | yes (`doas`) | yes | Make QEMU/KVM + Waydroid work automatically — runtime fixes, plus auto-rebuild the kernel & reboot if options are missing |
+| `fix-waydroid-net` | yes (`doas`) | yes | Waydroid Android has no internet ("unknown host …") — enables ip_forward, adds NAT/forward rules, restarts the container |
 | `rescue` | yes (`sudo`, from a **live USB**) | yes | System won't boot / an update was interrupted — chroot in and rebuild everything |
 | `rebuild-kernel` | yes (root, in chroot) | yes | Kernel hangs at rEFInd "Starting vmlinuz" / boots blind — rebuild from the proven config |
 | `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
@@ -158,6 +159,21 @@ full recipe and reboots** — each long step counts down 10s first so you can Ct
 `--no-rebuild` stops at the runtime fixes. The one thing it can't do is toggle
 firmware **VT-x** (no `vmx` flag) — it flags that for you to fix in the Mac's
 firmware. After the reboot, `check-virt` confirms all green.
+
+## `fix-waydroid-net` — no internet inside Waydroid
+
+```sh
+doas bash ~/legenddots/gentoo/troubleshooting/fix-waydroid-net
+```
+
+`ping: unknown host …` inside Android means the container's NAT/DNS isn't routing.
+On a hardened Gentoo the cause is almost always **`net.ipv4.ip_forward` off** (the
+hardened kernel default) — so Waydroid's NAT can't route out. This enables + persists
+`ip_forward`, adds the MASQUERADE + FORWARD rules for the `192.168.240.0/24` container
+subnet (idempotent), restarts the container so it re-runs its bridge + `dnsmasq`
+setup, and prints a three-step in-Android test (`ping` the gateway → an IP → a name)
+that isolates routing-vs-DNS if anything's still off. `setup` now enables
+`ip_forward` for fresh installs, so this is mainly for existing boxes.
 
 ## `rescue` — finish an interrupted update + rebuild the kernel (in place)
 
