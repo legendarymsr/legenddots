@@ -115,6 +115,20 @@ s2 = re.sub(r'run\((\[[^\]]*\])\)', r'run(\1, ignore=r".*")', s)
 open(p, "w").write(s2); print("ok" if s2 != s else "nochange")
 PY
 
+# THE ROOT of it: helper.run() raises on ANY stderr output even when the command
+# EXITED 0 (success). waydroid logs to stderr on success, and so do mount/cp/unzip
+# during the module installs themselves — so the container.py tweak above isn't
+# enough; every install step that prints a stderr line false-fails. Patch run() to
+# not raise on a zero exit code (real non-zero failures still raise). This is what
+# makes the whole install robust. Re-applied each run (git pull reverts it).
+"$VENV_PY" - "$WD_SCRIPT_DIR/tools/helper.py" <<'PY' 2>/dev/null && success "relaxed waydroid_script's run(): stderr with exit 0 is no longer a failure"
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+s2 = re.sub(r'if ignore and re\.match\(ignore, error\):',
+            'if result.returncode == 0 or (ignore and re.match(ignore, error)):', s)
+open(p, "w").write(s2); print("ok" if s2 != s else "nochange")
+PY
+
 # ── 3. Stop the session, but START the container manager ─────────────────────
 # waydroid_script installs modules via `waydroid upgrade -o`, which talks to the
 # container MANAGER — if it isn't running the install dies on "Couldn't get LXC
