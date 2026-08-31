@@ -127,6 +127,17 @@ make defconfig
 ./scripts/config -e CONFIG_ANDROID_BINDER_IPC
 ./scripts/config -e CONFIG_ANDROID_BINDERFS
 ./scripts/config --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
+# Waydroid's LXC container + Android userspace also need: user namespaces + the
+# device cgroup (LXC), a loop device (to mount system/vendor .img), PSI (lmkd),
+# and dma-buf sync/heaps (graphics). Without these the container won't start or
+# Android boots to a black screen. defconfig leaves several off.
+./scripts/config -e CONFIG_USER_NS
+./scripts/config -e CONFIG_BLK_DEV_LOOP
+./scripts/config -e CONFIG_CGROUP_DEVICE
+./scripts/config -e CONFIG_PSI
+./scripts/config -e CONFIG_SYNC_FILE
+./scripts/config -e CONFIG_DMABUF_HEAPS
+./scripts/config -e CONFIG_DMABUF_HEAPS_SYSTEM
 
 # --- WIRELESS: cfg80211 as a MODULE so the kernel can load regulatory.db from
 # /lib/firmware — needed for a real regdomain (5 GHz WiFi; world/00 blocks it). ---
@@ -173,14 +184,18 @@ make olddefconfig
 header "Verifying boot-critical options survived olddefconfig..."
 missing=""
 for opt in CONFIG_DRM_SIMPLEDRM CONFIG_SYSFB_SIMPLEFB CONFIG_FRAMEBUFFER_CONSOLE \
-           CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD; do
+           CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD \
+           CONFIG_KVM CONFIG_KVM_INTEL CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
+           CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE; do
   grep -q "^${opt}=y" .config || missing="$missing $opt"
 done
 if [[ -n "$missing" ]]; then
-  warn "These MUST be =y for the Mac to boot with a display + mount root:$missing"
-  warn "Continuing, but if it still boots blind, that's why — check manually."
+  warn "Options that did NOT stick as =y:$missing"
+  warn "  DRM/EXT4/AHCI/SD are boot-critical (blind boot / can't mount root)."
+  warn "  KVM/binder/USER_NS/LOOP/CGROUP_DEVICE break QEMU-KVM / Waydroid instead."
+  warn "Continuing — enable the missing symbol + its deps in 'make menuconfig' if needed."
 else
-  success "Display stack + root drivers are all built-in (=y). Good."
+  success "Display + root drivers AND KVM/binder/container options are all =y. Good."
 fi
 
 header "Building kernel (make -j3)..."

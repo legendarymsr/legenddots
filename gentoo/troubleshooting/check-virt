@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# =============================================================================
+# check-virt — diagnose why QEMU/KVM and/or Waydroid don't work on this Gentoo
+# box, and print the exact fix for each problem. Read-only: it changes nothing.
+#
+#   sudo bash check-virt      (or: doas bash check-virt)
+#
+# It inspects the RUNNING kernel (via /proc/config.gz), /dev/kvm, group
+# membership, the lockdown LSM, binder, the loop device, and the libvirtd /
+# waydroid services — then tells you whether you need to rebuild the kernel
+# (bash gentoo/troubleshooting/rebuild-kernel), re-login for a group, flip a
+# BIOS switch, or start a service.
+# =============================================================================
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+hdr()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+ok()   { echo -e "  ${GREEN}✓${NC} $*"; }
+bad()  { echo -e "  ${RED}✗${NC} $*"; FAILS=$((FAILS+1)); }
+info() { echo -e "  ${CYAN}·${NC} $*"; }
+warn() { echo -e "  ${YELLOW}!${NC} $*"; }
+FAILS=0
+NEED_REBUILD=0
+
+# The human user to check groups for (this runs as root).
+U="${SUDO_USER:-${DOAS_USER:-}}"
+[[ -z "$U" ]] && U="$(logname 2>/dev/null || true)"
+[[ -z "$U" || "$U" == "root" ]] && { id legend &>/dev/null && U="legend"; }
+
+# --- running-kernel config source ---------------------------------------------
+KCONF=""
+if [[ -r /proc/config.gz ]]; then KCONF="zcat /proc/config.gz"
+elif [[ -r "/boot/config-$(uname -r)" ]]; then KCONF="cat /boot/config-$(uname -r)"
+elif [[ -r /usr/src/linux/.config ]]; then KCONF="cat /usr/src/linux/.config"; fi
+khas() { [[ -n "$KCONF" ]] && $KCONF 2>/dev/null | grep -q "^$1=[ym]"; }
+
+echo -e "${CYAN}check-virt${NC} — kernel $(uname -r)"
+
+# =========================== CPU virtualization ==============================
+hdr "CPU virtualization (needs VT-x/AMD-V in firmware)"
+if grep -Eq '\b(vmx|svm)\b' /proc/cpuinfo; then
+  ok "CPU exposes $(grep -Eo '\b(vmx|svm)\b' /proc/cpuinfo | head -1) — virtualization is on in firmware"
+else
+  bad "no vmx/svm flag — VT-x is OFF in firmware (no fix in software)."
+  info "Reboot into firmware and enable Intel VT-x / 'Virtualization'. On a Mac that"
+  info "means a real UEFI/Boot Camp firmware switch; some models have it always-on."
+fi
+
+# =========================== running kernel config ===========================
+hdr "Running-kernel options (/proc/config.gz)"
+if [[ -z "$KCONF" ]]; then
+  warn "can't read the running kernel config (no /proc/config.gz, /boot/config-*, or"
+  warn "/usr/src/linux/.config). Enable CONFIG_IKCONFIG_PROC; skipping config checks."
+else
+  info "reading from: $KCONF"
+  # name -> why it matters
+  declare -A NEED=(
+    [CONFIG_KVM]="KVM core (QEMU -enable-kvm)"
+    [CONFIG_KVM_INTEL]="Intel VMX backend"
+    [CONFIG_VHOST_NET]="fast virtio guest networking"
+    [CONFIG_ANDROID_BINDER_IPC]="Waydroid: binder IPC"
+    [CONFIG_ANDROID_BINDERFS]="Waydroid: dynamic binder nodes"
+    [CONFIG_USER_NS]="Waydroid/LXC: user namespaces"
+    [CONFIG_BLK_DEV_LOOP]="Waydroid: loop-mount system/vendor .img"
+    [CONFIG_CGROUP_DEVICE]="Waydroid/LXC: device cgroup"
+    [CONFIG_PSI]="Waydroid: Android lmkd reads PSI"
+    [CONFIG_IP_NF_IPTABLES]="Waydroid: container NAT/iptables"
+  )
+  for opt in CONFIG_KVM CONFIG_KVM_INTEL CONFIG_VHOST_NET \
+             CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS CONFIG_USER_NS \
+             CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE CONFIG_PSI CONFIG_IP_NF_IPTABLES; do
+    if khas "$opt"; then ok "$opt — ${NEED[$opt]}"
+    else bad "$opt MISSING — ${NEED[$opt]}"; NEED_REBUILD=1; fi
+  done
+fi
+
+# =========================== /dev/kvm + groups ===============================
+hdr "/dev/kvm and group access"
+if [[ -e /dev/kvm ]]; then
+  ok "/dev/kvm exists ($(stat -c '%U:%G %A' /dev/kvm))"
+  if [[ -n "$U" ]] && id -nG "$U" 2>/dev/null | grep -qw kvm; then
+    ok "user '$U' is in the 'kvm' group"
+  else
+    bad "user '$U' is NOT in 'kvm' — QEMU can't open /dev/kvm without root."
+    info "fix:  sudo usermod -aG kvm $U   then LOG OUT and back in (group is per-session)"
+  fi
+else
+  bad "/dev/kvm is missing."
+  if grep -Eq '\b(vmx|svm)\b' /proc/cpuinfo && khas CONFIG_KVM_INTEL; then
+    info "CPU + config look fine, so the module isn't active. Try:  modprobe kvm_intel"
+    info "and check 'dmesg | grep -i kvm' (VT-x may be disabled, or nested/BIOS locked)."
+  else
+    info "expected — either VT-x is off (above) or KVM isn't in the kernel (rebuild)."
+  fi
+fi
+
+# =========================== libvirt ========================================
+hdr "libvirt (for virt-manager / virsh)"
+if command -v virsh >/dev/null 2>&1; then
+  ok "libvirt installed"
+  if pgrep -x libvirtd >/dev/null 2>&1 || rc-service libvirtd status 2>/dev/null | grep -q started; then
+    ok "libvirtd is running"
+  else
+    bad "libvirtd not running.  fix:  sudo rc-service libvirtd start; sudo rc-update add libvirtd default"
+  fi
+  [[ -n "$U" ]] && { id -nG "$U" | grep -qw libvirt && ok "user '$U' in 'libvirt' group" \
+    || warn "user '$U' not in 'libvirt' — virsh needs sudo, or: usermod -aG libvirt $U (then re-login)"; }
+else
+  warn "libvirt not installed (QEMU/KVM still works via plain 'qemu-system-x86_64 -enable-kvm')."
+fi
+
+# =========================== lockdown LSM ===================================
+hdr "Kernel lockdown (hardening — can block VFIO passthrough, not basic KVM)"
+if [[ -r /sys/kernel/security/lockdown ]]; then
+  LD="$(cat /sys/kernel/security/lockdown)"
+  case "$LD" in
+    *'[none]'*) ok "lockdown = none (not enforced) — not your problem" ;;
+    *'[integrity]'*|*'[confidentiality]'*)
+      warn "lockdown is ENFORCED: $LD"
+      warn "basic KVM VMs still run, but PCI/GPU passthrough (VFIO), /dev/mem and some"
+      warn "ioctls are blocked. If you don't do passthrough, this isn't the blocker."
+      warn "to disable: remove 'lockdown=' from the kernel cmdline in /boot/refind_linux.conf" ;;
+    *) info "lockdown state: $LD" ;;
+  esac
+else
+  info "lockdown LSM not active — nothing to worry about here"
+fi
+
+# =========================== Waydroid =======================================
+hdr "Waydroid"
+if command -v waydroid >/dev/null 2>&1; then
+  ok "waydroid installed"
+  [[ -e /dev/loop-control ]] && ok "/dev/loop-control present (image mounts will work)" \
+    || bad "/dev/loop-control missing — CONFIG_BLK_DEV_LOOP not active (rebuild kernel)."
+  if [[ -d /dev/binderfs ]] || mountpoint -q /dev/binderfs 2>/dev/null; then
+    ok "binderfs mounted at /dev/binderfs"
+  elif khas CONFIG_ANDROID_BINDERFS; then
+    info "binderfs not mounted yet — waydroid mounts it on start; that's normal when stopped"
+  fi
+  ST="$(waydroid status 2>/dev/null)"; [[ -n "$ST" ]] && echo "$ST" | sed 's/^/    /'
+  pgrep -f waydroid-container >/dev/null 2>&1 && ok "waydroid-container service running" \
+    || warn "waydroid-container not running.  start:  sudo systemctl --no-pager start waydroid-container 2>/dev/null || sudo rc-service waydroid-container start 2>/dev/null || sudo waydroid container start"
+  info "if 'waydroid init' / first boot hangs, watch:  sudo waydroid log"
+else
+  warn "waydroid not installed. Build/install it (gentoo/setup step 12c installs it),"
+  warn "then re-run this check."
+fi
+
+# =========================== summary ========================================
+hdr "Summary"
+if [[ "$NEED_REBUILD" == 1 ]]; then
+  echo -e "  ${YELLOW}Kernel options are missing above.${NC} Rebuild with the full recipe:"
+  echo -e "      sudo bash gentoo/troubleshooting/rebuild-kernel   (then reboot)"
+  echo -e "  It now enables KVM + binder + USER_NS + LOOP + CGROUP_DEVICE + PSI + dma-buf."
+fi
+if [[ "$FAILS" -eq 0 ]]; then
+  echo -e "  ${GREEN}No blockers found.${NC} If a VM/Waydroid still fails, capture the exact error"
+  echo -e "  ('dmesg | grep -i kvm', 'sudo waydroid log') and dig into that."
+else
+  echo -e "  ${RED}$FAILS problem(s) above${NC} — fix each, re-login if a group changed, reboot if"
+  echo -e "  the kernel was rebuilt, then re-run:  sudo bash check-virt"
+fi
