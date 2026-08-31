@@ -16,48 +16,35 @@ dotfiles — edit one, then rebuild that program. All themed **Tokyo Night**,
 
 ### Also here — not suckless, but same spirit
 
-Minimal **screen** and **vi** configs, kept for the minimalist collection. Unlike
+Minimal **screen** and **vim** configs, kept for the minimalist collection. Unlike
 everything above, these are **runtime dotfiles**, not compile-time `config.h` — so
 you *symlink* them, no rebuild.
 
 | Tool | What | file | symlink to |
 |------|------|------|-----------|
 | **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
-| **vi** | classic-vi config (read by any real vi) | `vi/exrc` | `~/.exrc` |
+| **vim** | very minimal vim config | `vim/vimrc` | `~/.vimrc` |
 
 ```sh
 ln -sfn "$PWD/screen/screenrc" ~/.screenrc
-ln -sfn "$PWD/vi/exrc"         ~/.exrc
+ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
 ```
 
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
-Arch / nixpkgs / Guix). **vi is config-only** — we ship the `.exrc` but install *no*
-editor; it's read by whatever `vi` you already have (a real `nvi`, traditional vi, …).
-The `.exrc` uses only POSIX ex options (no vim-isms like `expandtab`/`syntax`), so a
-real vi won't reject it.
+Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
+vim yourself (it's a vi, and it's in every main repo, Termux included). The vimrc is
+deliberately bare: `autoindent`, `shiftwidth`/`tabstop=4`, `number`, `showmatch`,
+`ignorecase`, `incsearch`, `syntax on` — nothing else.
 
 **Declaratively you don't symlink by hand:**
 
 - **home-manager** (`legend.suckless.enable = true`) installs `screen`, links
-  `~/.screenrc`, and links `~/.exrc` (config only, no editor). Turn either off with
-  `legend.suckless.screen.enable = false` / `legend.suckless.vi.enable = false`.
+  `~/.screenrc`, and links `~/.vimrc` (config only, vim not installed). Turn either off
+  with `legend.suckless.screen.enable = false` / `legend.suckless.vim.enable = false`.
 - **Guix Home** (`home-configuration.scm`) installs `screen` and places both dotfiles
   via `home-files-service-type`. The `config.scm` manifest also carries `screen`.
 
 The manual `ln -sfn` above is only for non-declarative setups.
-
-**Want an actual traditional vi** that reads the `.exrc` (not vim/nvim/busybox)?
-`bash suckless/vi/build-exvi.sh` builds **Traditional Vi** (ex-vi — Gunnar Ritter's
-port of the original AT&T/BSD ex/vi) from source and installs `ex`/`vi`/`view`. It's
-self-contained (bundles its own termlib + regex — no ncurses/termcap), so it builds
-with just `make` + a C compiler. Installs into `~/.local` by default
-(`PREFIX=/usr/local doas bash …/build-exvi.sh` for system-wide; on Termux it uses the
-Termux prefix). Then `ln -sfn "$PWD/vi/exrc" ~/.exrc` and it reads your config natively.
-
-**Simplest of all — just use vim.** `vi/vimrc` is a very minimal vim config (the same
-core settings as the `.exrc`). vim is a vi and is in every main repo (Termux included),
-so when ex-vi is more trouble than it's worth: install vim, `ln -sfn "$PWD/vi/vimrc"
-~/.vimrc`, done.
 
 ---
 

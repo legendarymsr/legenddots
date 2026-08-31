@@ -8,8 +8,7 @@
 #   init.lua                 -> ~/.config/nvim/init.lua   (Neovim)
 #   tmux.conf                -> ~/.config/tmux/tmux.conf   (tmux 3.1+ reads it there)
 #   suckless/screen/screenrc -> ~/.screenrc                (GNU Screen)
-#   suckless/vi/exrc         -> ~/.exrc                    (vi config, any real vi)
-#   suckless/vi/vimrc        -> ~/.vimrc                   (minimal vim config)
+#   suckless/vim/vimrc       -> ~/.vimrc                   (minimal vim config)
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -45,12 +44,18 @@ link() {
 link "$REPO/init.lua"                  "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
-link "$REPO/suckless/vi/exrc"          "$HOME/.exrc"
-link "$REPO/suckless/vi/vimrc"         "$HOME/.vimrc"
+link "$REPO/suckless/vim/vimrc"        "$HOME/.vimrc"
 
-# 4. cleanup: an earlier version of this script appended a busybox-vi EXINIT line
-#    to the shell rc. vi is config-only now, so strip it back out. Matches both the
-#    commented line the script wrote and the bare one-liner from the old README.
+# 4. cleanup of earlier versions of this script:
+#  a) it used to link ~/.exrc to the (now removed) vi config — drop that dangling link
+if [ -L "$HOME/.exrc" ]; then
+  case "$(readlink "$HOME/.exrc")" in
+    */legenddots/suckless/vi/exrc)
+      rm -f "$HOME/.exrc" && say "removed the stale ~/.exrc symlink (vi dropped; vim now)" ;;
+  esac
+fi
+#  b) it used to append a busybox-vi EXINIT line to the shell rc — strip it back out.
+#     Matches both the commented line it wrote and the bare one-liner from the old README.
 EXINIT_PAT="export EXINIT='set autoindent ignorecase showmatch tabstop=4'"
 for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   [ -e "$rc" ] || continue
@@ -62,4 +67,4 @@ done
 
 echo
 say "Done. Packages: pkg install neovim tmux screen vim git"
-say "vim uses ~/.vimrc (linked). ~/.exrc is for a real traditional vi (see README)."
+say "vim uses the minimal ~/.vimrc (linked)."
