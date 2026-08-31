@@ -773,8 +773,12 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     # `make defconfig` leaves several of these off, so without them the container
     # never starts or Android boots to a black screen. (USER_NS widens attack
     # surface vs the hardened default — the deliberate trade for Waydroid to run.)
+    # MEMCG = container memory cgroup; MACVLAN = an LXC networking mode. Both are in
+    # app-containers/lxc's recommended-kernel notice. MEMCG is usually already on and
+    # Waydroid doesn't need MACVLAN (it uses bridge+veth+NAT), but set them to satisfy
+    # the notice and keep container memory limits working.
     ./scripts/config -e CONFIG_USER_NS -e CONFIG_BLK_DEV_LOOP -e CONFIG_CGROUP_DEVICE \
-                     -e CONFIG_PSI -e CONFIG_SYNC_FILE \
+                     -e CONFIG_PSI -e CONFIG_SYNC_FILE -e CONFIG_MEMCG -m CONFIG_MACVLAN \
                      -e CONFIG_DMABUF_HEAPS -e CONFIG_DMABUF_HEAPS_SYSTEM
     # Full hardware + hardening recipe (mirror of install.sh) so a rebuild enables
     # EVERYTHING, not just deltas — Intel ME off, Apple audio/HID/BT/Thunderbolt/
