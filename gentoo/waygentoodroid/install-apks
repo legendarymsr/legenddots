@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# =============================================================================
+# install-apks — side-load a working Magisk app + Termux into the Waydroid Android.
+# -----------------------------------------------------------------------------
+# waydroid_script's bundled Magisk app (Delta) sometimes won't launch. Root still
+# works (it's the magiskd daemon, separate from the app), so this just swaps the
+# APP for a fresh APK, and preinstalls Termux while we're at it.
+#
+# Run as YOUR USER — from inside your niri session, with Waydroid RUNNING (this
+# uses `waydroid app install`, which needs the live session). NOT with doas:
+#   waydroid session start &        # if it isn't already
+#   bash ~/legenddots/gentoo/waygentoodroid/install-apks
+#
+# Options (env):
+#   MAGISK_REPO=topjohnwu/Magisk   # default; HuskyDG/magisk-files for Magisk Delta
+#   INSTALL_MAGISK=true  INSTALL_TERMUX=true
+# =============================================================================
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+header()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+info()    { echo -e "  ${CYAN}→${NC} $*"; }
+success() { echo -e "  ${GREEN}✓${NC} $*"; }
+warn()    { echo -e "  ${YELLOW}!${NC} $*"; }
+die()     { echo -e "  ${RED}✗${NC} $*"; exit 1; }
+
+MAGISK_REPO="${MAGISK_REPO:-topjohnwu/Magisk}"
+INSTALL_MAGISK="${INSTALL_MAGISK:-true}"
+INSTALL_TERMUX="${INSTALL_TERMUX:-true}"
+
+[[ $EUID -ne 0 ]] || die "run as your USER, not root — waydroid app install talks to your session."
+command -v waydroid >/dev/null 2>&1 || die "waydroid not installed."
+command -v curl     >/dev/null 2>&1 || die "need curl (emerge net-misc/curl)."
+
+# The session must be RUNNING (waydroid app install goes through it).
+waydroid status 2>/dev/null | grep -q 'Session:[[:space:]]*RUNNING' \
+  || die "Waydroid session isn't running — start it first:  waydroid session start &"
+
+DL="$(mktemp -d)"; trap 'rm -rf "$DL"' EXIT
+
+# newest .apk asset URL from a repo's latest GitHub release (optionally arch-filtered)
+latest_apk() {  # <owner/repo> [grep-extra-regex]
+  local urls
+  urls="$(curl -fsSL "https://api.github.com/repos/$1/releases/latest" \
+          | grep -oE 'https://[^"]+\.apk')" || return 1
+  [[ -n "${2:-}" ]] && urls="$(printf '%s\n' "$urls" | grep -E "$2")"
+  printf '%s\n' "$urls" | head -1
+}
+
+install_apk() {  # <name> <url>
+  [[ -n "${2:-}" ]] || { warn "no download URL for $1 (GitHub reachable / rate-limited?)"; return 1; }
+  info "downloading $1…"
+  curl -fSL -o "$DL/$1.apk" "$2" || { warn "download of $1 failed"; return 1; }
+  waydroid app install "$DL/$1.apk" && success "$1 installed" || warn "$1 install failed"
+}
+
+if [[ "$INSTALL_MAGISK" == true ]]; then
+  header "Magisk app — swap the broken one"
+  # remove whatever Magisk app is there (any known package), then install fresh.
+  # This does NOT touch root — magiskd is separate from the manager app.
+  for pkg in com.topjohnwu.magisk io.github.huskydg.magisk io.github.vvb2060.magisk; do
+    waydroid app remove "$pkg" 2>/dev/null || true
+  done
+  install_apk Magisk "$(latest_apk "$MAGISK_REPO" || true)" || true
+fi
+
+if [[ "$INSTALL_TERMUX" == true ]]; then
+  header "Termux"
+  # x86_64 build — native to the x86_64 Waydroid container (no ARM translation).
+  install_apk Termux "$(latest_apk termux/termux-app 'x86_64' || true)" || true
+fi
+
+header "Done"
+success "Reopen the app drawer (or restart the session) and the new apps are there."
+echo "  Root still fine?   waydroid shell su -c id     (want: uid=0(root))"
+echo "  Magisk crashes too? retry with Delta:  MAGISK_REPO=HuskyDG/magisk-files bash $0"
