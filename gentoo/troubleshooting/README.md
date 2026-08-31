@@ -16,7 +16,7 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
 | `check-virt` | yes (`doas`) | no (read-only) | QEMU/KVM or Waydroid won't work — pinpoints whether it's the kernel config, a group, firmware VT-x, or lockdown |
-| `fix-virt` | yes (`doas`) | yes | Apply the runtime QEMU/KVM + Waydroid fixes (groups, services, modules, binderfs) without a full re-setup |
+| `fix-virt` | yes (`doas`) | yes | Make QEMU/KVM + Waydroid work automatically — runtime fixes, plus auto-rebuild the kernel & reboot if options are missing |
 | `rescue` | yes (`sudo`, from a **live USB**) | yes | System won't boot / an update was interrupted — chroot in and rebuild everything |
 | `rebuild-kernel` | yes (root, in chroot) | yes | Kernel hangs at rEFInd "Starting vmlinuz" / boots blind — rebuild from the proven config |
 | `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
@@ -142,20 +142,22 @@ usual real blockers are the kernel missing `USER_NS`/`BLK_DEV_LOOP` for Waydroid
 container, or the `kvm` group not yet applied to your session. `check-virt` tells
 you which.
 
-## `fix-virt` — apply the QEMU/KVM + Waydroid runtime fixes
+## `fix-virt` — make QEMU/KVM + Waydroid work, automatically
 
 ```sh
-doas bash ~/legenddots/gentoo/troubleshooting/fix-virt
+doas bash ~/legenddots/gentoo/troubleshooting/fix-virt                # full auto
+doas bash ~/legenddots/gentoo/troubleshooting/fix-virt --no-rebuild   # runtime only
 ```
 
-The doing counterpart to `check-virt`. It applies everything that *doesn't* need a
-kernel rebuild: creates + adds you to the `kvm`/`libvirt` groups, loads `kvm_intel`,
-enables and starts `libvirtd`, mounts `binderfs`, and enables + starts
-`waydroid-container` (and points out `waydroid init` if the images aren't downloaded
-yet). It then re-checks the running kernel and, if `USER_NS`/`BLK_DEV_LOOP`/`KVM`/…
-are still missing, tells you to run `rebuild-kernel` (the one thing it can't do live).
-After it runs: **log out and back in** for the group change, then `check-virt` to
-confirm all green.
+The doing counterpart to `check-virt`, hands-off. It creates + adds you to the
+`kvm`/`libvirt` groups, loads `kvm_intel`, enables + starts `libvirtd`, mounts
+`binderfs`, enables + starts `waydroid-container` (and points out `waydroid init` if
+the images aren't downloaded yet). Then it checks the running kernel and, if
+`USER_NS`/`BLK_DEV_LOOP`/`KVM`/binder/… are missing, **rebuilds the kernel with the
+full recipe and reboots** — each long step counts down 10s first so you can Ctrl-C.
+`--no-rebuild` stops at the runtime fixes. The one thing it can't do is toggle
+firmware **VT-x** (no `vmx` flag) — it flags that for you to fix in the Mac's
+firmware. After the reboot, `check-virt` confirms all green.
 
 ## `rescue` — finish an interrupted update + rebuild the kernel (in place)
 

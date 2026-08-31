@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # =============================================================================
-# fix-virt — apply the QEMU/KVM + Waydroid fixes that DON'T need a kernel rebuild:
-# group membership, services, the kvm module, and binderfs. Changes the system.
+# fix-virt — make QEMU/KVM + Waydroid work, automatically. Applies the runtime
+# fixes (kvm/libvirt groups, kvm_intel, libvirtd, binderfs, waydroid-container)
+# AND, if the running kernel is missing the required options, rebuilds it with the
+# full recipe and reboots. The only thing it can't fix is firmware VT-x (reported
+# clearly). Changes the system.
 #
-#   doas bash fix-virt
+#   doas bash fix-virt                # full auto: fixes + rebuild + reboot if needed
+#   doas bash fix-virt --no-rebuild   # runtime fixes only; never rebuild/reboot
 #
-# It does NOT rebuild the kernel (that's rebuild-kernel) — but it checks the
-# running config and tells you if a rebuild is still needed. Run check-virt after
-# to confirm, then re-login (group changes are per-session) / reboot (if you did
-# rebuild the kernel).
+# Each long step counts down 10s first (Ctrl-C to bail). After a reboot, run
+# check-virt to confirm everything's green.
 # =============================================================================
 set -o pipefail
 
@@ -20,6 +22,12 @@ info() { echo -e "  ${CYAN}·${NC} $*"; }
 die()  { echo -e "  ${RED}✗${NC} $*"; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "run as root:  doas bash fix-virt"
+
+# --no-rebuild = apply runtime fixes only, never auto-rebuild/reboot the kernel.
+REBUILD=1
+[[ "${1:-}" == "--no-rebuild" ]] && { REBUILD=0; shift; }
+# Firmware VT-x — the one thing no script can toggle.
+HAVE_VMX=0; grep -Eq '\b(vmx|svm)\b' /proc/cpuinfo && HAVE_VMX=1
 
 # The human user to grant access to (doas sets DOAS_USER; sudo sets SUDO_USER).
 U="${DOAS_USER:-${SUDO_USER:-}}"
@@ -80,18 +88,39 @@ else
   warn "waydroid not installed — gentoo/setup step 12c builds it. Install it, then re-run."
 fi
 
-# ============================ rebuild reminder ===============================
+# ==================== auto-rebuild the kernel if options are missing =========
 NEED=""
 for o in CONFIG_KVM CONFIG_KVM_INTEL CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
          CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE; do
   khas "$o" || NEED="$NEED $o"
 done
-hdr "Next"
+hdr "Kernel"
 if [[ -n "$NEED" ]]; then
-  warn "the running kernel is still missing:$NEED"
-  warn "these can't be fixed at runtime — rebuild the kernel, then reboot:"
-  warn "    doas bash $(dirname "$0")/rebuild-kernel"
+  warn "running kernel is missing:$NEED"
+  warn "these can't be fixed live — the kernel must be rebuilt (~30-45 min)."
+  if [[ "$REBUILD" == 1 ]]; then
+    echo -e "  ${YELLOW}! Rebuilding automatically in 10s — Ctrl-C to cancel (or re-run with --no-rebuild).${NC}"
+    sleep 10
+    if bash "$(dirname "$0")/rebuild-kernel"; then
+      ok "kernel rebuilt with the KVM + Waydroid options."
+      echo -e "  ${YELLOW}! Rebooting in 10s to load it (also applies your new groups) — Ctrl-C to stay up.${NC}"
+      sleep 10
+      reboot
+    else
+      die "rebuild-kernel failed — fix the error above, then re-run:  doas bash $(basename "$0")"
+    fi
+  else
+    warn "--no-rebuild set — rebuild it yourself:  doas bash $(dirname "$0")/rebuild-kernel  (then reboot)"
+  fi
 else
-  ok "kernel has the KVM + Waydroid options. Re-login for the group change, then:"
-  ok "    doas bash $(dirname "$0")/check-virt   # confirm everything's green"
+  ok "kernel already has the KVM + Waydroid options — no rebuild needed."
+  ok "Log out and back in for the group change, then verify:  doas bash $(dirname "$0")/check-virt"
+fi
+
+# ==================== firmware VT-x (the one thing no script can fix) =========
+if [[ "$HAVE_VMX" == 0 ]]; then
+  hdr "Firmware — needs you"
+  warn "no vmx/svm CPU flag: Intel VT-x is OFF in firmware, and no software can flip"
+  warn "it. QEMU/KVM stays unavailable until you enable 'Virtualization'/VT-x in the"
+  warn "Mac's firmware. (Waydroid does NOT need VT-x — it works without this.)"
 fi
