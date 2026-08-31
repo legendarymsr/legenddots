@@ -71,6 +71,16 @@ if command -v waydroid >/dev/null 2>&1; then
     mount -t binder binder /dev/binderfs 2>/dev/null && ok "mounted binderfs at /dev/binderfs" \
       || info "binderfs not mounted (waydroid mounts it on start; fine when stopped)"
   fi
+  # LXC must be built with the apparmor USE flag, or Waydroid's LXC config
+  # ('lxc.apparmor.profile = unconfined') fails to parse ("Built without AppArmor
+  # support") and the container won't start. Detect a plain lxc (no libapparmor
+  # linked) and rebuild it with the flag.
+  if command -v lxc-start >/dev/null 2>&1 && ! ldd "$(command -v lxc-start)" 2>/dev/null | grep -q libapparmor; then
+    warn "lxc was built WITHOUT apparmor — Waydroid's config needs it. Rebuilding lxc..."
+    echo "app-containers/lxc apparmor" > /etc/portage/package.use/lxc
+    emerge --changed-use --oneshot app-containers/lxc && ok "rebuilt lxc with apparmor support" \
+      || warn "lxc rebuild failed — run:  doas emerge --changed-use app-containers/lxc"
+  fi
   # enable + start the container service (OpenRC here; try systemd too, harmlessly)
   rc-update add waydroid-container default 2>/dev/null && info "waydroid-container enabled at boot"
   if rc-service waydroid-container start 2>/dev/null || systemctl start waydroid-container 2>/dev/null; then

@@ -608,7 +608,14 @@ if [[ "$INSTALL_WAYDROID" == "true" ]] && ! step_done waydroid; then
 
   # Deps that ARE in the Gentoo tree. glib + pkgconf are what the gbinder libs
   # compile and advertise themselves against.
-  emerge --noreplace app-containers/lxc net-dns/dnsmasq net-firewall/iptables \
+  # LXC MUST be built with the apparmor USE flag: Waydroid's generated LXC config
+  # always contains 'lxc.apparmor.profile = unconfined', and an lxc built WITHOUT
+  # apparmor rejects that line ("Built without AppArmor support"), so the container
+  # fails to start with a config parse error. The flag only links libapparmor — it
+  # does NOT enable AppArmor enforcement. --changed-use so a rerun rebuilds an
+  # already-installed plain lxc.
+  echo "app-containers/lxc apparmor" > /etc/portage/package.use/lxc
+  emerge --changed-use app-containers/lxc net-dns/dnsmasq net-firewall/iptables \
     dev-python/pygobject dev-python/dbus-python dev-vcs/git sys-apps/dbus \
     dev-util/gperf sys-devel/gettext dev-libs/glib dev-util/pkgconf \
     || warn "some Waydroid deps failed to emerge — the build may miss something"
