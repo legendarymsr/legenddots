@@ -180,8 +180,16 @@ or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens int
 a plain POSIX `.exrc`, so **any vi that reads `.exrc` picks it up**. On a stock phone
 nothing does — `nvim` reads `init.lua`, and busybox's `vi` doesn't read config files —
 so the `.exrc` just sits there as your shipped vi config and takes effect the moment you
-run a vi that honours it (a real nvi / traditional vi, if you ever add one). No editor is
+run a vi that honours it (a real traditional vi, if you ever add one). No editor is
 installed for it on purpose.
+
+**To add a real traditional vi** — the original AT&T/BSD ex/vi that reads `~/.exrc`
+natively — run `bash ~/legenddots/suckless/vi/build-exvi.sh`. It builds
+[ex-vi](https://ex-vi.sourceforge.net/) from source into `$PREFIX` (Termux's prefix);
+it's self-contained (bundles its own termlib + regex, so just `pkg install clang make`,
+no ncurses). That gives you `vi`/`ex`/`view`. *Caveat:* the build is tested on glibc,
+not Android/bionic — it has no external deps so it stands a good chance, but if the
+compile errors on a bionic quirk, paste it and I'll adapt the script.
 
 ---
 
