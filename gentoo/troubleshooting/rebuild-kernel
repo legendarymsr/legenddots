@@ -138,6 +138,11 @@ make defconfig
 ./scripts/config -e CONFIG_SYNC_FILE
 ./scripts/config -e CONFIG_DMABUF_HEAPS
 ./scripts/config -e CONFIG_DMABUF_HEAPS_SYSTEM
+# LXC's recommended-kernel notice: MEMCG (container memory cgroup — usually already
+# on) and MACVLAN (an LXC networking mode; Waydroid uses bridge+veth+NAT, not this,
+# but set it to satisfy the notice).
+./scripts/config -e CONFIG_MEMCG
+./scripts/config -m CONFIG_MACVLAN
 
 # --- WIRELESS: cfg80211 as a MODULE so the kernel can load regulatory.db from
 # /lib/firmware — needed for a real regdomain (5 GHz WiFi; world/00 blocks it). ---
