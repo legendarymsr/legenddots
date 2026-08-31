@@ -47,6 +47,7 @@ legenddots/
 │   ├── surf/config.h          WebKit browser
 │   ├── screen/screenrc        GNU Screen — runtime dotfile → ~/.screenrc
 │   ├── vi/exrc                traditional-vi config (POSIX ex) → ~/.exrc
+│   ├── vi/vimrc               minimal vim config → ~/.vimrc
 │   └── vi/build-exvi.sh       builds Traditional Vi (ex-vi) from source
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)

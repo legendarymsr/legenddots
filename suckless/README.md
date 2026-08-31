@@ -54,6 +54,11 @@ with just `make` + a C compiler. Installs into `~/.local` by default
 (`PREFIX=/usr/local doas bash …/build-exvi.sh` for system-wide; on Termux it uses the
 Termux prefix). Then `ln -sfn "$PWD/vi/exrc" ~/.exrc` and it reads your config natively.
 
+**Simplest of all — just use vim.** `vi/vimrc` is a very minimal vim config (the same
+core settings as the `.exrc`). vim is a vi and is in every main repo (Termux included),
+so when ex-vi is more trouble than it's worth: install vim, `ln -sfn "$PWD/vi/vimrc"
+~/.vimrc`, done.
+
 ---
 
 ## Declarative builds (NixOS / Guix)
