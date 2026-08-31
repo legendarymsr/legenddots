@@ -97,16 +97,21 @@ fi
 "$WD_SCRIPT_DIR/venv/bin/pip" install -q -r "$WD_SCRIPT_DIR/requirements.txt" || die "pip install requirements failed."
 success "waydroid_script ready at $WD_SCRIPT_DIR"
 
-# waydroid_script's container.upgrade() RAISES unless `waydroid upgrade -o` prints
-# "Stopping/Starting container" — which only happens when a SESSION is running. On
-# a headless/TTY box there's no session, so it prints "Couldn't get LXC status" and
-# EVERY module install false-fails even though upgrade exits 0 and the files ARE
-# applied. Relax that output check so installs report their real (success) result.
-# Re-applied each run because the git pull above reverts it.
-"$VENV_PY" - "$WD_SCRIPT_DIR/tools/container.py" <<'PY' 2>/dev/null && success "relaxed waydroid_script's upgrade output check"
+# waydroid_script's helper.run() RAISES whenever a command writes ANYTHING to
+# stderr, unless that call passed ignore=r"...". waydroid logs "Stopping container"
+# / "Couldn't get LXC status" to stderr while still exiting 0, so the bare
+# run([...]) calls — container.stop() and is_running(), which pass no ignore —
+# false-fail, and every module install dies at container.stop() with the tell-tale
+# "returned non-zero exit status 0". Add ignore=r".*" to every bare run([...]) in
+# container.py (upgrade() already has it, and calls that pass a real ignore stay
+# untouched) so stderr noise is tolerated. Re-applied each run — the git pull
+# above reverts it, and older 'Starting container' string patches no longer match.
+"$VENV_PY" - "$WD_SCRIPT_DIR/tools/container.py" <<'PY' 2>/dev/null && success "relaxed waydroid_script's stderr checks (container stop/status)"
 import re, sys
 p = sys.argv[1]; s = open(p).read()
-s2 = re.sub(r'ignore=r"[^"]*Starting container"', 'ignore=r".*"', s)
+# run([...])  ->  run([...], ignore=r".*")   (only bare calls: a ] immediately
+# followed by ), so run([...], ignore=...) is left alone)
+s2 = re.sub(r'run\((\[[^\]]*\])\)', r'run(\1, ignore=r".*")', s)
 open(p, "w").write(s2); print("ok" if s2 != s else "nochange")
 PY
 
