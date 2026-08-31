@@ -78,6 +78,27 @@ only re-inits the image if there isn't one yet, or you pass `REINIT=true`.
 
 ---
 
+## Side-load a working Magisk app + Termux (`install-apks`)
+
+`waydroid_script`'s bundled **Magisk app (Delta) sometimes won't launch** — root
+still works (that's the `magiskd` daemon, separate from the manager app), it's just
+the UI. `install-apks` swaps the app for a fresh APK and preinstalls Termux.
+
+Unlike the builder, this runs **as your user, inside niri, with Waydroid running**
+(it uses `waydroid app install`, which goes through the live session):
+
+```sh
+waydroid session start &        # if it isn't already
+bash ~/legenddots/gentoo/waygentoodroid/install-apks
+```
+
+It removes any existing Magisk app package, installs the latest official Magisk APK
+(`topjohnwu/Magisk`), and installs the x86_64 Termux build (native to the container).
+Options: `MAGISK_REPO=HuskyDG/magisk-files` for Magisk Delta (matches the daemon
+`waydroid_script` installs, if the official app misbehaves), `INSTALL_TERMUX=false`,
+`INSTALL_MAGISK=false`. Reopen the app drawer afterward; verify root is intact with
+`waydroid shell su -c id` (want `uid=0`).
+
 ## "Can I get Android 16 running?"
 
 **Short answer: not realistically yet — Android 11 or 13 is the ceiling today.**
