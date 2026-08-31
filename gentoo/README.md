@@ -973,6 +973,17 @@ instead of failing halfway through.
   [`waygentoodroid/README.md`](waygentoodroid/README.md), which also covers the
   Android-version reality (Android 11/13 today; **not** 16 yet) and why.
 
+- **Finalize + troubleshoot** — a third `[Y/n]` prompt (`RUN_FIXVIRT`, default Yes)
+  runs [`troubleshooting/fix-virt`](troubleshooting/README.md) `--no-rebuild` at the
+  end: it (re)adds you to `kvm`/`libvirt`, loads `kvm_intel`, starts `libvirtd`,
+  mounts `binderfs`, and starts `waydroid-container`. It uses `--no-rebuild` because
+  step 13 owns the kernel + reboot; the kernel options only come alive after that
+  reboot, so re-run `fix-virt` once you're on the rebuilt kernel to light up
+  binder/KVM. If a VM or Waydroid still won't start, `doas bash
+  gentoo/troubleshooting/check-virt` (read-only) pinpoints whether it's the kernel
+  config, a group, firmware VT-x, or lockdown; `fix-virt` (no flag) then fixes it
+  automatically, rebuilding + rebooting if the kernel needs it.
+
 **Portage housekeeping:** at the end, `setup` auto-merges the `._cfg` config
 writes under `/etc/portage` (the `--autounmask-write` USE/keyword changes its own
 emerges generate — safe, since it owns that dir) with `etc-update --automode -5

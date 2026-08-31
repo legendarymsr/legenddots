@@ -48,12 +48,18 @@ if [[ -z "${INSTALL_WAYDROID:-}" ]]; then
   read -t 10 -r WD_ANSWER || true; echo
   case "${WD_ANSWER,,}" in n|no) INSTALL_WAYDROID="false" ;; *) INSTALL_WAYDROID="true" ;; esac
 fi
+if [[ -z "${RUN_FIXVIRT:-}" ]]; then
+  echo -e "${CYAN}Afterward, run fix-virt to finalize QEMU/KVM + Waydroid (groups/services/binderfs; no kernel rebuild)? [Y/n] (10s, default: Y)${NC}"
+  read -t 10 -r FV_ANSWER || true; echo
+  case "${FV_ANSWER,,}" in n|no) RUN_FIXVIRT="false" ;; *) RUN_FIXVIRT="true" ;; esac
+fi
 ENABLE_WD40="${ENABLE_WD40:-true}"
 PRIV_ESC="${PRIV_ESC:-doas}"
 REBUILD_WORLD="${REBUILD_WORLD:-false}"
 REBUILD_KERNEL="${REBUILD_KERNEL:-false}"
 INSTALL_VIRT="${INSTALL_VIRT:-true}"
 INSTALL_WAYDROID="${INSTALL_WAYDROID:-true}"
+RUN_FIXVIRT="${RUN_FIXVIRT:-true}"
 
 # ── Checkpointing ─────────────────────────────────────────────────────────────
 STATE_FILE=/etc/gentoo-setup.state
@@ -315,7 +321,7 @@ if ! step_done localization_user; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
-    ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
+    ln -sfn ~/legenddots/suckless/vim/vimrc ~/.vimrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
@@ -843,6 +849,22 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
   fi
 fi
 
+# 13b. FINALIZE VIRTUALIZATION (opt-in) — apply the QEMU/KVM + Waydroid runtime
+# fixes via fix-virt: kvm/libvirt groups, kvm_intel, libvirtd, binderfs,
+# waydroid-container. --no-rebuild because step 13 above owns the kernel + reboot;
+# this must NOT trigger a second rebuild/reboot mid-setup. The kernel options only
+# come alive after you reboot into the rebuilt kernel, so re-run fix-virt (or this
+# step) post-reboot to light up binderfs/kvm on the new kernel.
+if [[ "$RUN_FIXVIRT" == "true" ]] && { [[ "$INSTALL_VIRT" == "true" ]] || [[ "$INSTALL_WAYDROID" == "true" ]]; }; then
+  header "Finalizing virtualization (fix-virt --no-rebuild)..."
+  FV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/troubleshooting/fix-virt"
+  if [[ -f "$FV" ]]; then
+    bash "$FV" --no-rebuild || warn "fix-virt reported issues above (often just 'reboot into the new kernel first')."
+  else
+    warn "fix-virt not found at $FV — run it by hand later: doas bash gentoo/troubleshooting/fix-virt"
+  fi
+fi
+
 # 14. FULL SYSTEM UPDATE (opt-in) — sync + world update + cleanup, all in one.
 # This is THE update routine: `REBUILD_WORLD=true doas bash gentoo/setup` does
 # everything. Hardened against the two stalls we hit: a perl major bump (needs a
@@ -911,7 +933,7 @@ if id legend &>/dev/null; then
     ln -sfn ~/legenddots/alacritty.toml  ~/.config/alacritty/alacritty.toml
     ln -sfn ~/legenddots/.zshrc          ~/.zshrc
     ln -sfn ~/legenddots/suckless/screen/screenrc ~/.screenrc
-    ln -sfn ~/legenddots/suckless/vi/exrc ~/.exrc
+    ln -sfn ~/legenddots/suckless/vim/vimrc ~/.vimrc
     ln -sfn ~/legenddots/init.lua        ~/.config/nvim/init.lua
     mkdir -p ~/.config/tmux
     ln -sfn ~/legenddots/tmux.conf       ~/.config/tmux/tmux.conf
