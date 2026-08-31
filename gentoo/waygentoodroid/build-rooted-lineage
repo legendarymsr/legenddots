@@ -129,6 +129,23 @@ s2 = re.sub(r'if ignore and re\.match\(ignore, error\):',
 open(p, "w").write(s2); print("ok" if s2 != s else "nochange")
 PY
 
+# waydroid_script HARDCODES `sudo` for privileged image ops (e2fsck/resize2fs/mount),
+# but this box uses doas — there's no `sudo`, so every module install dies with
+# FileNotFoundError: 'sudo'. We already run waydroid_script as root, so the sudo
+# prefix is redundant: strip "sudo", / 'sudo', from the run([...]) lists across
+# main.py + tools/*.py so the commands run directly. Keeps the system doas-pure (no
+# sudo shim). Re-applied each run (git pull reverts it).
+"$VENV_PY" - "$WD_SCRIPT_DIR" <<'PY' 2>/dev/null && success "stripped waydroid_script's hardcoded 'sudo' (runs as root; box uses doas)"
+import re, glob, sys
+root = sys.argv[1]; n = 0
+for p in glob.glob(root + "/*.py") + glob.glob(root + "/tools/*.py"):
+    s = open(p).read()
+    s2 = re.sub(r'''(["'])sudo\1,\s*''', '', s)   # strip a leading "sudo", element
+    if s2 != s:
+        open(p, "w").write(s2); n += 1
+print(f"stripped sudo from {n} file(s)")
+PY
+
 # ── 3. Stop the session, but START the container manager ─────────────────────
 # waydroid_script installs modules via `waydroid upgrade -o`, which talks to the
 # container MANAGER — if it isn't running the install dies on "Couldn't get LXC
