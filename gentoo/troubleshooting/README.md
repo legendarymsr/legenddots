@@ -15,6 +15,7 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
+| `check-virt` | yes (`sudo`) | no (read-only) | QEMU/KVM or Waydroid won't work — pinpoints whether it's the kernel config, a group, firmware VT-x, or lockdown |
 | `rescue` | yes (`sudo`, from a **live USB**) | yes | System won't boot / an update was interrupted — chroot in and rebuild everything |
 | `rebuild-kernel` | yes (root, in chroot) | yes | Kernel hangs at rEFInd "Starting vmlinuz" / boots blind — rebuild from the proven config |
 | `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
@@ -115,6 +116,30 @@ bin/lib dirs. Ends `Clean` or lists what's left with the exact fix
 non-zero if anything's found. Typical first run flags `/usr/lib32` and gcc's
 32-bit libs — leftovers from a build made before switching profiles — which the
 rebuild sweeps out.
+
+## `check-virt` — why QEMU/KVM or Waydroid won't work (read-only)
+
+```sh
+sudo bash ~/legenddots/gentoo/troubleshooting/check-virt
+```
+
+Changes nothing — it just tells you which layer is broken so you fix the right
+thing instead of guessing. It checks, in order: the **CPU** flags (`vmx`/`svm` in
+`/proc/cpuinfo` → firmware VT-x), the **running kernel** via `/proc/config.gz`
+(`KVM`, `KVM_INTEL`, `VHOST_NET`, `ANDROID_BINDER_IPC`/`BINDERFS`, `USER_NS`,
+`BLK_DEV_LOOP`, `CGROUP_DEVICE`, `PSI`, `IP_NF_IPTABLES`), **`/dev/kvm`** and
+`kvm`-group membership, **libvirtd**, the **lockdown** LSM state
+(`/sys/kernel/security/lockdown`), and **Waydroid** (`/dev/loop-control`,
+binderfs, `waydroid status`, the container service). Each failure prints its exact
+fix, and the summary says whether you need to **rebuild the kernel**
+(`rebuild-kernel`), **re-login** for a group, flip a **BIOS** switch, or **start a
+service**.
+
+The hardening angle: basic KVM VMs and Waydroid are *not* blocked by this system's
+lockdown LSM (it's not enforced unless you add `lockdown=` to the cmdline) — the
+usual real blockers are the kernel missing `USER_NS`/`BLK_DEV_LOOP` for Waydroid's
+container, or the `kvm` group not yet applied to your session. `check-virt` tells
+you which.
 
 ## `rescue` — finish an interrupted update + rebuild the kernel (in place)
 
