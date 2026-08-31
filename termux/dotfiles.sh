@@ -9,6 +9,7 @@
 #   tmux.conf                -> ~/.config/tmux/tmux.conf   (tmux 3.1+ reads it there)
 #   suckless/screen/screenrc -> ~/.screenrc                (GNU Screen)
 #   suckless/vi/exrc         -> ~/.exrc                    (vi config, any real vi)
+#   suckless/vi/vimrc        -> ~/.vimrc                   (minimal vim config)
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -45,6 +46,7 @@ link "$REPO/init.lua"                  "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
 link "$REPO/suckless/vi/exrc"          "$HOME/.exrc"
+link "$REPO/suckless/vi/vimrc"         "$HOME/.vimrc"
 
 # 4. cleanup: an earlier version of this script appended a busybox-vi EXINIT line
 #    to the shell rc. vi is config-only now, so strip it back out. Matches both the
@@ -59,5 +61,5 @@ for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
 done
 
 echo
-say "Done. Packages: pkg install neovim tmux screen git"
-say "~/.exrc is your vi config — read by any vi that reads .exrc (see README)."
+say "Done. Packages: pkg install neovim tmux screen vim git"
+say "vim uses ~/.vimrc (linked). ~/.exrc is for a real traditional vi (see README)."

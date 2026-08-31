@@ -174,22 +174,24 @@ links are stable it's idempotent.
 To land straight in tmux under pocketwl, run `tmux` in the `Alt+Return` terminal,
 or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens into it.
 
-### The `.exrc` (your vi config)
+### vi on the phone
 
-`dotfiles.sh` links `~/.exrc` — that's the config, which is all this is meant to be. It's
-a plain POSIX `.exrc`, so **any vi that reads `.exrc` picks it up**. On a stock phone
-nothing does — `nvim` reads `init.lua`, and busybox's `vi` doesn't read config files —
-so the `.exrc` just sits there as your shipped vi config and takes effect the moment you
-run a vi that honours it (a real traditional vi, if you ever add one). No editor is
-installed for it on purpose.
+The no-fuss answer is **vim** — it's a vi, it's in Termux's main repo, and `dotfiles.sh`
+links a very minimal `~/.vimrc` (`suckless/vi/vimrc`) for it:
 
-**To add a real traditional vi** — the original AT&T/BSD ex/vi that reads `~/.exrc`
-natively — run `bash ~/legenddots/suckless/vi/build-exvi.sh`. It builds
-[ex-vi](https://ex-vi.sourceforge.net/) from source into `$PREFIX` (Termux's prefix);
-it's self-contained (bundles its own termlib + regex, so just `pkg install clang make`,
-no ncurses). That gives you `vi`/`ex`/`view`. *Caveat:* the build is tested on glibc,
-not Android/bionic — it has no external deps so it stands a good chance, but if the
-compile errors on a bionic quirk, paste it and I'll adapt the script.
+```sh
+pkg install vim
+```
+
+That's a working vi with sensible minimal settings, today. (`nvim` reads `init.lua` and
+busybox's `vi` reads no config file at all, so vim is the one that actually uses a config
+here.)
+
+The repo also links `~/.exrc` for a **real traditional vi**, but nothing on a stock phone
+reads `.exrc`, so it's dormant until you add one. If you want the genuine original ex/vi,
+`bash ~/legenddots/suckless/vi/build-exvi.sh` builds [ex-vi](https://ex-vi.sourceforge.net/)
+from source — but it's **untested on Android/bionic and may not compile there** (it builds
+fine on glibc desktops). On the phone, **vim is the reliable choice**.
 
 ---
 

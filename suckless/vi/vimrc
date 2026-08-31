@@ -1,0 +1,14 @@
+" ~/.vimrc — very minimal vim. Same core settings as the suckless .exrc, vim
+" defaults left alone otherwise. No plugins, no fluff. `vim` is in every distro's
+" (and Termux's) main repo and is a vi, so this is the no-fuss fallback when a real
+" traditional vi (ex-vi) isn't handy.
+
+set nocompatible        " be vim, not bug-for-bug vi
+set autoindent          " keep indent on new lines
+set shiftwidth=4        " indent width
+set tabstop=4           " tab display width
+set number              " line numbers
+set showmatch           " briefly jump to the matching bracket
+set ignorecase          " case-insensitive search
+set incsearch           " show matches while typing (wrapscan is already on)
+syntax on               " syntax highlighting
