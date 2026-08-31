@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fix-virt — apply the QEMU/KVM + Waydroid fixes that DON'T need a kernel rebuild:
+# group membership, services, the kvm module, and binderfs. Changes the system.
+#
+#   doas bash fix-virt
+#
+# It does NOT rebuild the kernel (that's rebuild-kernel) — but it checks the
+# running config and tells you if a rebuild is still needed. Run check-virt after
+# to confirm, then re-login (group changes are per-session) / reboot (if you did
+# rebuild the kernel).
+# =============================================================================
+set -o pipefail
+
+GREEN='\033[0;32m'; YELLOW='\033[0;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
+hdr()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+ok()   { echo -e "  ${GREEN}✓${NC} $*"; }
+warn() { echo -e "  ${YELLOW}!${NC} $*"; }
+info() { echo -e "  ${CYAN}·${NC} $*"; }
+die()  { echo -e "  ${RED}✗${NC} $*"; exit 1; }
+
+[[ $EUID -eq 0 ]] || die "run as root:  doas bash fix-virt"
+
+# The human user to grant access to (doas sets DOAS_USER; sudo sets SUDO_USER).
+U="${DOAS_USER:-${SUDO_USER:-}}"
+[[ -z "$U" ]] && U="$(logname 2>/dev/null || true)"
+[[ -z "$U" || "$U" == "root" ]] && { id legend &>/dev/null && U="legend"; }
+[[ -n "$U" && "$U" != "root" ]] || warn "couldn't determine your normal user — skipping group adds; run 'usermod -aG kvm,libvirt <you>' by hand"
+
+# running-kernel config, to warn when a rebuild is still required
+KCONF=""
+if [[ -r /proc/config.gz ]]; then KCONF="zcat /proc/config.gz"
+elif [[ -r "/boot/config-$(uname -r)" ]]; then KCONF="cat /boot/config-$(uname -r)"
+elif [[ -r /usr/src/linux/.config ]]; then KCONF="cat /usr/src/linux/.config"; fi
+khas() { [[ -n "$KCONF" ]] && $KCONF 2>/dev/null | grep -q "^$1=[ym]"; }
+
+# ============================ KVM: groups + module ===========================
+hdr "QEMU/KVM"
+groupadd -f kvm; groupadd -f libvirt
+if [[ -n "$U" && "$U" != "root" ]]; then
+  usermod -aG kvm,libvirt "$U" && ok "added '$U' to kvm + libvirt (LOG OUT and back in to apply)"
+fi
+if khas CONFIG_KVM_INTEL && [[ ! -e /dev/kvm ]]; then
+  modprobe kvm_intel 2>/dev/null && ok "loaded kvm_intel" || warn "modprobe kvm_intel failed — VT-x may be off in firmware"
+fi
+[[ -e /dev/kvm ]] && ok "/dev/kvm present ($(stat -c '%U:%G %A' /dev/kvm))" \
+  || warn "/dev/kvm still missing — VT-x off in firmware, or KVM not in the kernel (rebuild)."
+
+# ============================ libvirtd service ===============================
+if command -v virsh >/dev/null 2>&1; then
+  rc-update add libvirtd default 2>/dev/null && info "libvirtd enabled at boot"
+  rc-service libvirtd start 2>/dev/null && ok "libvirtd started" || warn "couldn't start libvirtd — check 'rc-service libvirtd status'"
+else
+  info "libvirt not installed — plain 'qemu-system-x86_64 -enable-kvm' still works. (Install: gentoo/setup step 12b.)"
+fi
+
+# ============================ Waydroid =======================================
+hdr "Waydroid"
+if command -v waydroid >/dev/null 2>&1; then
+  # binderfs: waydroid normally mounts it, but mount it now if the kernel supports it
+  if khas CONFIG_ANDROID_BINDERFS && ! mountpoint -q /dev/binderfs 2>/dev/null; then
+    mkdir -p /dev/binderfs
+    mount -t binder binder /dev/binderfs 2>/dev/null && ok "mounted binderfs at /dev/binderfs" \
+      || info "binderfs not mounted (waydroid mounts it on start; fine when stopped)"
+  fi
+  # enable + start the container service (OpenRC here; try systemd too, harmlessly)
+  rc-update add waydroid-container default 2>/dev/null && info "waydroid-container enabled at boot"
+  if rc-service waydroid-container start 2>/dev/null || systemctl start waydroid-container 2>/dev/null; then
+    ok "waydroid-container started"
+  else
+    warn "couldn't start waydroid-container — is the service installed? try 'waydroid container start'"
+  fi
+  if [[ ! -f /var/lib/waydroid/waydroid.cfg ]]; then
+    warn "Waydroid isn't initialised yet — run once (downloads the images, ~1 GB):"
+    warn "    doas waydroid init          # add -s GAPPS for Google apps"
+  else
+    ok "Waydroid already initialised — launch with:  waydroid session start  (then waydroid show-full-ui)"
+  fi
+else
+  warn "waydroid not installed — gentoo/setup step 12c builds it. Install it, then re-run."
+fi
+
+# ============================ rebuild reminder ===============================
+NEED=""
+for o in CONFIG_KVM CONFIG_KVM_INTEL CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
+         CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE; do
+  khas "$o" || NEED="$NEED $o"
+done
+hdr "Next"
+if [[ -n "$NEED" ]]; then
+  warn "the running kernel is still missing:$NEED"
+  warn "these can't be fixed at runtime — rebuild the kernel, then reboot:"
+  warn "    doas bash $(dirname "$0")/rebuild-kernel"
+else
+  ok "kernel has the KVM + Waydroid options. Re-login for the group change, then:"
+  ok "    doas bash $(dirname "$0")/check-virt   # confirm everything's green"
+fi

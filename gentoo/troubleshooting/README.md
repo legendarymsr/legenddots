@@ -15,7 +15,8 @@ Most are read-only diagnostics; the ones that change state say so below.
 | `fix-wifi` | yes (`doas`) | yes | Broadcom WiFi dropped or the `wl` module isn't loaded |
 | `i915-fix` | mixed | yes (bootloader) | Display is broken / `/dev/dri/renderD128` missing (nomodeset stuck on) |
 | `check-32bit` | no (you) | no (read-only) | Auditing that the system is fully 64-bit / no multilib remnants |
-| `check-virt` | yes (`sudo`) | no (read-only) | QEMU/KVM or Waydroid won't work — pinpoints whether it's the kernel config, a group, firmware VT-x, or lockdown |
+| `check-virt` | yes (`doas`) | no (read-only) | QEMU/KVM or Waydroid won't work — pinpoints whether it's the kernel config, a group, firmware VT-x, or lockdown |
+| `fix-virt` | yes (`doas`) | yes | Apply the runtime QEMU/KVM + Waydroid fixes (groups, services, modules, binderfs) without a full re-setup |
 | `rescue` | yes (`sudo`, from a **live USB**) | yes | System won't boot / an update was interrupted — chroot in and rebuild everything |
 | `rebuild-kernel` | yes (root, in chroot) | yes | Kernel hangs at rEFInd "Starting vmlinuz" / boots blind — rebuild from the proven config |
 | `build-rooted-lineage` | yes (`doas`) | yes | Building a rooted, GApps-free LineageOS image on Waydroid (lives in `../waygentoodroid/`) |
@@ -120,7 +121,7 @@ rebuild sweeps out.
 ## `check-virt` — why QEMU/KVM or Waydroid won't work (read-only)
 
 ```sh
-sudo bash ~/legenddots/gentoo/troubleshooting/check-virt
+doas bash ~/legenddots/gentoo/troubleshooting/check-virt
 ```
 
 Changes nothing — it just tells you which layer is broken so you fix the right
@@ -140,6 +141,21 @@ lockdown LSM (it's not enforced unless you add `lockdown=` to the cmdline) — t
 usual real blockers are the kernel missing `USER_NS`/`BLK_DEV_LOOP` for Waydroid's
 container, or the `kvm` group not yet applied to your session. `check-virt` tells
 you which.
+
+## `fix-virt` — apply the QEMU/KVM + Waydroid runtime fixes
+
+```sh
+doas bash ~/legenddots/gentoo/troubleshooting/fix-virt
+```
+
+The doing counterpart to `check-virt`. It applies everything that *doesn't* need a
+kernel rebuild: creates + adds you to the `kvm`/`libvirt` groups, loads `kvm_intel`,
+enables and starts `libvirtd`, mounts `binderfs`, and enables + starts
+`waydroid-container` (and points out `waydroid init` if the images aren't downloaded
+yet). It then re-checks the running kernel and, if `USER_NS`/`BLK_DEV_LOOP`/`KVM`/…
+are still missing, tells you to run `rebuild-kernel` (the one thing it can't do live).
+After it runs: **log out and back in** for the group change, then `check-virt` to
+confirm all green.
 
 ## `rescue` — finish an interrupted update + rebuild the kernel (in place)
 
