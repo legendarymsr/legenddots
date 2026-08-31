@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fix-waydroid-net — get the internet working inside Waydroid.
+# "ping: unknown host ..." inside Android means the container's NAT/DNS isn't
+# routing. On a hardened Gentoo the usual causes are: IPv4 forwarding off (the
+# hardened kernel default), the NAT/forward rules not applied, or dnsmasq (the
+# container's DNS forwarder) not up. This fixes all three, idempotently.
+#
+#   doas bash fix-waydroid-net
+# =============================================================================
+set -o pipefail
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+hdr()  { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
+ok()   { echo -e "  ${GREEN}✓${NC} $*"; }
+warn() { echo -e "  ${YELLOW}!${NC} $*"; }
+info() { echo -e "  ${CYAN}·${NC} $*"; }
+die()  { echo -e "  ${RED}✗${NC} $*"; exit 1; }
+[[ $EUID -eq 0 ]] || die "run as root:  doas bash fix-waydroid-net"
+
+WD_NET="192.168.240.0/24"           # Waydroid's default container subnet
+UPLINK="$(ip route show default 2>/dev/null | awk '{print $5; exit}')"
+
+# 1. IPv4 forwarding — NAT can't route without it (the #1 cause here).
+hdr "IPv4 forwarding"
+sysctl -w net.ipv4.ip_forward=1 >/dev/null && ok "net.ipv4.ip_forward = 1 (now)"
+echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-waydroid.conf && ok "persisted in /etc/sysctl.d/99-waydroid.conf"
+
+# 2. NAT + forward rules for the container subnet, in case waydroid's own rule
+#    didn't apply or the firewall dropped it. Idempotent (-C before -A).
+hdr "NAT + forwarding rules (uplink: ${UPLINK:-unknown})"
+if command -v iptables >/dev/null 2>&1; then
+  iptables -t nat -C POSTROUTING -s "$WD_NET" ! -o waydroid0 -j MASQUERADE 2>/dev/null \
+    || iptables -t nat -A POSTROUTING -s "$WD_NET" ! -o waydroid0 -j MASQUERADE
+  iptables -C FORWARD -i waydroid0 -j ACCEPT 2>/dev/null || iptables -A FORWARD -i waydroid0 -j ACCEPT
+  iptables -C FORWARD -o waydroid0 -j ACCEPT 2>/dev/null || iptables -A FORWARD -o waydroid0 -j ACCEPT
+  ok "MASQUERADE for $WD_NET + FORWARD accept on waydroid0"
+else
+  warn "iptables not found — waydroid needs it for NAT (emerge net-firewall/iptables)"
+fi
+
+# 3. Restart the container so waydroid re-runs its network setup (bridge + dnsmasq).
+hdr "Restarting the container (re-runs bridge + dnsmasq setup)"
+rc-service waydroid-container restart 2>/dev/null && ok "waydroid-container restarted" \
+  || { systemctl restart waydroid-container 2>/dev/null && ok "waydroid-container restarted" \
+       || warn "couldn't restart the service — 'doas waydroid container start' by hand"; }
+sleep 3
+
+# 4. Verify the pieces are actually up.
+hdr "State"
+ip -br addr show waydroid0 2>/dev/null | grep -q UP && ok "waydroid0 bridge is up ($(ip -4 -br addr show waydroid0 2>/dev/null | awk '{print $3}'))" \
+  || warn "waydroid0 bridge missing/down — the container mustn't be running; start it."
+pgrep -f "dnsmasq.*waydroid0" >/dev/null 2>&1 && ok "dnsmasq (container DNS) is running" \
+  || warn "dnsmasq for waydroid0 not seen — DNS may fail even with routing up. It's started by the container; if it's missing, check 'doas waydroid log'."
+
+hdr "Next — test from inside Android"
+echo "  Reopen Termux (or any app) in Waydroid and try, in this order:"
+echo "     ping -c1 192.168.240.1   # the gateway  (tests the bridge)"
+echo "     ping -c1 1.1.1.1         # by IP        (tests NAT/forwarding)"
+echo "     ping -c1 gentoo.org      # by name      (tests DNS)"
+echo "  If IP works but name fails, it's DNS only — tell me and I'll set the"
+echo "  container's resolver directly. If even 192.168.240.1 fails, the container"
+echo "  isn't running: doas rc-service waydroid-container restart"

@@ -12,7 +12,8 @@
 #   bash ~/legenddots/gentoo/waygentoodroid/install-apks
 #
 # Options (env):
-#   MAGISK_REPO=topjohnwu/Magisk   # default; HuskyDG/magisk-files for Magisk Delta
+#   MAGISK_REPO=HuskyDG/magisk-files   # default (Delta, matches the daemon);
+#                                      # topjohnwu/Magisk for the official app
 #   INSTALL_MAGISK=true  INSTALL_TERMUX=true
 # =============================================================================
 set -euo pipefail
@@ -24,9 +25,14 @@ success() { echo -e "  ${GREEN}✓${NC} $*"; }
 warn()    { echo -e "  ${YELLOW}!${NC} $*"; }
 die()     { echo -e "  ${RED}✗${NC} $*"; exit 1; }
 
-MAGISK_REPO="${MAGISK_REPO:-topjohnwu/Magisk}"
+# Default to Magisk Delta — waydroid_script installs Delta's daemon, and only the
+# Delta app recognizes it (the official app opens but shows "install Magisk" because
+# it can't see the Delta daemon). Override with MAGISK_REPO=topjohnwu/Magisk.
+MAGISK_REPO="${MAGISK_REPO:-HuskyDG/magisk-files}"
 INSTALL_MAGISK="${INSTALL_MAGISK:-true}"
 INSTALL_TERMUX="${INSTALL_TERMUX:-true}"
+INSTALL_BRAVE="${INSTALL_BRAVE:-true}"
+BRAVE_APK_URL="${BRAVE_APK_URL:-}"    # optional: a direct Brave-for-Android .apk URL
 
 [[ $EUID -ne 0 ]] || die "run as your USER, not root — waydroid app install talks to your session."
 command -v waydroid >/dev/null 2>&1 || die "waydroid not installed."
@@ -70,7 +76,24 @@ if [[ "$INSTALL_TERMUX" == true ]]; then
   install_apk Termux "$(latest_apk termux/termux-app 'x86_64' || true)" || true
 fi
 
+if [[ "$INSTALL_BRAVE" == true ]]; then
+  header "Brave"
+  # Brave's Android builds aren't on a clean predictable URL. Try a direct URL if
+  # given, else the arm64 APK from brave/brave-browser's latest release (arm64 runs
+  # via houdini on the x86_64 container). NOTE: Brave needs working internet inside
+  # Waydroid to be useful — run fix-waydroid-net first if 'unknown host' persists.
+  BURL="$BRAVE_APK_URL"
+  [[ -z "$BURL" ]] && BURL="$(latest_apk brave/brave-browser 'arm64' || true)"
+  if [[ -n "$BURL" ]]; then
+    install_apk Brave "$BURL" || true
+  else
+    warn "couldn't auto-resolve a Brave APK (Brave's Android builds move around)."
+    warn "Pass one:  BRAVE_APK_URL=<direct .apk> bash $0"
+    warn "Or, once internet works in Waydroid, get it from Aurora Store / brave.com/download."
+  fi
+fi
+
 header "Done"
 success "Reopen the app drawer (or restart the session) and the new apps are there."
 echo "  Root still fine?   waydroid shell su -c id     (want: uid=0(root))"
-echo "  Magisk crashes too? retry with Delta:  MAGISK_REPO=HuskyDG/magisk-files bash $0"
+echo "  Magisk app misbehaves? swap the variant:  MAGISK_REPO=topjohnwu/Magisk bash $0"

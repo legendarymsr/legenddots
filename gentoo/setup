@@ -668,6 +668,11 @@ depend() { need dbus; }
 EOF
     chmod +x /etc/init.d/waydroid-container
     rc-update add waydroid-container default 2>/dev/null || true
+    # Waydroid's container NAT needs IPv4 forwarding — the hardened kernel leaves
+    # it off, so without this the Android container has no internet ("unknown host
+    # ..."). Enable + persist it.
+    echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-waydroid.conf
+    sysctl -p /etc/sysctl.d/99-waydroid.conf >/dev/null 2>&1 || sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
     success "Waydroid built. It needs the binder kernel config (this setup enables"
     success "it), so AFTER rebuilding the kernel and rebooting:"
     echo "  doas rc-service waydroid-container start"
