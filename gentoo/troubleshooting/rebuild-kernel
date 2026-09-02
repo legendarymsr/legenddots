@@ -138,6 +138,14 @@ make defconfig
 ./scripts/config -e CONFIG_SYNC_FILE
 ./scripts/config -e CONFIG_DMABUF_HEAPS
 ./scripts/config -e CONFIG_DMABUF_HEAPS_SYSTEM
+# Android's netd needs POLICY ROUTING (per-network route tables + fwmark ip rules).
+# Without CONFIG_IP_MULTIPLE_TABLES netd can't build the container's route table, so
+# Android has an IP but NO route ("Network is unreachable" / ndc "No such device") —
+# the reason Waydroid had no internet. xt_owner = Android's per-UID network rules.
+./scripts/config -e CONFIG_IP_ADVANCED_ROUTER
+./scripts/config -e CONFIG_IP_MULTIPLE_TABLES
+./scripts/config -e CONFIG_NETFILTER_XT_MATCH_OWNER
+./scripts/config -e CONFIG_INET_DIAG
 # LXC's recommended-kernel notice: MEMCG (container memory cgroup — usually already
 # on) and MACVLAN (an LXC networking mode; Waydroid uses bridge+veth+NAT, not this,
 # but set it to satisfy the notice).
@@ -191,7 +199,7 @@ missing=""
 for opt in CONFIG_DRM_SIMPLEDRM CONFIG_SYSFB_SIMPLEFB CONFIG_FRAMEBUFFER_CONSOLE \
            CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD \
            CONFIG_KVM CONFIG_KVM_INTEL CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
-           CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE; do
+           CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE CONFIG_IP_MULTIPLE_TABLES; do
   grep -q "^${opt}=y" .config || missing="$missing $opt"
 done
 if [[ -n "$missing" ]]; then
