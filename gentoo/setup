@@ -785,6 +785,13 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     ./scripts/config -e CONFIG_USER_NS -e CONFIG_BLK_DEV_LOOP -e CONFIG_CGROUP_DEVICE \
                      -e CONFIG_PSI -e CONFIG_SYNC_FILE -e CONFIG_MEMCG -m CONFIG_MACVLAN \
                      -e CONFIG_DMABUF_HEAPS -e CONFIG_DMABUF_HEAPS_SYSTEM
+    # Android's netd routes EVERYTHING through policy routing (per-network route
+    # tables + fwmark ip rules) and per-UID firewalling. Without IP_MULTIPLE_TABLES
+    # netd can't create the container's route table, so Android gets an IP but NO
+    # usable route — "Network is unreachable", ndc "addRoute failed (No such device)".
+    # THIS is why Waydroid had no internet. xt_owner is Android's per-UID match.
+    ./scripts/config -e CONFIG_IP_ADVANCED_ROUTER -e CONFIG_IP_MULTIPLE_TABLES \
+                     -e CONFIG_NETFILTER_XT_MATCH_OWNER -e CONFIG_INET_DIAG
     # Full hardware + hardening recipe (mirror of install.sh) so a rebuild enables
     # EVERYTHING, not just deltas — Intel ME off, Apple audio/HID/BT/Thunderbolt/
     # USB, broadcom-sta compat (drop in-tree brcm/b43/mac80211), KASLR/PTI/
@@ -814,7 +821,7 @@ if [[ "$REBUILD_KERNEL" == "true" ]]; then
     for opt in CONFIG_DRM_SIMPLEDRM CONFIG_SYSFB_SIMPLEFB CONFIG_FRAMEBUFFER_CONSOLE \
                CONFIG_EXT4_FS CONFIG_SATA_AHCI CONFIG_BLK_DEV_SD \
                CONFIG_ANDROID_BINDER_IPC CONFIG_ANDROID_BINDERFS \
-               CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE \
+               CONFIG_USER_NS CONFIG_BLK_DEV_LOOP CONFIG_CGROUP_DEVICE CONFIG_IP_MULTIPLE_TABLES \
                CONFIG_KVM CONFIG_KVM_INTEL CONFIG_VHOST_NET CONFIG_TUN CONFIG_BRIDGE \
                CONFIG_EXFAT_FS CONFIG_FUSE_FS; do
       grep -q "^${opt}=" .config || missing="$missing $opt"
