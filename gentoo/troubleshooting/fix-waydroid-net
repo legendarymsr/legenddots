@@ -44,9 +44,19 @@ ip -br addr show waydroid0 2>/dev/null | grep -q UP && ok "waydroid0 bridge up (
 pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) running" || warn "dnsmasq for waydroid0 not running — that alone breaks DNS."
 
 # 3. force the container's DNS to a public resolver (the 'unknown host' fix).
-hdr "Container DNS"
+hdr "Container routing + DNS"
 wsh() { waydroid shell -- "$@" 2>/dev/null; }
 if wsh true; then
+  # Waydroid sometimes doesn't install the container's DEFAULT ROUTE, so every
+  # outbound packet is "Network is unreachable" (and DNS then fails too). Add it —
+  # gateway is the host's waydroid0 address, 192.168.240.1.
+  if wsh ip route show default | grep -q 'default'; then
+    ok "container already has a default route"
+  else
+    wsh ip route add default via 192.168.240.1 dev eth0 \
+      && ok "added container default route via 192.168.240.1" \
+      || warn "couldn't add the container default route — check 'waydroid shell -- ip route'"
+  fi
   # 'ndc resolver setnetdns' is removed on modern Android (500 Command not
   # recognized). Use Private DNS (DNS-over-TLS) instead — clean, persists across
   # sessions, and doesn't depend on the container's dnsmasq forwarder at all.
