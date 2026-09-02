@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
-# fix-waydroid-net — repair Waydroid's networking so Android has internet.
-# Idempotent + NON-disruptive: rerun it any time. It never restarts a running
-# container (that drops the DHCP IP/route and breaks the network). Instead it
-# repairs, in place: host ip_forward + NAT, the waydroid0 bridge's gateway IP,
-# and the container's eth0 IP + default route + DNS — then tests from inside
-# Android and prints a verdict.
-#   doas bash fix-waydroid-net
+# fix-waydroid-net — one command to get Waydroid's internet working.
+# By default it does a CLEAN restart (container, and best-effort your session),
+# then repairs the network in place — host ip_forward + NAT, the waydroid0 bridge
+# gateway IP, and the container's eth0 IP + default route + DNS — and tests from
+# inside Android. Idempotent; rerun any time. The repair fills in a static IP +
+# route when Waydroid's DHCP doesn't, so it recovers even a fully dead container.
+#   doas bash fix-waydroid-net                # restart + repair (default)
+#   doas bash fix-waydroid-net --no-restart   # repair the running container in place
 # =============================================================================
 set -o pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -21,7 +22,16 @@ command -v waydroid >/dev/null 2>&1 || die "waydroid not installed."
 WD_NET=192.168.240.0/24; GW=192.168.240.1; GW_CIDR=192.168.240.1/24
 CONT_IP="${CONT_IP:-192.168.240.112/24}"   # static fallback if DHCP gave eth0 no IP
 DNS1="${DNS1:-1.1.1.1}"; DNS2="${DNS2:-1.0.0.1}"
+RESTART=1; [[ "${1:-}" == "--no-restart" ]] && RESTART=0   # default: auto-restart
 wsh() { waydroid shell -- "$@" 2>/dev/null; }
+
+# Figure out the human user + their Wayland session, so we can (re)start the
+# session as them (waydroid session start needs XDG_RUNTIME_DIR + WAYLAND_DISPLAY).
+U="${DOAS_USER:-${SUDO_USER:-}}"; [[ -z "$U" ]] && U="$(logname 2>/dev/null || true)"
+[[ -z "$U" || "$U" == root ]] && { id legend &>/dev/null && U=legend; }
+UID_N="$(id -u "$U" 2>/dev/null || echo)"; XRD="/run/user/${UID_N}"
+WLDISP="$(basename "$(find "$XRD" -maxdepth 1 -name 'wayland-[0-9]*' 2>/dev/null | grep -v '\.lock$' | head -1)" 2>/dev/null)"
+as_user() { su - "$U" -c "export XDG_RUNTIME_DIR='$XRD' WAYLAND_DISPLAY='${WLDISP:-wayland-1}'; $*"; }
 
 # 1. HOST: IPv4 forwarding + NAT + forward accept.
 hdr "Host routing"
@@ -36,6 +46,28 @@ if command -v iptables >/dev/null 2>&1; then
   ok "NAT + FORWARD rules for $WD_NET"
 else
   warn "iptables not found (emerge net-firewall/iptables)"
+fi
+
+# 1b. RESTART Waydroid cleanly (default; pass --no-restart to skip). Host routing
+#     is already set above, so the fresh container comes up with forwarding ready.
+if [[ "$RESTART" == 1 ]]; then
+  hdr "Restarting Waydroid"
+  as_user "waydroid session stop" >/dev/null 2>&1 || waydroid session stop >/dev/null 2>&1 || true
+  rc-service waydroid-container stop >/dev/null 2>&1 || systemctl stop waydroid-container >/dev/null 2>&1 || waydroid container stop >/dev/null 2>&1 || true
+  sleep 2
+  ip link del waydroid0 2>/dev/null || true          # clear a stale bridge for a clean slate
+  ( setsid waydroid container start >/dev/null 2>&1 & )
+  for _ in $(seq 1 15); do ip link show waydroid0 >/dev/null 2>&1 && break; sleep 1; done
+  sleep 2
+  ip link show waydroid0 >/dev/null 2>&1 && ok "container manager restarted, bridge back" || warn "bridge didn't reappear yet"
+  # start the session as the user so Android boots — best-effort (needs their Wayland).
+  if [[ -n "$WLDISP" && -d "$XRD" ]]; then
+    info "starting session as $U (display $WLDISP)…"
+    as_user "setsid waydroid session start >/dev/null 2>&1 < /dev/null &" >/dev/null 2>&1 || warn "session auto-start failed"
+    for _ in $(seq 1 25); do wsh true && break; sleep 1; done    # wait for Android to answer
+  else
+    warn "no Wayland session found for ${U:-?} — start it in niri yourself:  waydroid session start &"
+  fi
 fi
 
 # 2. HOST BRIDGE: waydroid0 must exist (the container creates it) and carry the
