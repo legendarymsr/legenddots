@@ -47,13 +47,15 @@ pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) run
 hdr "Container DNS"
 wsh() { waydroid shell -- "$@" 2>/dev/null; }
 if wsh true; then
-  # Modern Android ignores setprop net.dns* for real resolution — it uses netd,
-  # per-netId. Waydroid's default network is netId 100. Set it there (and on any
-  # other netId dumpsys reports) — THIS is what actually fixes "unknown host".
-  NIDS="100 0 $(wsh sh -c 'dumpsys connectivity 2>/dev/null | grep -oE "netId[ :=]+[0-9]+" | grep -oE "[0-9]+"' 2>/dev/null | sort -u | tr '\n' ' ')"
-  for nid in $NIDS; do wsh ndc resolver setnetdns "$nid" "" "$DNS1" "$DNS2" >/dev/null 2>&1; done
-  wsh setprop net.dns1 "$DNS1"; wsh setprop net.dns2 "$DNS2"
-  ok "set netd DNS -> $DNS1 $DNS2 on netIds: $NIDS (+ setprop fallback)"
+  # 'ndc resolver setnetdns' is removed on modern Android (500 Command not
+  # recognized). Use Private DNS (DNS-over-TLS) instead — clean, persists across
+  # sessions, and doesn't depend on the container's dnsmasq forwarder at all.
+  # one.one.one.one = Cloudflare 1.1.1.1. (Needs routing to reach :853 — if this
+  # doesn't help, the problem is routing, not DNS.)
+  wsh settings put global private_dns_mode hostname
+  wsh settings put global private_dns_specifier one.one.one.one
+  wsh setprop net.dns1 "$DNS1"; wsh setprop net.dns2 "$DNS2"   # legacy fallback
+  ok "set Private DNS -> one.one.one.one (Cloudflare DoT) + net.dns fallback"
 else
   warn "couldn't 'waydroid shell' — is the container running (session up)? DNS not set."
 fi
