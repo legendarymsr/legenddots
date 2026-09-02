@@ -30,18 +30,21 @@ if command -v iptables >/dev/null 2>&1; then
   ok "NAT + FORWARD rules for $WD_NET"
 fi
 
-# 2. clean restart so waydroid re-runs its bridge + dnsmasq setup.
-hdr "Restarting the container"
-waydroid session stop 2>/dev/null || true
-rc-service waydroid-container stop 2>/dev/null || systemctl stop waydroid-container 2>/dev/null || waydroid container stop 2>/dev/null || true
-sleep 2
-rc-service waydroid-container start 2>/dev/null || systemctl start waydroid-container 2>/dev/null || ( setsid waydroid container start >/dev/null 2>&1 & )
-# wait for the container to actually be up
-for _ in $(seq 1 10); do pgrep -f 'waydroid.*container' >/dev/null 2>&1 && break; sleep 1; done
-sleep 3
+# 2. make sure the container is up — but NEVER restart a running one: a mid-flight
+# restart drops the container's DHCP-assigned IP/route and leaves it with no network
+# ("Network is unreachable"). Only start it if it's actually down.
+hdr "Container"
+if pgrep -f 'waydroid.*container' >/dev/null 2>&1; then
+  ok "container manager already running — leaving it alone (a restart drops its network)"
+else
+  info "container not running — starting it (do 'waydroid session start &' in niri after)"
+  ( setsid waydroid container start >/dev/null 2>&1 & )
+  for _ in $(seq 1 12); do pgrep -f 'waydroid.*container' >/dev/null 2>&1 && break; sleep 1; done
+  sleep 3
+fi
 ip -br addr show waydroid0 2>/dev/null | grep -q UP && ok "waydroid0 bridge up ($(ip -4 -br addr show waydroid0 2>/dev/null | awk '{print $3}'))" \
-  || warn "waydroid0 bridge is down — container may not be running."
-pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) running" || warn "dnsmasq for waydroid0 not running — that alone breaks DNS."
+  || warn "waydroid0 bridge down/missing — do a clean restart: waydroid session stop; doas waydroid container stop; doas waydroid container start"
+pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) running" || warn "dnsmasq for waydroid0 not running."
 
 # 3. force the container's DNS to a public resolver (the 'unknown host' fix).
 hdr "Container routing + DNS"
