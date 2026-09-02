@@ -47,13 +47,15 @@ pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) run
 hdr "Container DNS"
 wsh() { waydroid shell -- "$@" 2>/dev/null; }
 if wsh true; then
+  # Modern Android ignores setprop net.dns* for real resolution — it uses netd,
+  # per-netId. Waydroid's default network is netId 100. Set it there (and on any
+  # other netId dumpsys reports) — THIS is what actually fixes "unknown host".
+  NIDS="100 0 $(wsh sh -c 'dumpsys connectivity 2>/dev/null | grep -oE "netId[ :=]+[0-9]+" | grep -oE "[0-9]+"' 2>/dev/null | sort -u | tr '\n' ' ')"
+  for nid in $NIDS; do wsh ndc resolver setnetdns "$nid" "" "$DNS1" "$DNS2" >/dev/null 2>&1; done
   wsh setprop net.dns1 "$DNS1"; wsh setprop net.dns2 "$DNS2"
-  # Android 10+ uses the netd resolver; set it on the active network too.
-  NETID="$(wsh sh -c 'ndc network list 2>/dev/null | grep -oE "[0-9]+" | head -1')"
-  [[ -n "$NETID" ]] && wsh ndc resolver setnetdns "$NETID" "" "$DNS1" "$DNS2" >/dev/null 2>&1
-  ok "set net.dns1=$DNS1 net.dns2=$DNS2 (netid ${NETID:-?})"
+  ok "set netd DNS -> $DNS1 $DNS2 on netIds: $NIDS (+ setprop fallback)"
 else
-  warn "couldn't 'waydroid shell' — is the container running? DNS not set."
+  warn "couldn't 'waydroid shell' — is the container running (session up)? DNS not set."
 fi
 
 # 4. self-test FROM INSIDE Android — this is the definitive diagnosis.
