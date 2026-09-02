@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# fix-waydroid-net — get the internet working inside Waydroid, and self-diagnose.
-# Applies every routing/DNS fix, restarts the container, then runs the ping tests
-# FROM INSIDE Android and reports exactly where (if anywhere) it still breaks.
+# fix-waydroid-net — repair Waydroid's networking so Android has internet.
+# Idempotent + NON-disruptive: rerun it any time. It never restarts a running
+# container (that drops the DHCP IP/route and breaks the network). Instead it
+# repairs, in place: host ip_forward + NAT, the waydroid0 bridge's gateway IP,
+# and the container's eth0 IP + default route + DNS — then tests from inside
+# Android and prints a verdict.
 #   doas bash fix-waydroid-net
 # =============================================================================
 set -o pipefail
@@ -15,12 +18,15 @@ die()  { echo -e "  ${RED}✗${NC} $*"; exit 1; }
 [[ $EUID -eq 0 ]] || die "run as root:  doas bash fix-waydroid-net"
 command -v waydroid >/dev/null 2>&1 || die "waydroid not installed."
 
-WD_NET="192.168.240.0/24"
-DNS1="${DNS1:-1.1.1.1}"; DNS2="${DNS2:-9.9.9.9}"
+WD_NET=192.168.240.0/24; GW=192.168.240.1; GW_CIDR=192.168.240.1/24
+CONT_IP="${CONT_IP:-192.168.240.112/24}"   # static fallback if DHCP gave eth0 no IP
+DNS1="${DNS1:-1.1.1.1}"; DNS2="${DNS2:-1.0.0.1}"
+wsh() { waydroid shell -- "$@" 2>/dev/null; }
 
-# 1. routing: ip_forward + NAT + forward accept (idempotent).
+# 1. HOST: IPv4 forwarding + NAT + forward accept.
 hdr "Host routing"
-sysctl -w net.ipv4.ip_forward=1 >/dev/null; echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-waydroid.conf
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-waydroid.conf
 ok "ip_forward on (persisted)"
 if command -v iptables >/dev/null 2>&1; then
   iptables -t nat -C POSTROUTING -s "$WD_NET" ! -o waydroid0 -j MASQUERADE 2>/dev/null \
@@ -28,70 +34,68 @@ if command -v iptables >/dev/null 2>&1; then
   iptables -C FORWARD -i waydroid0 -j ACCEPT 2>/dev/null || iptables -A FORWARD -i waydroid0 -j ACCEPT
   iptables -C FORWARD -o waydroid0 -j ACCEPT 2>/dev/null || iptables -A FORWARD -o waydroid0 -j ACCEPT
   ok "NAT + FORWARD rules for $WD_NET"
-fi
-
-# 2. make sure the container is up — but NEVER restart a running one: a mid-flight
-# restart drops the container's DHCP-assigned IP/route and leaves it with no network
-# ("Network is unreachable"). Only start it if it's actually down.
-hdr "Container"
-if pgrep -f 'waydroid.*container' >/dev/null 2>&1; then
-  ok "container manager already running — leaving it alone (a restart drops its network)"
 else
-  info "container not running — starting it (do 'waydroid session start &' in niri after)"
-  ( setsid waydroid container start >/dev/null 2>&1 & )
-  for _ in $(seq 1 12); do pgrep -f 'waydroid.*container' >/dev/null 2>&1 && break; sleep 1; done
-  sleep 3
+  warn "iptables not found (emerge net-firewall/iptables)"
 fi
-ip -br addr show waydroid0 2>/dev/null | grep -q UP && ok "waydroid0 bridge up ($(ip -4 -br addr show waydroid0 2>/dev/null | awk '{print $3}'))" \
-  || warn "waydroid0 bridge down/missing — do a clean restart: waydroid session stop; doas waydroid container stop; doas waydroid container start"
-pgrep -f 'dnsmasq.*waydroid0' >/dev/null 2>&1 && ok "dnsmasq (container DNS) running" || warn "dnsmasq for waydroid0 not running."
 
-# 3. force the container's DNS to a public resolver (the 'unknown host' fix).
-hdr "Container routing + DNS"
-wsh() { waydroid shell -- "$@" 2>/dev/null; }
-if wsh true; then
-  # Waydroid sometimes doesn't install the container's DEFAULT ROUTE, so every
-  # outbound packet is "Network is unreachable" (and DNS then fails too). Add it —
-  # gateway is the host's waydroid0 address, 192.168.240.1.
-  if wsh ip route show default | grep -q 'default'; then
-    ok "container already has a default route"
+# 2. HOST BRIDGE: waydroid0 must exist (the container creates it) and carry the
+#    gateway IP. Add it if it's missing.
+hdr "Host bridge (waydroid0)"
+if ip link show waydroid0 >/dev/null 2>&1; then
+  ip link set waydroid0 up 2>/dev/null
+  if ip -4 addr show waydroid0 2>/dev/null | grep -q "$GW"; then
+    ok "waydroid0 up, has $GW"
   else
-    wsh ip route add default via 192.168.240.1 dev eth0 \
-      && ok "added container default route via 192.168.240.1" \
-      || warn "couldn't add the container default route — check 'waydroid shell -- ip route'"
+    ip addr add "$GW_CIDR" dev waydroid0 2>/dev/null && ok "added $GW to waydroid0" || warn "couldn't add $GW to waydroid0"
   fi
-  # 'ndc resolver setnetdns' is removed on modern Android (500 Command not
-  # recognized). Use Private DNS (DNS-over-TLS) instead — clean, persists across
-  # sessions, and doesn't depend on the container's dnsmasq forwarder at all.
-  # one.one.one.one = Cloudflare 1.1.1.1. (Needs routing to reach :853 — if this
-  # doesn't help, the problem is routing, not DNS.)
+else
+  warn "waydroid0 doesn't exist — the container isn't running yet."
+  info "Start it first, then rerun me:  doas waydroid container start   (+ 'waydroid session start &' in niri)"
+fi
+
+# 3. CONTAINER: eth0 up, has an IP, has a default route, has DNS. All in place
+#    without restarting anything.
+hdr "Container network"
+if wsh true; then
+  wsh ip link set eth0 up
+  if wsh ip addr show eth0 | grep -q '192\.168\.240'; then
+    ok "eth0 has an IP ($(wsh ip -4 addr show eth0 | awk '/inet /{print $2; exit}'))"
+  else
+    wsh ip addr add "$CONT_IP" dev eth0 && ok "assigned $CONT_IP to eth0 (DHCP had given none)" \
+      || warn "couldn't set eth0 IP"
+  fi
+  if wsh ip route show default | grep -q default; then
+    ok "default route present"
+  else
+    wsh ip route add default via "$GW" dev eth0 && ok "added default route via $GW" \
+      || warn "couldn't add default route (does eth0 have a 192.168.240.x IP above?)"
+  fi
+  # DNS: Private DNS (DoT) — modern, persists, bypasses the flaky dnsmasq forwarder.
   wsh settings put global private_dns_mode hostname
   wsh settings put global private_dns_specifier one.one.one.one
-  wsh setprop net.dns1 "$DNS1"; wsh setprop net.dns2 "$DNS2"   # legacy fallback
-  ok "set Private DNS -> one.one.one.one (Cloudflare DoT) + net.dns fallback"
+  wsh setprop net.dns1 "$DNS1"; wsh setprop net.dns2 "$DNS2"
+  ok "DNS -> Private DNS one.one.one.one (Cloudflare) + net.dns fallback"
 else
-  warn "couldn't 'waydroid shell' — is the container running (session up)? DNS not set."
+  warn "'waydroid shell' failed — the session isn't running."
+  info "In niri:  waydroid session start &   then rerun me."
 fi
 
-# 4. self-test FROM INSIDE Android — this is the definitive diagnosis.
-hdr "Testing from inside Android"
+# 4. TEST from inside Android + verdict.
+hdr "Test (from inside Android)"
 t() { wsh ping -c1 -W2 "$1" >/dev/null 2>&1 && { ok "ping $1 — OK"; return 0; } || { warn "ping $1 — FAIL"; return 1; }; }
-GW=ok; IP=ok; NM=ok
-t 192.168.240.1 || GW=fail
-t 1.1.1.1        || IP=fail
-t gentoo.org     || NM=fail
-
+G=ok; I=ok; N=ok
+t "$GW" || G=fail
+t 1.1.1.1 || I=fail
+t fsf.org || N=fail
 hdr "Verdict"
-if [[ "$GW" == ok && "$IP" == ok && "$NM" == ok ]]; then
+if [[ $G == ok && $I == ok && $N == ok ]]; then
   ok "Internet works inside Waydroid. 🎉  Reopen your apps."
-elif [[ "$GW" == fail ]]; then
-  warn "Can't even reach the gateway → the container isn't networked. It's probably"
-  warn "not fully running: start the session once (waydroid session start &) then re-run."
-elif [[ "$IP" == fail ]]; then
-  warn "Gateway OK but no route to the internet → NAT/forwarding. If you run a firewall"
-  warn "(nft), it's dropping forwarded packets; otherwise check the host's own uplink."
-elif [[ "$NM" == fail ]]; then
-  warn "Routing works, only DNS fails. The net.dns props are set above — fully restart"
-  warn "the session (waydroid session stop; waydroid session start &) and retest. If it"
-  warn "persists, your host /etc/resolv.conf may point at a dead stub (127.0.0.53)."
+elif [[ $G == fail ]]; then
+  warn "Can't reach the gateway → the container network is down. Do ONE clean restart,"
+  warn "then rerun me:  waydroid session stop; doas waydroid container stop; doas waydroid container start"
+elif [[ $I == fail ]]; then
+  warn "Gateway OK, no route to the internet → host NAT/uplink. Are you online on the host?"
+else
+  warn "Routing OK, DNS still resolving-fails → rerun me once more (Private DNS needs one"
+  warn "lookup to bootstrap), or check the host's /etc/resolv.conf has a real nameserver."
 fi
