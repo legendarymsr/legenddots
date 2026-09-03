@@ -35,19 +35,6 @@ Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; in
 vim yourself (it's a vi, and it's in every main repo, Termux included). The vimrc is
 deliberately bare: `syntax on` and `tabstop`/`shiftwidth=4` — nothing else.
 
-**Editing it later** — because `~/.vimrc` is a symlink into this repo, editing it
-*is* editing the repo file. The `vim/vimup` helper collapses the whole loop into one
-word: it opens the config, then commits + pushes only if you changed something.
-
-```sh
-vimup        # edit vim/vimrc, then auto commit + push
-vimup lsp    # same, for vim/c-lsp.vim
-```
-
-The alias is added to `~/.zshrc` (Gentoo) and, via `termux/dotfiles.sh`, to
-`~/.bashrc`/`~/.zshrc` on the phone. Push is best-effort — offline, the commit still
-lands and pushes next time.
-
 **Optional C/C++ LSP** (`vim/c-lsp.vim`) — kept out of the base vimrc so that stays
 minimal. It's the dead-simplest LSP path for real Vim (Vim has no built-in client):
 the pure-Vim9 [`yegappan/lsp`](https://github.com/yegappan/lsp) plugin driving

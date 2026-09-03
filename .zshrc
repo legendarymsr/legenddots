@@ -265,7 +265,6 @@ export MANPAGER="${MANPAGER:-nvim +Man!}"   # man pages open in neovim (:Man)
 alias v='nvim'
 alias vi='nvim'
 alias vim='nvim'
-alias vimup="$HOME/legenddots/suckless/vim/vimup"   # edit + commit + push the suckless vimrc
 alias e='emacsclient -t -a ""'     # terminal emacs via the daemon (auto-starts)
 alias ee='emacsclient -t -a "" -e'  # eval elisp in the running emacs
 
