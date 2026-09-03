@@ -33,8 +33,8 @@ ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
 Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
 vim yourself (it's a vi, and it's in every main repo, Termux included). The vimrc is
-deliberately bare: `autoindent`, `shiftwidth`/`tabstop=4`, `number`, `showmatch`,
-`ignorecase`, `incsearch`, `syntax on` — nothing else.
+deliberately bare: `autoindent`, `shiftwidth`/`tabstop=4`, `ignorecase`, `syntax on`
+— nothing else.
 
 **Declaratively you don't symlink by hand:**
 
