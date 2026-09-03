@@ -33,8 +33,20 @@ ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
 Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
 vim yourself (it's a vi, and it's in every main repo, Termux included). The vimrc is
-deliberately bare: `autoindent`, `shiftwidth`/`tabstop=4`, `ignorecase`, `syntax on`
-— nothing else.
+deliberately bare: `syntax on` and `tabstop`/`shiftwidth=4` — nothing else.
+
+**Optional C/C++ LSP** (`vim/c-lsp.vim`) — kept out of the base vimrc so that stays
+minimal. It's the dead-simplest LSP path for real Vim (Vim has no built-in client):
+the pure-Vim9 [`yegappan/lsp`](https://github.com/yegappan/lsp) plugin driving
+`clangd` — no node, no python, no plugin manager. Install:
+
+```sh
+git clone https://github.com/yegappan/lsp ~/.vim/pack/lsp/start/lsp   # Vim native packages
+echo 'source ~/legenddots/suckless/vim/c-lsp.vim' >> ~/.vimrc          # opt in
+```
+
+Then `clangd` starts on `.c`/`.cpp` buffers; keys: `gd` def, `gr` refs, `K` hover,
+`grn` rename, `gra` code action. (Needs Vim 9 and `clangd` on `PATH`.)
 
 **Declaratively you don't symlink by hand:**
 
