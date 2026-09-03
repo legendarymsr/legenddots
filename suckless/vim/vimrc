@@ -1,3 +1,8 @@
 syntax on
 set tabstop=4 shiftwidth=4
 set number
+
+" C/C++ LSP — only loads if the yegappan/lsp plugin is actually installed.
+if isdirectory(expand('~/.vim/pack/lsp/start/lsp'))
+  source ~/legenddots/suckless/vim/c-lsp.vim
+endif
