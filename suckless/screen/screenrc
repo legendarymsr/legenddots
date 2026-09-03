@@ -1,14 +1,3 @@
-escape ^Tt
 startup_message off
 defscrollback 10000
 altscreen on
-term screen-256color
-caption always '%n %t'
-
-bind s eval 'split' 'focus down' 'screen'
-bind v eval 'split -v' 'focus right' 'screen'
-bind h focus left
-bind j focus down
-bind k focus up
-bind l focus right
-bind x remove
