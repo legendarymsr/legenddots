@@ -1,48 +1,29 @@
-function s:LspInit()
+function s:Init()
   call LspOptionsSet(#{showDiagWithVirtualText: v:false, showDiagInPopup: v:true})
-  call LspAddServer([#{name: 'clangd', filetype: ['c', 'cpp'], path: 'clangd', args: []}])
-  for sev in ['Error', 'Warning', 'Info', 'Hint']
-    execute 'highlight LspDiagInline' .. sev .. ' ctermbg=NONE guibg=NONE cterm=underline gui=underline'
+  call LspAddServer([#{name: 'clangd', filetype: ['c', 'cpp'], path: 'clangd'}])
+  for s in ['Error', 'Warning', 'Info', 'Hint']
+    execute 'highlight LspDiagInline' .. s .. ' ctermbg=NONE guibg=NONE cterm=underline gui=underline'
   endfor
-  highlight LspDiagSignErrorText   ctermbg=NONE guibg=NONE cterm=bold gui=bold ctermfg=red    guifg=#f7768e
-  highlight LspDiagSignWarningText ctermbg=NONE guibg=NONE ctermfg=yellow guifg=#e0af68
-  highlight LspDiagSignInfoText    ctermbg=NONE guibg=NONE ctermfg=cyan   guifg=#7dcfff
-  highlight LspDiagSignHintText    ctermbg=NONE guibg=NONE ctermfg=green  guifg=#9ece6a
 endfunction
 
+" turn the plugin's E>/W> signs into line-number colors (red number = broken line)
 function s:NumSigns()
-  let bnr = bufnr('%')
-  let placed = sign_getplaced(bnr, {'group': 'LSPDiag'})
-  let m = {'LspDiagError': 'LspDiagSignErrorText', 'LspDiagWarning': 'LspDiagSignWarningText', 'LspDiagInfo': 'LspDiagSignInfoText', 'LspDiagHint': 'LspDiagSignHintText'}
-  let converted = v:false
-  for [nm, hl] in items(m)
-    let d = sign_getdefined(nm)
+  for c in [['LspDiagError','red','#f7768e'], ['LspDiagWarning','yellow','#e0af68'], ['LspDiagInfo','cyan','#7dcfff'], ['LspDiagHint','green','#9ece6a']]
+    let d = sign_getdefined(c[0])
     if !empty(d) && has_key(d[0], 'text')
-      call sign_undefine(nm)
-      call sign_define(nm, {'numhl': hl})
-      let converted = v:true
+      execute 'highlight ' .. c[0] .. 'Num ctermfg=' .. c[1] .. ' guifg=' .. c[2]
+      call sign_undefine(c[0])
+      call sign_define(c[0], #{numhl: c[0] .. 'Num'})
     endif
   endfor
-  if converted && !empty(placed) && !empty(placed[0].signs)
-    call sign_unplace('LSPDiag', {'buffer': bnr})
-    for s in placed[0].signs
-      call sign_place(0, 'LSPDiag', s.name, bnr, {'lnum': s.lnum})
-    endfor
-  endif
 endfunction
 
-augroup c_lsp
-  autocmd!
-  autocmd VimEnter * call s:LspInit()
-  autocmd User LspAttached call s:NumSigns()
-  autocmd User LspDiagsUpdated call s:NumSigns()
-augroup END
+autocmd VimEnter * call s:Init()
+autocmd User LspAttached call s:NumSigns()
 
-nnoremap <silent> gd :LspGotoDefinition<CR>
-nnoremap <silent> gr :LspShowReferences<CR>
-nnoremap <silent> K  :LspHover<CR>
-nnoremap <silent> grn :LspRename<CR>
-nnoremap <silent> gra :LspCodeAction<CR>
-nnoremap <silent> gl :LspDiag current<CR>
-nnoremap <silent> ]g :LspDiag next<CR>
-nnoremap <silent> [g :LspDiag prev<CR>
+nnoremap <silent> gd <Cmd>LspGotoDefinition<CR>
+nnoremap <silent> gr <Cmd>LspShowReferences<CR>
+nnoremap <silent> K  <Cmd>LspHover<CR>
+nnoremap <silent> gl <Cmd>LspDiag current<CR>
+nnoremap <silent> ]g <Cmd>LspDiag next<CR>
+nnoremap <silent> [g <Cmd>LspDiag prev<CR>
