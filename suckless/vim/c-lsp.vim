@@ -11,17 +11,29 @@ function s:LspInit()
 endfunction
 
 function s:NumSigns()
-  for s in sign_getdefined()
-    if has_key(s, 'text') && has_key(s, 'texthl') && s.texthl =~# '^LspDiag'
-      call sign_define(s.name, {'numhl': s.texthl})
+  let bnr = bufnr('%')
+  let placed = sign_getplaced(bnr, {'group': 'LSPDiag'})
+  let m = {'LspDiagError': 'LspDiagSignErrorText', 'LspDiagWarning': 'LspDiagSignWarningText', 'LspDiagInfo': 'LspDiagSignInfoText', 'LspDiagHint': 'LspDiagSignHintText'}
+  let converted = v:false
+  for [nm, hl] in items(m)
+    let d = sign_getdefined(nm)
+    if !empty(d) && has_key(d[0], 'text')
+      call sign_undefine(nm)
+      call sign_define(nm, {'numhl': hl})
+      let converted = v:true
     endif
   endfor
+  if converted && !empty(placed) && !empty(placed[0].signs)
+    call sign_unplace('LSPDiag', {'buffer': bnr})
+    for s in placed[0].signs
+      call sign_place(0, 'LSPDiag', s.name, bnr, {'lnum': s.lnum})
+    endfor
+  endif
 endfunction
 
 augroup c_lsp
   autocmd!
   autocmd VimEnter * call s:LspInit()
-  autocmd VimEnter * call s:NumSigns()
   autocmd User LspAttached call s:NumSigns()
   autocmd User LspDiagsUpdated call s:NumSigns()
 augroup END
