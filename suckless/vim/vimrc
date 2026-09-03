@@ -1,5 +1,2 @@
-set autoindent
-set shiftwidth=4
-set tabstop=4
-set ignorecase
 syntax on
+set tabstop=4 shiftwidth=4
