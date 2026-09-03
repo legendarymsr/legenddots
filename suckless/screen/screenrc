@@ -1,17 +1,13 @@
-# ~/.screenrc — minimal GNU Screen.
-# A dotfile, not a config.h: screen is configured at runtime, so just symlink
-# this to ~/.screenrc (no rebuild). GNU Screen, not suckless — kept here for the
-# minimalist collection alongside st/dwm.
+startup_message off
+defscrollback 10000
+altscreen on
+term screen-256color
+caption always '%n %t'
 
-startup_message off          # skip the licence splash
-defscrollback 10000          # generous scrollback
-altscreen on                 # restore the screen after full-screen apps (vim/less)
-vbell off                    # no visual bell flash
-defutf8 on                   # UTF-8
-term screen-256color         # 256-colour TERM inside screen
-
-# Bottom status line: window list (current window in reverse video) on the left,
-# hostname + clock on the right. screen's status line is 16-colour only, so this
-# uses the reverse-video attribute rather than any Tokyo Night hex.
-hardstatus alwayslastline
-hardstatus string '%-w%{r}%n %t%{-}%+w %= %H  %c'
+bind s eval 'split' 'focus down' 'screen'
+bind v eval 'split -v' 'focus right' 'screen'
+bind h focus left
+bind j focus down
+bind k focus up
+bind l focus right
+bind x remove
