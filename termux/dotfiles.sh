@@ -46,6 +46,17 @@ link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
 link "$REPO/suckless/vim/vimrc"        "$HOME/.vimrc"
 
+# 3b. make `vimup` a one-word command (edit the vimrc, then commit + push it).
+#     Idempotent: only added once per rc, matched by the script path.
+VIMUP_ALIAS="alias vimup='\$HOME/legenddots/suckless/vim/vimup'"
+for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  [ -e "$rc" ] || touch "$rc"
+  if ! grep -qF "suckless/vim/vimup" "$rc" 2>/dev/null; then
+    printf '%s\n' "$VIMUP_ALIAS" >> "$rc"
+    say "added the 'vimup' alias to $(basename "$rc")"
+  fi
+done
+
 # 4. cleanup of earlier versions of this script:
 #  a) it used to link ~/.exrc to the (now removed) vi config — drop that dangling link
 if [ -L "$HOME/.exrc" ]; then
@@ -67,4 +78,5 @@ done
 
 echo
 say "Done. Packages: pkg install neovim tmux screen vim git"
-say "vim uses the minimal ~/.vimrc (linked)."
+say "vim uses the minimal ~/.vimrc (linked). Edit + push it with:  vimup"
+say "(restart your shell or 'source ~/.bashrc' to pick up the vimup alias)"
