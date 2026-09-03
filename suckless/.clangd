@@ -1,0 +1,9 @@
+# suckless config.h files are #include'd into each program's source, not
+# standalone translation units — so on their own clangd flags a wall of
+# "undefined" errors. Suppress diagnostics on them; highlighting, hover, and
+# completion still work. clangd finds this file by walking up from the edited
+# file, so it applies to suckless/*/config.h.
+If:
+  PathMatch: .*/config\.h
+Diagnostics:
+  Suppress: "*"
