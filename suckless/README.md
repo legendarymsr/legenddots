@@ -22,7 +22,7 @@ you *symlink* them, no rebuild.
 
 | Tool | What | file | symlink to |
 |------|------|------|-----------|
-| **screen** | terminal multiplexer (GNU, tmux-style `hjkl` region tiling) | `screen/screenrc` | `~/.screenrc` |
+| **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
 | **vim** | very minimal vim config | `vim/vimrc` | `~/.vimrc` |
 
 ```sh
