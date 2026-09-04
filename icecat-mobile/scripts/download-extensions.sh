@@ -37,5 +37,7 @@ download_extension privacy-badger privacy-badger17
 download_extension darkreader      darkreader
 download_extension librejs         librejs
 download_extension jshelter        javascript-restrictor
+download_extension libredirect    libredirect
+download_extension tprb           tprb
 
 echo "==> Extensions downloaded to $WORK_DIR/extensions/"

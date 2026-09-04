@@ -98,7 +98,7 @@ if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
   echo "==> [EXPERIMENTAL] Bundling built-in extensions (BUNDLE_EXTENSIONS=true)"
   [ -d "$WORK_DIR/extensions" ] || { echo "Run scripts/download-extensions.sh first"; exit 1; }
 
-  for ext in ublock0 privacy-badger darkreader librejs jshelter; do
+  for ext in ublock0 privacy-badger darkreader librejs jshelter libredirect tprb; do
     echo "==> Copying $ext into assets/extensions/"
     rm -rf "$WORK_DIR/src/assets/extensions/$ext"
     cp -r "$WORK_DIR/extensions/$ext" "$WORK_DIR/src/assets/extensions/$ext"
@@ -130,7 +130,9 @@ if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
     "jid1-MnnxcxisBPnSXQ@jetpack:privacy-badger" \
     "addon@darkreader.org:darkreader" \
     "jid1-KtlZuoiikVfFew@jetpack:librejs" \
-    "jsr@javascriptrestrictor:jshelter"; do
+    "jsr@javascriptrestrictor:jshelter" \
+    "7esoorv3@alefvanoon.anonaddy.me:libredirect" \
+    "tprb.addon@searxes.danwin1210.me:tprb"; do
     guid="${pair%%:*}"; dir="${pair##*:}"
     printf '    const-string %s, "%s"\n    const-string %s, "resource://android/assets/extensions/%s/"\n    invoke-interface {%s, %s, %s, %s, %s}, %s\n' \
       "$ID" "$guid" "$URL" "$dir" "$R" "$ID" "$URL" "$SUCC" "$ERR" "$IFACE" >> "$BLOCK"
