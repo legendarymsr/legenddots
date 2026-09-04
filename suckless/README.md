@@ -93,6 +93,62 @@ The manual `ln -sfn` above is only for non-declarative setups.
 
 ---
 
+## Config reference
+
+The `config.h` files are kept **comment-free** — what each thing does lives here
+instead. All Tokyo Night (`bg #1a1b26`, `fg #c0caf5`, `dim #414868`, `accent/blue
+#7aa2f7`, `urgent/red #f7768e`), JetBrainsMono Nerd Font size 11.
+
+### dwm (X11) & dwl (Wayland) — same scheme
+
+Mod is **Super** (`Mod4` / `LOGO`). dwm spawns `st` + `dmenu` + `slock`; dwl spawns
+`foot` + `menu` (wmenu) + `swaylock`.
+
+| Key | Action |
+|-----|--------|
+| `Mod+Return` | terminal |
+| `Mod+d` | launcher |
+| `Mod+b` / `Mod+e` | icecat / emacs |
+| `Mod+Esc` | lock screen |
+| `Mod+j` / `Mod+k` | focus next / prev window |
+| `Mod+h` / `Mod+l` | shrink / grow master area |
+| `Mod+i` / `Mod+o` | more / fewer master windows |
+| `Mod+space` | zoom (promote to master) |
+| `Mod+t` / `Mod+f` / `Mod+m` | tile / floating / monocle layout |
+| `Mod+Shift+space` | toggle floating |
+| `Mod+Shift+q` (dwl) / `Mod+Shift+c` (dwm) | kill window |
+| `Mod+F11` (dwl) | fullscreen |
+| `Mod+1..9` | view tag · `+Shift` move window · `+Ctrl` toggle-view · `+Ctrl+Shift` toggle-tag |
+| `Mod+0` | view all tags · `Mod+Tab` last tag |
+| `Mod+,` / `Mod+.` | focus monitor left / right (`+Shift` moves the window) |
+| `Mod+Shift+e` | quit the WM · dwl: `Ctrl+Alt+F1..F12` switch VT |
+
+**Rules:** Gimp floats; IceCat opens on tag 9. **Layouts:** tile `[]=`, float `><>`,
+monocle `[M]`; master factor `0.55`, 1 master.
+
+### st
+
+Trimmed from stock: **no** F13–F35 keys, **no** keypad table, **no** mouse
+shortcuts (keyboard-only) — the source references still exist so it compiles clean.
+`shell=/bin/sh`, `borderpx=12`, `tabspaces=8`, `termname=st-256color`. The 16-colour
+`colorname[]` is the Tokyo Night palette (256→fg, 257→bg, 258→cursor).
+
+### surf
+
+Mod is **Ctrl**. `Ctrl+g` = go (URL prompt), `Ctrl+f` = find; standard surf binds
+otherwise. Behaviour flags only — page colours come from your user CSS. Keeps the
+`suckless.org` cert-pinning regex and the `SETPROP`/`DOWNLOAD`/`PLUMB`/`VIDEOPLAY`
+helper macros.
+
+### slock / dmenu
+
+**slock** drops privileges to `nobody` after locking; three Tokyo Night states —
+idle (init), input, wrong-password — and treats a cleared field as a wrong attempt.
+**dmenu** is themed to match (`-nb/-nf/-sb/-sf`), JetBrainsMono; add `-b` for a
+bottom bar or `-l N` for a vertical list at runtime.
+
+---
+
 ## Declarative builds (NixOS / Guix)
 
 You don't have to build by hand — this folder is self-contained.
