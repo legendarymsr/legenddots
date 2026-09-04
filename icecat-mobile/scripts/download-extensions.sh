@@ -36,5 +36,6 @@ download_extension ublock0        ublock-origin
 download_extension privacy-badger privacy-badger17
 download_extension darkreader      darkreader
 download_extension librejs         librejs
+download_extension jshelter        javascript-restrictor
 
 echo "==> Extensions downloaded to $WORK_DIR/extensions/"
