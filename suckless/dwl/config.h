@@ -80,7 +80,7 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 
 /* commands */
 static const char *termcmd[] = { "foot", NULL };
-static const char *menucmd[] = { "fuzzel", NULL };
+static const char *menucmd[] = { "menu", NULL };	/* wmenu wrapper: suckless/wmenu/menu */
 
 static const Key keys[] = {
 	/* Note that Shift changes certain key codes: 2 -> at, etc. */

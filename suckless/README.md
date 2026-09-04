@@ -11,7 +11,7 @@ dotfiles — edit one, then rebuild that program. All themed **Tokyo Night**,
 | **slock** | screen locker | `slock/config.h` — Tokyo Night lock colors |
 | **dmenu** | launcher | `dmenu/config.h` — Tokyo Night + font |
 | **dwm** | X11 tiling WM | `dwm/config.h` — Super mod, hjkl, st + dmenu |
-| **dwl** | Wayland tiling WM (dwm-alike) | `dwl/config.h` — Super mod, foot + fuzzel |
+| **dwl** | Wayland tiling WM (dwm-alike) | `dwl/config.h` — Super mod, foot + wmenu |
 | **surf** | WebKit browser | `surf/config.h` — behaviour/keybinds (colors via user CSS) |
 
 ### Also here — not suckless, but same spirit
@@ -24,11 +24,23 @@ you *symlink* them, no rebuild.
 |------|------|------|-----------|
 | **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
 | **vim** | very minimal vim config | `vim/vimrc` | `~/.vimrc` |
+| **foot** | Wayland terminal (dwl's `termcmd`) | `foot/foot.ini` | `~/.config/foot/foot.ini` |
+| **wmenu** | Wayland launcher (dwl's `menucmd`) | `wmenu/menu` | `~/.local/bin/menu` |
 
 ```sh
 ln -sfn "$PWD/screen/screenrc" ~/.screenrc
 ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
+ln -sfn "$PWD/foot/foot.ini"   ~/.config/foot/foot.ini
+ln -sfn "$PWD/wmenu/menu"      ~/.local/bin/menu          # dwl runs `menu` on Mod+d
 ```
+
+**foot + wmenu complement dwl.** dwl's `config.h` launches `foot` (`Mod+Return`)
+and `menu` (`Mod+d`). `foot/foot.ini` themes foot Tokyo Night + JetBrainsMono to
+match st. **wmenu has no config file** — it's configured by flags — so
+`wmenu/menu` is a tiny wrapper that runs `wmenu-run` with the theme; dwl calls it
+by name (`menucmd = { "menu" }`), so keep it on `PATH`. Install the programs with
+`gui-apps/foot` + `gui-apps/wmenu` (Gentoo; wmenu is in the GURU overlay),
+`foot wmenu` (Arch/nixpkgs).
 
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
 Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
