@@ -5,7 +5,7 @@
 # Fenix smali tree and adds one call to IcecatExtensions->installAll() from
 # Core's BrowserStore initializer (where Fenix itself installs its own
 # built-in extensions, e.g. "icons@mozac.org"). installAll() registers
-# GNU LibreJS, uBlock Origin, Privacy Badger, and Dark Reader as built-in
+# GNU LibreJS, uBlock Origin, Privacy Badger, Dark Reader, and JShelter as built-in
 # WebExtensions the same way, via
 # WebExtensionRuntime->installBuiltInWebExtension(), using their unpacked
 # XPIs under assets/extensions/ (placed there by the same script from
@@ -77,6 +77,20 @@
     const-string v2, "jid1-KtlZuoiikVfFew@jetpack"
 
     const-string v3, "resource://android/assets/extensions/librejs/"
+
+    invoke-interface {p0, v2, v3, v0, v1}, Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;->installBuiltInWebExtension(Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+
+    new-instance v0, Lmozilla/components/support/webextensions/BuiltInWebExtensionController$$ExternalSyntheticLambda2;
+
+    invoke-direct {v0}, Ljava/lang/Object;-><init>()V
+
+    new-instance v1, Lmozilla/components/support/webextensions/BuiltInWebExtensionController$$ExternalSyntheticLambda3;
+
+    invoke-direct {v1}, Ljava/lang/Object;-><init>()V
+
+    const-string v2, "jsr@javascriptrestrictor"
+
+    const-string v3, "resource://android/assets/extensions/jshelter/"
 
     invoke-interface {p0, v2, v3, v0, v1}, Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;->installBuiltInWebExtension(Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 

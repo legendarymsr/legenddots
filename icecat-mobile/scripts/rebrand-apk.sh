@@ -85,7 +85,7 @@ if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
   echo "==> [EXPERIMENTAL] Bundling built-in extensions (BUNDLE_EXTENSIONS=true)"
   [ -d "$WORK_DIR/extensions" ] || { echo "Run scripts/download-extensions.sh first"; exit 1; }
 
-  for ext in ublock0 privacy-badger darkreader librejs; do
+  for ext in ublock0 privacy-badger darkreader librejs jshelter; do
     echo "==> Copying $ext into assets/extensions/"
     rm -rf "$WORK_DIR/src/assets/extensions/$ext"
     cp -r "$WORK_DIR/extensions/$ext" "$WORK_DIR/src/assets/extensions/$ext"

@@ -19,8 +19,8 @@ This folder is self-contained: all paths below are relative to
    `build/upstream.apk`.
 2. `scripts/download-extensions.sh` is a no-op unless `BUNDLE_EXTENSIONS="true"`
    (see "Bundled extensions (experimental)" below), in which case it
-   downloads GNU LibreJS, uBlock Origin, Privacy Badger, and Dark Reader from
-   addons.mozilla.org into `build/extensions/`.
+   downloads GNU LibreJS, JShelter, uBlock Origin, Privacy Badger, and Dark
+   Reader from addons.mozilla.org into `build/extensions/`.
 3. `scripts/rebrand-apk.sh` decompiles `build/upstream.apk` with `apktool`,
    then:
    - rewrites the `app_name` string to `APP_NAME` and replaces remaining
@@ -198,10 +198,11 @@ checker, or crash-reporter URLs is unaffected.
 
 **Status: experimental, opt-in, default off, untested on a real device.**
 Set `BUNDLE_EXTENSIONS="true"` in `config/branding.env` to have
-`scripts/package.sh` pre-install GNU LibreJS, uBlock Origin, Privacy Badger,
-and Dark Reader as **built-in, auto-enabled WebExtensions** — no taps, no
-visit to Settings → Add-ons required. The published `icecat-latest` release
-is built with `BUNDLE_EXTENSIONS="false"` (the default); this is something
+`scripts/package.sh` pre-install GNU LibreJS, JShelter, uBlock Origin, Privacy
+Badger, and Dark Reader as **built-in, auto-enabled WebExtensions** — no taps, no
+visit to Settings → Add-ons required. This config enables it
+(`BUNDLE_EXTENSIONS="true"`), so the `icecat-latest` release ships them; this is
+something
 you opt into for your own sideloaded build.
 
 ### How it works
@@ -292,9 +293,9 @@ doesn't require the currently-installed app to run. If a
 
 ## Recommended add-ons
 
-This config sets `BUNDLE_EXTENSIONS="true"`, so GNU LibreJS, uBlock Origin,
-Privacy Badger, and Dark Reader are **pre-installed** as built-in, auto-enabled
-WebExtensions (see "Bundled extensions (experimental)" below). The
+This config sets `BUNDLE_EXTENSIONS="true"`, so GNU LibreJS, JShelter, uBlock
+Origin, Privacy Badger, and Dark Reader are **pre-installed** as built-in,
+auto-enabled WebExtensions (see "Bundled extensions (experimental)" below). The
 Settings → Add-ons → Recommended list is driven by `AMO_COLLECTION_USER`/
 `AMO_COLLECTION_NAME`; point those at your own AMO collection to feature LibreJS
 there too (Mozilla's default collection doesn't include it).
@@ -305,6 +306,8 @@ tap "Add to Firefox":
 
 - [GNU LibreJS](https://addons.mozilla.org/en-US/android/addon/librejs/) —
   blocks nonfree/nontrivial JavaScript
+- [JShelter](https://addons.mozilla.org/en-US/android/addon/javascript-restrictor/)
+  — IceCat's other signature add-on: anti-fingerprinting + JavaScript API shield
 - [uBlock Origin](https://addons.mozilla.org/en-US/android/addon/ublock-origin/)
   — wide-spectrum content/ad blocker
 - [Privacy Badger](https://addons.mozilla.org/en-US/android/addon/privacy-badger17/)
