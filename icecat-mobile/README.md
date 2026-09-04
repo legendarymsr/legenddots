@@ -290,12 +290,18 @@ doesn't require the currently-installed app to run. If a
 3. Install the resulting `dist/icecat.apk` over the broken one — same signing
    key, no uninstall needed.
 
-## Recommended add-ons (default build)
+## Recommended add-ons
 
-With `BUNDLE_EXTENSIONS="false"` (the default), GNU LibreJS, uBlock Origin,
-Privacy Badger, and Dark Reader are not pre-installed, but each is a couple of
-taps away — open the link on the device (it'll launch IceCat) and tap
-"Add to Firefox":
+This config sets `BUNDLE_EXTENSIONS="true"`, so GNU LibreJS, uBlock Origin,
+Privacy Badger, and Dark Reader are **pre-installed** as built-in, auto-enabled
+WebExtensions (see "Bundled extensions (experimental)" below). The
+Settings → Add-ons → Recommended list is driven by `AMO_COLLECTION_USER`/
+`AMO_COLLECTION_NAME`; point those at your own AMO collection to feature LibreJS
+there too (Mozilla's default collection doesn't include it).
+
+If you set `BUNDLE_EXTENSIONS="false"` instead, none are pre-installed, but each
+is a couple of taps away — open the link on the device (it'll launch IceCat) and
+tap "Add to Firefox":
 
 - [GNU LibreJS](https://addons.mozilla.org/en-US/android/addon/librejs/) —
   blocks nonfree/nontrivial JavaScript
