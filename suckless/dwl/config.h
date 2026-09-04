@@ -89,6 +89,7 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_Return,      spawn,            {.v = termcmd} },
 	{ MODKEY,                    XKB_KEY_b,           spawn,            SHCMD("icecat") },
 	{ MODKEY,                    XKB_KEY_e,           spawn,            SHCMD("emacs") },
+	{ MODKEY,                    XKB_KEY_Escape,      spawn,            SHCMD("swaylock") },
 	{ MODKEY,                    XKB_KEY_j,           focusstack,       {.i = +1} },
 	{ MODKEY,                    XKB_KEY_k,           focusstack,       {.i = -1} },
 	{ MODKEY,                    XKB_KEY_i,           incnmaster,       {.i = +1} },

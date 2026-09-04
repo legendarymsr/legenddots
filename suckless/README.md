@@ -11,7 +11,8 @@ dotfiles — edit one, then rebuild that program. All themed **Tokyo Night**,
 | **slock** | screen locker | `slock/config.h` — Tokyo Night lock colors |
 | **dmenu** | launcher | `dmenu/config.h` — Tokyo Night + font |
 | **dwm** | X11 tiling WM | `dwm/config.h` — Super mod, hjkl, st + dmenu |
-| **dwl** | Wayland tiling WM (dwm-alike) | `dwl/config.h` — Super mod, foot + wmenu |
+| **dwl** | Wayland tiling WM (dwm-alike) | `dwl/config.h` — Super mod, foot + wmenu, `Mod+Esc` lock |
+| **dwlb** | status bar for dwl | `dwlb/config.h` — Tokyo Night, `hide_vacant`, JetBrainsMono |
 | **surf** | WebKit browser | `surf/config.h` — behaviour/keybinds (colors via user CSS) |
 
 ### Also here — not suckless, but same spirit
@@ -26,12 +27,14 @@ you *symlink* them, no rebuild.
 | **vim** | very minimal vim config | `vim/vimrc` | `~/.vimrc` |
 | **foot** | Wayland terminal (dwl's `termcmd`) | `foot/foot.ini` | `~/.config/foot/foot.ini` |
 | **wmenu** | Wayland launcher (dwl's `menucmd`) | `wmenu/menu` | `~/.local/bin/menu` |
+| **swaylock** | Wayland screen locker (dwl's `Mod+Esc`) | `swaylock/config` | `~/.config/swaylock/config` |
 
 ```sh
 ln -sfn "$PWD/screen/screenrc" ~/.screenrc
 ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
 ln -sfn "$PWD/foot/foot.ini"   ~/.config/foot/foot.ini
 ln -sfn "$PWD/wmenu/menu"      ~/.local/bin/menu          # dwl runs `menu` on Mod+d
+ln -sfn "$PWD/swaylock/config" ~/.config/swaylock/config  # dwl locks with Mod+Esc
 ```
 
 **foot + wmenu complement dwl.** dwl's `config.h` launches `foot` (`Mod+Return`)
@@ -41,6 +44,24 @@ match st. **wmenu has no config file** — it's configured by flags — so
 by name (`menucmd = { "menu" }`), so keep it on `PATH`. Install the programs with
 `gui-apps/foot` + `gui-apps/wmenu` (Gentoo; wmenu is in the GURU overlay),
 `foot wmenu` (Arch/nixpkgs).
+
+**dwlb** is dwl's bar (dwl ships none). It's compile-time like the other suckless
+tools — drop `dwlb/config.h` in before `make`, then start it *attached to dwl* so
+it gets the tag/title/status feed:
+
+```sh
+dwl -s 'dwlb -font "JetBrainsMono Nerd Font:size=11"'   # or just: dwl -s dwlb
+```
+
+Feed the status text (right side) with anything that prints lines — e.g.
+`while :; do date "+%H:%M"; sleep 30; done | dwlb -status-stdin all`. Install:
+`gui-apps/dwlb` (GURU) / build from `github.com/kolunmi/dwlb`.
+
+**swaylock** handles locking — dwl has no built-in locker, and `slock` above is
+X11-only, so on Wayland this is the one. `Mod+Esc` in `dwl/config.h` runs
+`swaylock`, which reads `~/.config/swaylock/config` — ours is one line, a solid
+Tokyo Night background (`color=1a1b26`); the password ring stays swaylock's
+default. Install `gui-apps/swaylock` (Gentoo) / `swaylock` (Arch/nixpkgs).
 
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
 Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
