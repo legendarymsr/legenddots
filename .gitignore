@@ -12,3 +12,6 @@ caulklinux/test.qcow2
 # Python bytecode
 __pycache__/
 *.pyc
+
+# stale build artifact: build-exvi.sh (removed) used to unpack Traditional Vi here
+suckless/vi/
