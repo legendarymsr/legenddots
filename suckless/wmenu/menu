@@ -1,7 +1,4 @@
 #!/bin/sh
-# wmenu launcher for dwl — Tokyo Night + JetBrainsMono. wmenu has no config file,
-# so the theme lives here as flags. dwl's Mod+d runs this (menucmd = "menu").
-# Symlink it onto PATH:  ln -sfn "$PWD/menu" ~/.local/bin/menu
 exec wmenu-run -i \
 	-f 'JetBrainsMono Nerd Font 11' \
 	-N '#1a1b26' -n '#c0caf5' \
