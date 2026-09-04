@@ -217,7 +217,7 @@ this list, so extending it means patching that compiled code.
 
 When `BUNDLE_EXTENSIONS="true"`, `scripts/rebrand-apk.sh`:
 
-1. Unpacks the five extensions' XPIs (fetched by
+1. Unpacks the seven extensions' XPIs (fetched by
    `scripts/download-extensions.sh` from addons.mozilla.org) into
    `assets/extensions/<name>/`, alongside Fenix's own built-ins.
 2. Finds Fenix's own `installBuiltInWebExtension(...)` call for its
