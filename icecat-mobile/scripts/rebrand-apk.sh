@@ -32,19 +32,23 @@ find "$WORK_DIR/src/res" -path '*/values*/colors.xml' -print0 \
       -e "s|(<color name=\"photonInk20A20\">)[^<]*(</color>)|\1#33${ICECAT_ACCENT_COLOR}\2|"
 
 echo "==> Setting 'Recommended' add-ons collection to ${AMO_COLLECTION_USER}/${AMO_COLLECTION_NAME}"
-AMO_FILE=$(grep -rl 'const-string v5, "Extensions-for-Android"' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
+# Register-agnostic: apktool 3.x reallocates registers vs 2.x, so match any vN.
+AMO_FILE=$(grep -rlE 'const-string v[0-9]+, "Extensions-for-Android"' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
 [ -n "$AMO_FILE" ] || { echo "ERROR: could not locate the Recommended add-ons AMO collection reference (Fenix internals may have changed)"; exit 1; }
 sed -i -E \
-    -e "s|(const-string v5, \")Extensions-for-Android(\")|\1${AMO_COLLECTION_NAME}\2|" \
-    -e "s|(const-string v4, \")mozilla(\")|\1${AMO_COLLECTION_USER}\2|" \
+    -e "s|(const-string v[0-9]+, \")Extensions-for-Android(\")|\1${AMO_COLLECTION_NAME}\2|" \
+    -e "s|(const-string v[0-9]+, \")mozilla(\")|\1${AMO_COLLECTION_USER}\2|" \
     "$AMO_FILE"
 
 echo "==> Exposing the 'Custom extension collection' setting (Settings -> Advanced)"
-FEATUREFLAGS_FILE=$(grep -rl 'sput-boolean v1, Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
+FEATUREFLAGS_FILE=$(grep -rlE 'sput-boolean v[0-9]+, Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
 [ -n "$FEATUREFLAGS_FILE" ] || { echo "ERROR: could not locate customExtensionCollectionFeature (Fenix internals may have changed)"; exit 1; }
-awk '
-  /sput-boolean v1, Lorg\/mozilla\/fenix\/FeatureFlags;->customExtensionCollectionFeature:Z/ && !done {
-    print "    const/4 v1, 0x1"
+# capture the actual register (apktool 3.x may not use v1) so the override matches
+FF_REG=$(grep -oP 'sput-boolean \Kv[0-9]+(?=, Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z)' "$FEATUREFLAGS_FILE" | head -1)
+[ -n "$FF_REG" ] || { echo "ERROR: could not read customExtensionCollectionFeature register"; exit 1; }
+awk -v reg="$FF_REG" '
+  index($0, "Lorg/mozilla/fenix/FeatureFlags;->customExtensionCollectionFeature:Z") && index($0, "sput-boolean") && !done {
+    print "    const/4 " reg ", 0x1"
     print ""
     done = 1
   }
