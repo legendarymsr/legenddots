@@ -217,24 +217,23 @@ this list, so extending it means patching that compiled code.
 
 When `BUNDLE_EXTENSIONS="true"`, `scripts/rebrand-apk.sh`:
 
-1. Unpacks the four extensions' XPIs (fetched by the new
+1. Unpacks the five extensions' XPIs (fetched by
    `scripts/download-extensions.sh` from addons.mozilla.org) into
    `assets/extensions/<name>/`, alongside Fenix's own built-ins.
-2. Adds one new decompiled-bytecode (smali) class,
-   `org.mozilla.fenix.icecat.IcecatExtensions`
-   (`branding/smali/IcecatExtensions.smali`), whose `installAll()` method
-   calls `installBuiltInWebExtension()` once per bundled extension — reusing
-   the same no-op success/error callback classes
-   (`BuiltInWebExtensionController$$ExternalSyntheticLambda2`/`Lambda3`) Fenix
-   already ships for this purpose.
-3. Finds the line where Fenix registers its own `icons@mozac.org` built-in
-   and inserts one call to `IcecatExtensions.installAll()` immediately after
-   it, passing along the same live `WebExtensionRuntime` reference.
+2. Finds Fenix's own `installBuiltInWebExtension(...)` call for its
+   `browser-icons` built-in, parses that exact call's registers (the live
+   `WebExtensionRuntime` object plus its success/error callbacks), and inserts
+   one **clone of the call per bundled extension** immediately after it — same
+   registers, just a different id and `resource://.../assets/extensions/<name>/`.
 
-This bytecode patch is the *only* way to get zero-tap, auto-enabled, unsigned
-extensions out of a repackaging-only pipeline — everything else this pipeline
-does is a resource/string/asset rewrite, but this one step edits compiled app
-code.
+No separate class and no hand-built callback objects: R8 merges and renames the
+synthetic callback lambdas every build (in the version tested it also merged
+dozens of lambdas, including this installer, into one giant `packed-switch`
+method), which is exactly what silently broke the earlier `IcecatExtensions`
+approach on a Fennec update. Cloning Fenix's own call — whatever registers R8
+happened to assign — is register-agnostic by construction. It's the *only* way
+to get zero-tap, auto-enabled, unsigned extensions out of a repackaging-only
+pipeline; everything else here is a resource/string/asset rewrite.
 
 ### Why this is risky
 
