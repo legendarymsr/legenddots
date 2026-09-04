@@ -66,6 +66,19 @@ else
   echo "==> No custom icons in branding/icons/, keeping upstream icons"
 fi
 
+# Newer Fennec ships a dark-mode-only VECTOR wordmark (drawable-night/ic_logo_wordmark_*.xml)
+# that the raster copy above can't replace, so in dark mode the upstream "Fennec F-Droid"
+# wordmark survives. Drop the night variant(s) so night mode falls back to our rebranded
+# density rasters. Safe: the resource still exists via the drawable-<density>/ webps.
+if find branding/icons -type f -name 'ic_logo_wordmark*' 2>/dev/null | grep -q .; then
+  NIGHT_WM=$(find "$WORK_DIR/src/res" -path '*-night*' -name 'ic_logo_wordmark*.xml' 2>/dev/null)
+  if [ -n "$NIGHT_WM" ]; then
+    echo "==> Removing dark-mode vector wordmark(s) so the rebrand applies in night mode:"
+    echo "$NIGHT_WM" | sed 's/^/     /'
+    echo "$NIGHT_WM" | xargs -r rm -f
+  fi
+fi
+
 if [ "$ENABLE_HARDENING" = "true" ]; then
   echo "==> Applying hardening prefs from branding/hardening-prefs.js"
   OMNI="$(realpath "$WORK_DIR/src/assets/omni.ja")"
@@ -91,28 +104,48 @@ if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
     cp -r "$WORK_DIR/extensions/$ext" "$WORK_DIR/src/assets/extensions/$ext"
   done
 
-  echo "==> Adding IcecatExtensions smali class"
-  mkdir -p "$WORK_DIR/src/smali_classes2/org/mozilla/fenix/icecat"
-  cp branding/smali/IcecatExtensions.smali "$WORK_DIR/src/smali_classes2/org/mozilla/fenix/icecat/IcecatExtensions.smali"
-
+  # Clone Fenix's OWN built-in install (browser-icons) for each bundled extension,
+  # reusing that call's exact runtime + callback registers. No separate class and
+  # no hand-built callbacks — R8 merges/renames those, which is what silently broke
+  # the old approach across Fennec updates. Register-agnostic by construction.
   echo "==> Registering built-in extensions alongside Fenix's own (browser-icons)"
-  LAMBDA_FILE=$(grep -rl 'resource://android/assets/extensions/browser-icons/' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
+  LAMBDA_FILE=$(grep -rl 'assets/extensions/browser-icons/' "$WORK_DIR"/src/smali*/ 2>/dev/null | head -1)
   [ -n "$LAMBDA_FILE" ] || { echo "ERROR: could not locate Core's built-in-extension installer (Fenix internals may have changed)"; exit 1; }
 
-  MARKER='Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;->installBuiltInWebExtension'
-  CALL_LINE=$(grep -m1 "$MARKER" "$LAMBDA_FILE")
-  REG=$(echo "$CALL_LINE" | grep -oP '(?<=\{)v[0-9]+' | head -1)
-  [ -n "$REG" ] || { echo "ERROR: could not find installBuiltInWebExtension call in $LAMBDA_FILE"; exit 1; }
+  # the browser-icons install: invoke-interface {vRuntime, vId, vUrl, vSucc, vErr}, ...installBuiltInWebExtension(...)
+  BICALL=$(awk '/assets\/extensions\/browser-icons\// {f=1} f && /installBuiltInWebExtension\(/ {print; exit}' "$LAMBDA_FILE")
+  REGS=$(printf '%s' "$BICALL" | grep -oP '\{\K[^}]+')
+  R=$(printf   '%s' "$REGS" | awk -F', *' '{print $1}')   # WebExtensionRuntime
+  ID=$(printf  '%s' "$REGS" | awk -F', *' '{print $2}')   # id string (scratch)
+  URL=$(printf '%s' "$REGS" | awk -F', *' '{print $3}')   # url string (scratch)
+  SUCC=$(printf '%s' "$REGS" | awk -F', *' '{print $4}')  # onSuccess callback
+  ERR=$(printf '%s' "$REGS" | awk -F', *' '{print $5}')   # onError callback
+  { [ -n "$R" ] && [ -n "$ID" ] && [ -n "$URL" ] && [ -n "$SUCC" ] && [ -n "$ERR" ]; } \
+    || { echo "ERROR: could not parse install registers from: $BICALL"; exit 1; }
+  IFACE='Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;->installBuiltInWebExtension(Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V'
 
-  awk -v reg="$REG" -v marker="$MARKER" '
+  BLOCK=$(mktemp)
+  for pair in \
+    "uBlock0@raymondhill.net:ublock0" \
+    "jid1-MnnxcxisBPnSXQ@jetpack:privacy-badger" \
+    "addon@darkreader.org:darkreader" \
+    "jid1-KtlZuoiikVfFew@jetpack:librejs" \
+    "jsr@javascriptrestrictor:jshelter"; do
+    guid="${pair%%:*}"; dir="${pair##*:}"
+    printf '    const-string %s, "%s"\n    const-string %s, "resource://android/assets/extensions/%s/"\n    invoke-interface {%s, %s, %s, %s, %s}, %s\n' \
+      "$ID" "$guid" "$URL" "$dir" "$R" "$ID" "$URL" "$SUCC" "$ERR" "$IFACE" >> "$BLOCK"
+  done
+
+  awk -v block="$BLOCK" '
     { print }
-    index($0, marker) && !done {
-      print ""
-      print "    invoke-static {" reg "}, Lorg/mozilla/fenix/icecat/IcecatExtensions;->installAll(Lmozilla/components/concept/engine/webextension/WebExtensionRuntime;)V"
-      done = 1
+    /assets\/extensions\/browser-icons\// { seen = 1 }
+    seen && /installBuiltInWebExtension\(/ && !done {
+      while ((getline line < block) > 0) print line
+      close(block); done = 1
     }
-  ' "$LAMBDA_FILE" > "$LAMBDA_FILE.tmp"
-  mv "$LAMBDA_FILE.tmp" "$LAMBDA_FILE"
+  ' "$LAMBDA_FILE" > "$LAMBDA_FILE.tmp" && mv "$LAMBDA_FILE.tmp" "$LAMBDA_FILE"
+  rm -f "$BLOCK"
+  echo "==> injected 5 built-in extensions after browser-icons (runtime=$R onSuccess=$SUCC onError=$ERR)"
 else
   echo "==> BUNDLE_EXTENSIONS=false, skipping built-in extension bundling"
 fi
