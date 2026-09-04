@@ -264,18 +264,17 @@ pipeline; everything else here is a resource/string/asset rewrite.
    a no-op when `BUNDLE_EXTENSIONS="false"`).
 3. Install `dist/icecat.apk` on a device and open the app.
 
-**Known issue**: the app launches normally (no crash), but the four
-extensions do **not** appear in **Settings → Add-ons**. `WebExtensionRuntime.
-installBuiltInWebExtension()` registers them directly with GeckoView, which is
-how Fenix's own hidden built-ins (e.g. `icons@mozac.org`) work — but Fenix's
-Add-ons screen is populated separately, by `WebExtensionSupport`/`AddonManager`
-correlating AMO collection metadata with extensions installed through Fenix's
-normal install flow. Extensions added via `installBuiltInWebExtension` outside
-that flow aren't picked up by the screen, even if GeckoView has loaded them.
-Whether they're nonetheless functionally active (e.g. uBlock0 actually
-blocking requests) hasn't been verified. Making them appear/manageable in
-**Settings → Add-ons** would need additional changes to register them with
-`WebExtensionSupport` too — not yet implemented.
+**They won't appear in Settings → Add-ons — by design, not a bug.** These are
+registered with `WebExtensionRuntime.installBuiltInWebExtension()`, the same path
+Fenix uses for its *own* hidden built-ins (`icons@mozac.org`, reader view). That
+screen is populated separately — `WebExtensionSupport`/`AddonManager` from normal
+installs plus AMO metadata — so built-ins never show there even when GeckoView
+has loaded them. **Judge success functionally, not by the Add-ons list**: e.g.
+uBlock Origin actually blocking ads, LibreJS blocking nonfree JS, Dark Reader
+darkening a light site. Making them *visible and manageable* would need
+registering them with `WebExtensionSupport` too (not done) — or, simpler, don't
+bundle at all and install them normally (a few taps, or a custom Recommended
+collection), trading zero-tap/auto-enable for visibility.
 
 ### Recovery if it breaks
 
