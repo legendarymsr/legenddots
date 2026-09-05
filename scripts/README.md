@@ -63,15 +63,19 @@ Tokyo Night themed.
 
 ### Install on Gentoo
 
-**Option A — Portage (system-wide).** Emerges the bindings + mpv. Note that
-`dev-python/PyQt6-WebEngine` pulls in **`dev-qt/qtwebengine:6`**, a Chromium-based
-package — it's a long compile and wants a lot of RAM/disk:
+**Option A — Portage (system-wide).** Emerges the bindings + mpv. Portage package
+names are **lowercase** (`dev-python/pyqt6-webengine`, not the pip distribution's
+`PyQt6-WebEngine`). It pulls in **`dev-qt/qtwebengine:6`**, a Chromium-based package
+— a long compile that wants a lot of RAM/disk, but it declares every X11 runtime lib
+as a real dependency, so nothing is missing at launch:
 
 ```sh
-sudo emerge -av dev-python/PyQt6 dev-python/PyQt6-WebEngine media-video/mpv
-# sanity-check PyQt6 has the modules the browser uses (gui, widgets, network):
-emerge -pv dev-python/PyQt6
+sudo emerge -av dev-python/pyqt6-webengine media-video/mpv   # pyqt6 comes in as a dep
+# sanity-check the bindings have the modules the browser uses (gui, widgets, network):
+emerge -pv dev-python/pyqt6
 ```
+
+Run it with the **system** python (not a venv):  `python ~/legenddots/scripts/legend-gui`.
 
 **Option B — Python venv + pip (faster, skips the qtwebengine compile).** pip ships
 prebuilt Qt wheels, so this avoids building `dev-qt/qtwebengine` from source:
