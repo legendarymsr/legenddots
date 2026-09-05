@@ -83,6 +83,31 @@ pip install PyQt6 PyQt6-WebEngine
 sudo emerge -av media-video/mpv          # mpv still comes from Portage
 ```
 
+The pip Qt wheels bundle Qt/Chromium but still **dynamically link against system X11
+libraries at runtime**. Portage doesn't pull these in for a pip install, so a fresh
+box hits `ImportError: libXtst.so.6: cannot open shared object file` on first launch.
+Install the Chromium runtime X11 deps once:
+
+```sh
+sudo emerge -1 \
+  x11-libs/libXtst x11-libs/libXScrnSaver x11-libs/libXcomposite x11-libs/libXdamage \
+  x11-libs/libXrandr x11-libs/libXcursor x11-libs/libXi x11-libs/libXext \
+  x11-libs/libXrender x11-libs/libXfixes x11-libs/libxkbfile x11-libs/libxkbcommon \
+  x11-libs/libxcb x11-libs/libxshmfence x11-libs/libdrm \
+  dev-libs/nss dev-libs/nspr media-libs/alsa-lib media-libs/mesa net-print/cups
+```
+
+That's the full set QtWebEngine's Chromium links against; install them together so you
+don't hit them one `.so` at a time (`libXtst` → `libxkbfile` → …). Option A avoids this
+entirely — `dev-qt/qtwebengine:6` declares these as real dependencies. If a launch
+*still* names a missing lib, list every one at once and map it to a package:
+
+```sh
+ldd ~/.venvs/legend-gui/lib/python*/site-packages/PyQt6/Qt6/lib/libQt6WebEngineCore.so.6 \
+  | grep 'not found'
+# then, for each libFoo.so:  e-file libFoo.so   (pfl:  sudo emerge app-portage/pfl)
+```
+
 ### Run it
 
 ```sh
