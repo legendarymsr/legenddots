@@ -97,14 +97,16 @@ sudo emerge -1 \
   x11-libs/libXtst x11-libs/libXScrnSaver x11-libs/libXcomposite x11-libs/libXdamage \
   x11-libs/libXrandr x11-libs/libXcursor x11-libs/libXi x11-libs/libXext \
   x11-libs/libXrender x11-libs/libXfixes x11-libs/libxkbfile x11-libs/libxkbcommon \
-  x11-libs/libxcb x11-libs/libxshmfence x11-libs/libdrm \
+  x11-libs/libxcb x11-libs/libxshmfence x11-libs/libdrm app-crypt/mit-krb5 \
   dev-libs/nss dev-libs/nspr media-libs/alsa-lib media-libs/mesa net-print/cups
 ```
 
-That's the full set QtWebEngine's Chromium links against; install them together so you
-don't hit them one `.so` at a time (`libXtst` → `libxkbfile` → …). Option A avoids this
-entirely — `dev-qt/qtwebengine:6` declares these as real dependencies. If a launch
-*still* names a missing lib, list every one at once and map it to a package:
+Install them together so you don't hit them one `.so` at a time (`libXtst` →
+`libxkbfile` → `libgssapi_krb5` → …). But the pip Qt wheel's closure is large and
+version-dependent, so this list may still miss one — **the reliable move is to
+enumerate what's actually missing** rather than trust any fixed list. Option A avoids
+all of this: `dev-qt/qtwebengine:6` declares every one as a real dependency. To list
+any stragglers and map each to its package:
 
 ```sh
 ldd ~/.venvs/legend-gui/lib/python*/site-packages/PyQt6/Qt6/lib/libQt6WebEngineCore.so.6 \
