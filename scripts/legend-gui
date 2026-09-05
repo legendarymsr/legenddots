@@ -273,8 +273,9 @@ KEYMAP_JS = r"""
             return;
         }
         if (leader) { leader = false; if (e.key === 'm') { toMpv(location.href); e.preventDefault(); } return; }
-        if (e.key === 'f') { hint("click"); e.preventDefault(); return; }  // click a link
-        if (e.key === 'F') { hint("mpv");   e.preventDefault(); return; }  // send a link to mpv
+        if (e.key === 'f' || e.key === 'F') {   // f = click a link, Shift+f = send it to mpv
+            hint(e.shiftKey ? "mpv" : "click"); e.preventDefault(); return;
+        }
         if (e.key === '.') { leader = true; e.preventDefault(); return; }
     }, true);
 })();
