@@ -16,7 +16,7 @@ Proprietary codecs (H.264/AAC/HEVC/Dolby) are refused at the JS layer by default
 so even a QtWebEngine built WITH them (the pip wheels) can't use them — sites fall
 back to free VP9/AV1 + Opus. Set LEGENDCHROME_ALLOW_PROPRIETARY=1 to opt back in.
 
-Deps:  pip install PyQt6 PyQt6-WebEngine   (and `mpv` for `.m`)
+Deps:  pip install PyQt6 PyQt6-WebEngine   (and `mpv` + `yt-dlp` for `.m`/Shift+f→mpv)
 Run:   python legend-gui  [url]
 
 Optional big blocklist: hosts-format file at ~/.config/legendchrome/blocklist.txt
