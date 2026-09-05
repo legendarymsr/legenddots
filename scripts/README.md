@@ -187,8 +187,16 @@ the URL to **mpv**, which uses **yt-dlp** to fetch the real stream. No embedded
 Google player, no ads, no tracking, and it's far lighter than the in-page player:
 
 ```sh
+# build mpv WITH pipewire so it has audio (else it falls back to raw ALSA and
+# fails with "[ao/alsa] Playback open error" -> no sound on a PipeWire desktop):
+echo 'media-video/mpv pipewire' | sudo tee /etc/portage/package.use/mpv
 sudo emerge -av media-video/mpv net-misc/yt-dlp
 ```
+
+mpv picks its audio output in order pipewire → pulse → alsa; on a PipeWire session
+without the `pipewire` USE flag it lands on ALSA and can't open the device. (Use
+`pulseaudio` instead if that's your sound server.) `F`/`.m` also needs `yt-dlp` to
+resolve web video pages.
 
 > If you want to watch proprietary garbage without selling your soul to Google,
 > install mpv too.
