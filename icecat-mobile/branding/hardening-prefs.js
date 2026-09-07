@@ -53,7 +53,7 @@ pref("network.IDN_show_punycode", true);
 // "Increased" mode: try DoH first, fall back to the system resolver only if
 // DoH fails or is unavailable, so DNS lookups aren't plaintext on the
 // network path.
-// Quad9: Mullvad shut down its public encrypted DNS on 2025-11-02 and now
+// Quad9: Mullvad is shutting down its public encrypted DNS on 2026-11-02 and now
 // sponsors Quad9 instead (mullvad.net/en/blog/shutting-down-our-public-
 // encrypted-dns-servers-and-sponsoring-quad9-instead). Quad9 is a non-profit,
 // no-logging, malware-blocking resolver.
