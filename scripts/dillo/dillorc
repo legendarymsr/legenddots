@@ -1,0 +1,39 @@
+# Dillo — minimal, Tokyo Night, JetBrainsMono. Symlink to ~/.dillo/dillorc
+# (Dillo <=3.0) or ~/.config/dillo/dillorc (Dillo 3.1+). Dillo has NO JavaScript
+# by design, so it's already a lean, low-tracking browser out of the box.
+
+# home / search  (first search_url = default)
+home="about:blank"
+start_page="about:blank"
+search_url="DuckDuckGo https://lite.duckduckgo.com/lite/?q=%s"
+
+# fonts
+font_serif="JetBrainsMono Nerd Font"
+font_sans_serif="JetBrainsMono Nerd Font"
+font_monospace="JetBrainsMono Nerd Font"
+font_cursive="JetBrainsMono Nerd Font"
+font_fantasy="JetBrainsMono Nerd Font"
+font_factor=1.0
+
+# colors — applied to pages that don't set their own (Tokyo Night)
+bg_color=0x1a1b26
+allow_white_bg=NO
+text_color=0xc0caf5
+link_color=0x7aa2f7
+visited_color=0xbb9af7
+
+# rendering
+load_images=YES
+load_background_images=NO
+parse_embedded_css=YES
+
+# privacy
+filter_auto_requests=same_domain
+http_referer=host
+http_language="en-US"
+
+# UI — compact panel
+panel_size=tiny
+small_icons=YES
+show_tooltip=YES
+fullwindow_start=NO

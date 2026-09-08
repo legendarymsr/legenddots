@@ -1,0 +1,9 @@
+# Dillo cookie policy. Symlink next to dillorc (~/.dillo/ or ~/.config/dillo/).
+# Rules are matched top-down; DEFAULT is the fallback.
+#   DENY           reject all cookies (most private)
+#   ACCEPT_SESSION keep cookies only until Dillo quits
+#   ACCEPT         persist cookies to disk
+# Add per-host exceptions ABOVE the DEFAULT line, e.g.:
+#   example.com  ACCEPT_SESSION
+
+DEFAULT  DENY
