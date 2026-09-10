@@ -66,17 +66,28 @@ else
   echo "==> No custom icons in branding/icons/, keeping upstream icons"
 fi
 
-# Newer Fennec ships a dark-mode-only VECTOR wordmark (drawable-night/ic_logo_wordmark_*.xml)
-# that the raster copy above can't replace, so in dark mode the upstream "Fennec F-Droid"
-# wordmark survives. Drop the night variant(s) so night mode falls back to our rebranded
-# density rasters. Safe: the resource still exists via the drawable-<density>/ webps.
-if find branding/icons -type f -name 'ic_logo_wordmark*' 2>/dev/null | grep -q .; then
-  NIGHT_WM=$(find "$WORK_DIR/src/res" -path '*-night*' -name 'ic_logo_wordmark*.xml' 2>/dev/null)
-  if [ -n "$NIGHT_WM" ]; then
-    echo "==> Removing dark-mode vector wordmark(s) so the rebrand applies in night mode:"
-    echo "$NIGHT_WM" | sed 's/^/     /'
-    echo "$NIGHT_WM" | xargs -r rm -f
-  fi
+# Fenix serves each wordmark resource under MULTIPLE config variants, and only
+# some are the raster webps our copy loop above replaces. In particular:
+#   * drawable/ic_wordmark_text_{normal,private}.xml  — a VECTOR variant of the
+#     homepage wordmark text (the raster lives in drawable-nodpi/), and
+#   * drawable-night/ic_logo_wordmark_normal.xml      — a dark-mode inset that
+#     re-points the About-screen wordmark at the upstream art.
+# A surviving vector variant can win over our raster on some densities / in dark
+# mode, leaving the upstream "Fennec F-Droid" wordmark visible. For every
+# wordmark resource we ship a raster for, drop every upstream .xml variant so our
+# raster is the sole representation. Safe: the resource still resolves via the
+# webp(s) we copied in.
+WM_BASES=$(find branding/icons -type f \( -name 'ic_wordmark_*' -o -name 'ic_logo_wordmark_*' \) \
+             -printf '%f\n' 2>/dev/null | sed -E 's/\.[^.]+$//' | sort -u)
+if [ -n "$WM_BASES" ]; then
+  for base in $WM_BASES; do
+    STALE=$(find "$WORK_DIR/src/res" -type f -path '*/drawable*' -name "$base.xml" 2>/dev/null)
+    if [ -n "$STALE" ]; then
+      echo "==> Removing upstream vector variant(s) of $base so the rebrand applies:"
+      echo "$STALE" | sed "s#^$WORK_DIR/src/#     #"
+      echo "$STALE" | xargs -r rm -f
+    fi
+  done
 fi
 
 if [ "$ENABLE_HARDENING" = "true" ]; then
