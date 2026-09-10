@@ -43,9 +43,8 @@ new-tab homepage and the in-app About screen with an IceCat cat-head icon
 
 ```
 branding/icons/
-├── drawable/ic_wordmark_logo.webp                       # homepage icon
-├── drawable/ic_wordmark_text_{normal,private}.webp      # homepage wordmark text
-├── drawable/ic_wordmark_sport_logo.webp                 # seasonal icon variant
+├── drawable-nodpi/ic_wordmark_logo.webp                 # homepage icon (160x160)
+├── drawable-nodpi/ic_wordmark_text_{normal,private}.webp # homepage wordmark text (661x70)
 ├── drawable-mdpi/ic_logo_wordmark_{normal,private}.webp # About-screen combined icon+wordmark
 ├── drawable-hdpi/ic_logo_wordmark_{normal,private}.webp
 ├── drawable-xhdpi/ic_logo_wordmark_{normal,private}.webp
@@ -53,11 +52,24 @@ branding/icons/
 └── drawable-xxxhdpi/ic_logo_wordmark_{normal,private}.webp
 ```
 
-`normal`/`private` are Fenix's light/dark-theme variants (dark mode also
-reuses `private` via `drawable-night/ic_logo_wordmark_normal.xml`'s inset, so
-no separate night-mode asset is needed). The shipped set is an original
-cat-head icon (flat shapes, no third-party artwork) in `ICECAT_ACCENT_COLOR`
-paired with "IceCat" rendered in IBM Plex Serif Bold; hand-edit or regenerate
-these `.webp` files (e.g. with Pillow) to use different artwork or colors —
-they're static images, so changing `ICECAT_ACCENT_COLOR` alone won't update
-them.
+Each file must sit in the SAME `res/` folder Fenix serves that resource from,
+or `rebrand-apk.sh`'s path-exact copy silently skips it and the upstream
+"Fennec F-Droid" art survives. In current Fennec F-Droid the split homepage
+wordmark (icon + text, shown side-by-side on the new-tab page) lives in
+`drawable-nodpi/`, while the combined About-screen wordmark is a density raster
+set (`drawable-mdpi`..`drawable-xxxhdpi`). Match those exactly.
+
+`normal`/`private` are Fenix's light/dark-theme variants. Fenix ALSO ships
+vector (`.xml`) variants of some of these resources — `drawable/ic_wordmark_text_*.xml`
+and a `drawable-night/ic_logo_wordmark_normal.xml` inset — that can override a
+raster on some densities or in dark mode; `rebrand-apk.sh` deletes every upstream
+`.xml` variant of any wordmark resource we ship a raster for, so ours is the
+sole representation.
+
+The shipped set is an original cat-head icon (flat shapes, no third-party
+artwork) in `ICECAT_ACCENT_COLOR` paired with "IceCat" rendered in IBM Plex
+Serif Bold; hand-edit or regenerate these `.webp` files (e.g. with Pillow) to
+use different artwork or colors — they're static images, so changing
+`ICECAT_ACCENT_COLOR` alone won't update them. Keep the pixel dimensions equal
+to the upstream file you're replacing (see the tree above) so it renders at the
+right size.
