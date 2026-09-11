@@ -107,9 +107,9 @@ The manifesto page lives in `manifesto/` — open `index.html` locally.
 made literal. No runtime, no framework, no build system inside a build system;
 just `cc` and a `Makefile`.
 
-- **`fetch-c`** — the manifesto spite binary in C: flies the flag, prints the
-  manifesto and neofetch-style system info read from `/proc` and `uname(2)`.
-  The C sibling of the Rust `fetch` (`fetch.rs`); both are kept.
+- **`fetch-c`** — the manifesto in C: prints the manifesto lines and
+  neofetch-style system info read from `/proc` and `uname(2)`. The C sibling
+  of the Rust `fetch` (`fetch.rs`); both are kept.
 - **`legendstatus`** — a status line for dwm/dwl (battery, load, memory,
   temperature, clock), read straight from `/proc` and `/sys`.
 
