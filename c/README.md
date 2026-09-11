@@ -69,14 +69,17 @@ legendstatus -n 2     # loop with a 2s interval
 
 Fields, in order: **battery** (`/sys/class/power_supply`, any supply whose
 `type` is `Battery` — so it works for laptop `BAT0` *and* Android's
-`battery`), **disk** (root-filesystem used %, `statvfs`), **memory**
-(`/proc/meminfo`), **CPU load** (`/proc/loadavg`), **temperature**
-(`/sys/class/thermal`), and the **clock**. Every field is optional: a machine
-with no battery or no thermal zone simply drops that field, so the same binary
-works on the MacBook Air, on a phone, and on a headless box. Example output:
+`battery` — with an estimated time-to-empty while discharging / time-to-full
+while charging when the kernel exposes `energy_now`+`power_now` or
+`charge_now`+`current_now`; laptops do, most phones don't), **disk**
+(root-filesystem used %, `statvfs`), **memory** (`/proc/meminfo`), **CPU
+load** (`/proc/loadavg`), **temperature** (`/sys/class/thermal`), and the
+**clock**. Every field is optional: a machine with no battery or no thermal
+zone simply drops that field, so the same binary works on the MacBook Air, on
+a phone, and on a headless box. Example output:
 
 ```
-bat 87%- | disk 62% | mem 31% | load 0.42 | 47°C | Fri 11 Sep 14:03
+bat 87%- 4h12m | disk 62% | mem 31% | load 0.42 | 47°C | Fri 11 Sep 14:03
 ```
 
 ### Wiring it into a bar
@@ -94,4 +97,5 @@ legendstatus -n 5 | dwlb -stdin -status-stdin all
 ```
 
 Battery status is shown with a trailing glyph: `+` charging, `-`
-discharging, `=` full, `•` unknown.
+discharging, `=` full, `•` unknown, followed by the runtime estimate when
+available (e.g. `bat 87%- 4h12m`).
