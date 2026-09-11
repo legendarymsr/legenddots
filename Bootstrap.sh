@@ -65,13 +65,13 @@ ln -sf "$(pwd)/init.lua" ~/.config/nvim/init.lua
 ln -sf "$(pwd)/.zshrc" ~/.zshrc
 ln -sf "$(pwd)/alacritty.toml" ~/.config/alacritty/alacritty.toml
 
-# --- 6. THE SPITE COMPILER (RUST) ---
-if [[ -d "./fetch" ]]; then
-    echo "🦀 COMPILING RUST LUNDUKE-BUSTER..."
-    cd fetch
-    rustc main.rs -o fetch-rs
-    sudo mv fetch-rs /usr/local/bin/fetch
-    cd ..
+# --- 6. THE SPITE COMPILER (C) ---
+# Reject Electron. Return to C. Builds 'fetch' (the manifesto) and
+# 'legendstatus' (the status line) and installs both to /usr/local/bin.
+if [[ -d "./c" ]]; then
+    echo "🔧 COMPILING C LUNDUKE-BUSTER..."
+    make -C c
+    sudo make -C c install
 fi
 
 # --- 7. FINAL HANDSHAKE ---

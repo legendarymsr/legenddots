@@ -15,3 +15,7 @@ __pycache__/
 
 # stale build artifact: build-exvi.sh (removed) used to unpack Traditional Vi here
 suckless/vi/
+
+# c/ build artifacts (binaries, not sources)
+/c/fetch
+/c/legendstatus
