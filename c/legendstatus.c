@@ -60,12 +60,54 @@ static int read_str(const char *path, char *buf, size_t n)
 /* Append " bat NN% <glyph>" for the first real battery under
  * /sys/class/power_supply. Detected by its `type` file (== "Battery"), so it
  * works for laptop supplies named BAT0/BAT1 *and* Android's, named "battery". */
+
+/* Estimated battery runtime, in minutes: time-to-empty while discharging,
+ * time-to-full while charging. Uses energy_now/power_now (Wh/W) or, failing
+ * that, charge_now/current_now (Ah/A). Returns 0 when the rate isn't exposed
+ * (common on phones) or there's no meaningful estimate. */
+static long battery_minutes(const char *base, const char *status)
+{
+	char path[600];
+	long now = 0, rate = 0, full = 0;
+	long long target;
+
+	snprintf(path, sizeof path, "%s/power_now", base);
+	if (read_long(path, &rate) && rate != 0) {
+		snprintf(path, sizeof path, "%s/energy_now", base);
+		read_long(path, &now);
+		snprintf(path, sizeof path, "%s/energy_full", base);
+		read_long(path, &full);
+	} else {
+		snprintf(path, sizeof path, "%s/current_now", base);
+		if (!read_long(path, &rate) || rate == 0)
+			return 0;
+		snprintf(path, sizeof path, "%s/charge_now", base);
+		read_long(path, &now);
+		snprintf(path, sizeof path, "%s/charge_full", base);
+		read_long(path, &full);
+	}
+	if (rate < 0)
+		rate = -rate; /* current_now is signed on some kernels */
+	if (rate == 0)
+		return 0;
+
+	if (!strcmp(status, "Charging"))
+		target = (long long)full - now;
+	else if (!strcmp(status, "Discharging"))
+		target = now;
+	else
+		return 0; /* Full/Unknown: no estimate worth showing */
+	if (target <= 0)
+		return 0;
+	return (long)((target * 60) / rate);
+}
+
 static void field_battery(char *out, size_t n)
 {
 	DIR *d = opendir("/sys/class/power_supply");
 	struct dirent *e;
-	char base[512], path[600], type[32], status[32];
-	long cap;
+	char base[512], path[600], type[32], status[32], eta[16];
+	long cap, mins;
 
 	if (!d)
 		return;
@@ -91,9 +133,21 @@ static void field_battery(char *out, size_t n)
 		else if (!strcmp(status, "Full"))
 			glyph = "=";
 
+		/* Optional " 4h12m" runtime estimate when the kernel exposes it.
+		 * Clamp implausible values (a near-zero rate yields a nonsense
+		 * multi-thousand-hour estimate) to "unknown". */
+		eta[0] = '\0';
+		mins = battery_minutes(base, status);
+		if (mins > 99 * 60 + 59)
+			mins = 0;
+		if (mins >= 60)
+			snprintf(eta, sizeof eta, " %ldh%02ldm", mins / 60, mins % 60);
+		else if (mins > 0)
+			snprintf(eta, sizeof eta, " %ldm", mins);
+
 		size_t len = strlen(out);
-		snprintf(out + len, n - len, "%sbat %ld%%%s",
-			 len ? SEP : "", cap, glyph);
+		snprintf(out + len, n - len, "%sbat %ld%%%s%s",
+			 len ? SEP : "", cap, glyph, eta);
 		break;
 	}
 	closedir(d);
