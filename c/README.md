@@ -15,18 +15,31 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
 
-## Build & install
+## Build & run
 
 ```sh
 make                 # build every tool into ./
-doas make install    # install to /usr/local/bin
+./fetch-c            # run straight from here, no install needed
+./legendstatus -1    # one status line (see below for the loop modes)
+```
+
+`make` needs nothing but a C compiler (`cc`/`gcc`/`clang`) and `make` — both
+are already on any dev box; on a fresh Gentoo they come with `sys-devel/gcc`
+and `sys-devel/make` (in `@system`).
+
+## Install
+
+```sh
+doas make install    # install to /usr/local/bin, then run `fetch-c` anywhere
 ```
 
 Override the prefix for a per-user install (no root needed):
 
 ```sh
-make PREFIX="$HOME/.local" install
+make PREFIX="$HOME/.local" install    # ensure ~/.local/bin is on your PATH
 ```
+
+Remove them again with `doas make uninstall` (same `PREFIX`).
 
 `Bootstrap.sh` / `EndeavourRecovery.sh` already run `make -C c && make -C c
 install` for you, so a fresh deploy compiles these automatically.
