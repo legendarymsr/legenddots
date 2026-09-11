@@ -17,5 +17,5 @@ __pycache__/
 suckless/vi/
 
 # c/ build artifacts (binaries, not sources)
-/c/fetch
+/c/fetch-c
 /c/legendstatus
