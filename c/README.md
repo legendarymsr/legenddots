@@ -65,14 +65,17 @@ new terminal.
 legendstatus -1       # print one line and exit
 legendstatus          # loop, one line every 5s
 legendstatus -n 2     # loop with a 2s interval
+legendstatus -d /     # report a specific filesystem for 'disk'
 ```
 
 Fields, in order: **battery** (`/sys/class/power_supply`, any supply whose
 `type` is `Battery` — so it works for laptop `BAT0` *and* Android's
 `battery` — with an estimated time-to-empty while discharging / time-to-full
 while charging when the kernel exposes `energy_now`+`power_now` or
-`charge_now`+`current_now`; laptops do, most phones don't), **disk**
-(root-filesystem used %, `statvfs`), **memory** (`/proc/meminfo`), **CPU
+`charge_now`+`current_now`; laptops do, most phones don't), **disk** (used %
+of `$HOME`'s filesystem via `statvfs` — the data partition on Android, `/home`
+on a laptop — override with `-d PATH`; measuring `/` would just report a
+read-only system image stuck at ~100%), **memory** (`/proc/meminfo`), **CPU
 load** (`/proc/loadavg`), **temperature** (`/sys/class/thermal`), and the
 **clock**. Every field is optional: a machine with no battery or no thermal
 zone simply drops that field, so the same binary works on the MacBook Air, on

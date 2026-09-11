@@ -153,13 +153,16 @@ static void field_battery(char *out, size_t n)
 	closedir(d);
 }
 
-/* Append " disk NN%" — used space on the root filesystem (df-style). */
-static void field_storage(char *out, size_t n)
+/* Append " disk NN%" — used space on the filesystem holding `path` (df-style).
+ * Defaults to $HOME so it reports the partition your files live on (the data
+ * partition on Android, /home on a laptop) rather than a read-only system
+ * image mounted at / that always shows ~100%. */
+static void field_storage(char *out, size_t n, const char *path)
 {
 	struct statvfs vfs;
 	unsigned long long total, avail, used;
 
-	if (statvfs("/", &vfs) != 0 || vfs.f_blocks == 0)
+	if (statvfs(path, &vfs) != 0 || vfs.f_blocks == 0)
 		return;
 	total = (unsigned long long)vfs.f_blocks - vfs.f_bfree; /* used blocks */
 	avail = vfs.f_bavail;                                   /* free to us */
@@ -234,11 +237,11 @@ static void field_clock(char *out, size_t n)
 	snprintf(out + len, n - len, "%s%s", len ? SEP : "", buf);
 }
 
-static void build_line(char *out, size_t n)
+static void build_line(char *out, size_t n, const char *diskpath)
 {
 	out[0] = '\0';
 	field_battery(out, n);
-	field_storage(out, n);
+	field_storage(out, n, diskpath);
 	field_mem(out, n);
 	field_load(out, n);
 	field_temp(out, n);
@@ -250,6 +253,10 @@ int main(int argc, char **argv)
 	int once = 0;
 	unsigned interval = INTERVAL;
 	char line[512];
+	const char *diskpath = getenv("HOME");
+
+	if (!diskpath || !*diskpath)
+		diskpath = "/";
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-1")) {
@@ -258,18 +265,22 @@ int main(int argc, char **argv)
 			int v = atoi(argv[++i]);
 			if (v > 0)
 				interval = (unsigned)v;
+		} else if (!strcmp(argv[i], "-d") && i + 1 < argc) {
+			diskpath = argv[++i];
 		} else {
 			fprintf(stderr,
-				"usage: %s [-1] [-n interval]\n"
+				"usage: %s [-1] [-n interval] [-d path]\n"
 				"  -1          print one line and exit\n"
-				"  -n SECONDS  loop interval (default %d)\n",
+				"  -n SECONDS  loop interval (default %d)\n"
+				"  -d PATH     filesystem to report for 'disk'\n"
+				"              (default $HOME, else /)\n",
 				argv[0], INTERVAL);
 			return 2;
 		}
 	}
 
 	do {
-		build_line(line, sizeof line);
+		build_line(line, sizeof line, diskpath);
 		puts(line);
 		fflush(stdout);
 		if (!once)
