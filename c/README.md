@@ -9,7 +9,7 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 
 | tool | what it does |
 |------|--------------|
-| `fetch-c` | the manifesto spite binary — flies the flag, states the manifesto, prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept, same output, different language. |
+| `fetch-c` | states the manifesto and prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept. |
 | `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, load, memory, temperature, clock. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
@@ -54,10 +54,10 @@ Gentoo. Both binaries come out around 16 KB.
 fetch-c
 ```
 
-Prints the trans-pride flag and slogans, the two manifesto lines, and:
-`user@host`, OS (`/etc/os-release`), kernel (`uname`), uptime
-(`/proc/uptime`), shell, and a reminder that it's C — no Rust, no Electron,
-no runtime. Call it from your shell rc to greet every new terminal.
+Prints the two manifesto lines, then: `user@host`, OS (`/etc/os-release`),
+kernel (`uname`), uptime (`/proc/uptime`), shell, and a reminder that it's C —
+no Rust, no Electron, no runtime. Call it from your shell rc to greet every
+new terminal.
 
 ## legendstatus
 

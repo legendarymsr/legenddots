@@ -3,11 +3,11 @@
  * "Freedom is not granted — it is taken and defended."
  * "Reject Electron. Return to C."
  *
- * A dependency-free system fetch that flies the flag, states the manifesto,
- * and prints a little machine info by reading /proc, /etc, and uname(2) —
- * no libraries, no runtime, no 90MB of Chromium. The C sibling of the Rust
- * manifesto (../fetch.rs) — both are kept; the flag rows and slogans are
- * preserved verbatim. Installs as 'fetch-c' so it coexists with 'fetch'.
+ * A dependency-free system fetch that states the manifesto and prints a
+ * little machine info by reading /proc, /etc, and uname(2) — no libraries,
+ * no runtime, no 90MB of Chromium. The C sibling of the Rust manifesto
+ * (../fetch.rs); both are kept. Installs as 'fetch-c' so it coexists with
+ * 'fetch'.
  *
  * Build:  cc -std=c99 -Os -o fetch-c fetch.c    (see c/Makefile)
  */
@@ -27,8 +27,6 @@
 #define DIM   "\x1b[2m"
 #define BOLD  "\x1b[1m"
 #define RESET "\x1b[0m"
-
-#define BAR "████████" /* ████████ */
 
 /* Pull PRETTY_NAME="..." out of /etc/os-release into buf. */
 static void os_pretty_name(char *buf, size_t n)
@@ -76,13 +74,6 @@ static void uptime_str(char *buf, size_t n)
 
 int main(void)
 {
-	const char *rows[] = {
-		BLUE  BAR "   " BOLD WHITE "trans rights",
-		PINK  BAR "   " BOLD WHITE "protect trans kids",
-		WHITE BAR "   " BOLD WHITE "fuck you Lunduke",
-		PINK  BAR "   " BOLD WHITE "eat a dick Lunduke",
-		BLUE  BAR "   " BOLD WHITE "arm trans people",
-	};
 	struct utsname u;
 	struct passwd *pw = getpwuid(getuid());
 	char host[256] = "localhost", os[256], up[64];
@@ -98,13 +89,8 @@ int main(void)
 	if (!shell || !*shell)
 		shell = "?";
 
-	/* The flag. */
-	putchar('\n');
-	for (size_t i = 0; i < sizeof rows / sizeof *rows; i++)
-		printf("  %s" RESET "\n", rows[i]);
-	putchar('\n');
-
 	/* The manifesto. */
+	putchar('\n');
 	printf("  " BOLD WHITE "Freedom is not granted — it is taken and defended." RESET "\n");
 	printf("  " BOLD BLUE  "Reject Electron. " PINK "Return to C." RESET "\n");
 	putchar('\n');
