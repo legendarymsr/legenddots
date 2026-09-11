@@ -110,7 +110,7 @@ just `cc` and a `Makefile`.
 - **`fetch-c`** — the manifesto in C: prints the manifesto lines and
   neofetch-style system info read from `/proc` and `uname(2)`. The C sibling
   of the Rust `fetch` (`fetch.rs`); both are kept.
-- **`legendstatus`** — a status line for dwm/dwl (battery, load, memory,
+- **`legendstatus`** — a status line for dwm/dwl (battery, disk, memory, load,
   temperature, clock), read straight from `/proc` and `/sys`.
 
 **Build and run** without installing anything:
