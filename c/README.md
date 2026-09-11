@@ -10,7 +10,7 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | tool | what it does |
 |------|--------------|
 | `fetch-c` | states the manifesto and prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept. |
-| `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, load, memory, temperature, clock. |
+| `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, disk, memory, load, temperature, clock. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -67,12 +67,16 @@ legendstatus          # loop, one line every 5s
 legendstatus -n 2     # loop with a 2s interval
 ```
 
-Every field is optional: a machine with no battery or no thermal zone simply
-drops that field, so the same binary works on the MacBook Air and on a
-headless box. Example output:
+Fields, in order: **battery** (`/sys/class/power_supply`, any supply whose
+`type` is `Battery` — so it works for laptop `BAT0` *and* Android's
+`battery`), **disk** (root-filesystem used %, `statvfs`), **memory**
+(`/proc/meminfo`), **CPU load** (`/proc/loadavg`), **temperature**
+(`/sys/class/thermal`), and the **clock**. Every field is optional: a machine
+with no battery or no thermal zone simply drops that field, so the same binary
+works on the MacBook Air, on a phone, and on a headless box. Example output:
 
 ```
-bat 87%- | load 0.42 | mem 31% | 47°C | Fri 11 Sep 14:03
+bat 87%- | disk 62% | mem 31% | load 0.42 | 47°C | Fri 11 Sep 14:03
 ```
 
 ### Wiring it into a bar

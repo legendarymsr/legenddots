@@ -3,10 +3,10 @@
  * "Reject Electron. Return to C."
  *
  * Reads the kernel's own /proc and /sys files — no libraries, no daemons —
- * and prints a single status string: battery, CPU load, memory, temperature,
- * and the date. Every field is optional: if the machine has no battery or no
- * thermal zone, that field is silently dropped, so the same binary works on
- * the MacBook Air and on a headless box.
+ * and prints a single status string: battery, disk, memory, CPU load,
+ * temperature, and the date. Every field is optional: if the machine has no
+ * battery or no thermal zone, that field is silently dropped, so the same
+ * binary works on the MacBook Air, on a phone, and on a headless box.
  *
  *   legendstatus -1        print one status line and exit (pipe into a bar)
  *   legendstatus           loop, printing a line every INTERVAL seconds
@@ -27,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/statvfs.h>
 
 #define INTERVAL 5      /* default loop interval, seconds */
 #define SEP " | "       /* field separator */
@@ -56,20 +57,25 @@ static int read_str(const char *path, char *buf, size_t n)
 	return ok;
 }
 
-/* Append " bat NN% <glyph>" for the first /sys/class/power_supply/BAT*. */
+/* Append " bat NN% <glyph>" for the first real battery under
+ * /sys/class/power_supply. Detected by its `type` file (== "Battery"), so it
+ * works for laptop supplies named BAT0/BAT1 *and* Android's, named "battery". */
 static void field_battery(char *out, size_t n)
 {
 	DIR *d = opendir("/sys/class/power_supply");
 	struct dirent *e;
-	char base[512], path[600], status[32];
+	char base[512], path[600], type[32], status[32];
 	long cap;
 
 	if (!d)
 		return;
 	while ((e = readdir(d))) {
-		if (strncmp(e->d_name, "BAT", 3) != 0)
+		if (e->d_name[0] == '.')
 			continue;
 		snprintf(base, sizeof base, "/sys/class/power_supply/%s", e->d_name);
+		snprintf(path, sizeof path, "%s/type", base);
+		if (!read_str(path, type, sizeof type) || strcmp(type, "Battery") != 0)
+			continue;
 		snprintf(path, sizeof path, "%s/capacity", base);
 		if (!read_long(path, &cap))
 			continue;
@@ -91,6 +97,24 @@ static void field_battery(char *out, size_t n)
 		break;
 	}
 	closedir(d);
+}
+
+/* Append " disk NN%" — used space on the root filesystem (df-style). */
+static void field_storage(char *out, size_t n)
+{
+	struct statvfs vfs;
+	unsigned long long total, avail, used;
+
+	if (statvfs("/", &vfs) != 0 || vfs.f_blocks == 0)
+		return;
+	total = (unsigned long long)vfs.f_blocks - vfs.f_bfree; /* used blocks */
+	avail = vfs.f_bavail;                                   /* free to us */
+	used = total;
+	if (used + avail == 0)
+		return;
+	size_t len = strlen(out);
+	snprintf(out + len, n - len, "%sdisk %llu%%",
+		 len ? SEP : "", (used * 100) / (used + avail));
 }
 
 /* Append " load N.NN" from /proc/loadavg (1-minute average). */
@@ -160,8 +184,9 @@ static void build_line(char *out, size_t n)
 {
 	out[0] = '\0';
 	field_battery(out, n);
-	field_load(out, n);
+	field_storage(out, n);
 	field_mem(out, n);
+	field_load(out, n);
 	field_temp(out, n);
 	field_clock(out, n);
 }
