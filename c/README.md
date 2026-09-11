@@ -9,8 +9,11 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 
 | tool | what it does |
 |------|--------------|
-| `fetch` | the manifesto spite binary — flies the flag, states the manifesto, prints neofetch-style system info. Ported from the old `fetch.rs`. |
+| `fetch-c` | the manifesto spite binary — flies the flag, states the manifesto, prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept, same output, different language. |
 | `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, load, memory, temperature, clock. |
+
+> The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
+> installs as `fetch-c` so the two live side by side.
 
 ## Build & install
 
@@ -32,10 +35,10 @@ Build flags are hardened and warning-clean (`-Wall -Wextra -pedantic
 -D_FORTIFY_SOURCE=2 -fstack-protector-strong`) — a good fit for hardened
 Gentoo. Both binaries come out around 16 KB.
 
-## fetch
+## fetch-c
 
 ```sh
-fetch
+fetch-c
 ```
 
 Prints the trans-pride flag and slogans, the two manifesto lines, and:

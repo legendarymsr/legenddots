@@ -5,10 +5,11 @@
  *
  * A dependency-free system fetch that flies the flag, states the manifesto,
  * and prints a little machine info by reading /proc, /etc, and uname(2) —
- * no libraries, no runtime, no 90MB of Chromium. Ported from the old
- * fetch.rs; the flag rows and slogans are preserved verbatim.
+ * no libraries, no runtime, no 90MB of Chromium. The C sibling of the Rust
+ * manifesto (../fetch.rs) — both are kept; the flag rows and slogans are
+ * preserved verbatim. Installs as 'fetch-c' so it coexists with 'fetch'.
  *
- * Build:  cc -std=c99 -Os -o fetch fetch.c    (see c/Makefile)
+ * Build:  cc -std=c99 -Os -o fetch-c fetch.c    (see c/Makefile)
  */
 
 #define _POSIX_C_SOURCE 200809L

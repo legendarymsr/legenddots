@@ -123,9 +123,17 @@ ln -sf "$(pwd)/.zshrc" ~/.zshrc
 ln -sf "$(pwd)/alacritty.toml" ~/.config/alacritty/alacritty.toml
 ln -sf "$(pwd)/legend-browsers/qute-config.py" ~/.config/qutebrowser/config.py
 
-# --- 9. THE SPITE COMPILER (C) ---
-# Reject Electron. Return to C. Builds 'fetch' + 'legendstatus' and installs
-# both to /usr/local/bin.
+# --- 9. THE SPITE COMPILER (RUST) ---
+# The manifesto, in Rust: installs as 'fetch'.
+if [[ -f "./fetch.rs" ]]; then
+    echo "Cr COMPILING RUST SPITE BINARY..."
+    rustc fetch.rs -o fetch-rs
+    sudo mv fetch-rs /usr/local/bin/fetch
+fi
+
+# --- 9b. THE SPITE COMPILER (C) ---
+# Reject Electron. Return to C. The C port installs as 'fetch-c', alongside
+# 'legendstatus'. Both go to /usr/local/bin.
 if [[ -d "./c" ]]; then
     echo "C: COMPILING SPITE BINARIES..."
     make -C c

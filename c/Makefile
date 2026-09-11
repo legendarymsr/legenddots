@@ -19,11 +19,13 @@ CFLAGS ?= -std=c99 -Os -Wall -Wextra -pedantic \
           -D_FORTIFY_SOURCE=2 -fstack-protector-strong
 LDFLAGS ?=
 
-BINS = fetch legendstatus
+# The Rust manifesto (../fetch.rs) keeps the name 'fetch'; the C port installs
+# as 'fetch-c' so the two coexist. Same output, different language.
+BINS = fetch-c legendstatus
 
 all: $(BINS)
 
-fetch: fetch.c
+fetch-c: fetch.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 legendstatus: legendstatus.c
