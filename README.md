@@ -48,6 +48,13 @@ legenddots/
 │   ├── screen/screenrc        GNU Screen — runtime dotfile → ~/.screenrc
 │   └── vim/vimrc              minimal vim config → ~/.vimrc
 │
+├── c/                         hand-written C tools — no deps, just cc + Makefile
+│   ├── README.md              build / run / install + bar-wiring docs
+│   ├── Makefile               `make`; `doas make install`
+│   ├── fetch.c                'fetch-c' — the manifesto, in C (sibling of fetch.rs)
+│   └── legendstatus.c         status line for dwm/dwl (battery/load/mem/temp/clock)
+├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
+│
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
 ├── init.el                    Emacs config
 ├── alacritty.toml             Terminal (Tokyo Night, 95% opacity)
@@ -91,6 +98,41 @@ Every package here is auditable. Every config is version controlled. Nothing run
 - Bloat is attack surface.
 
 The manifesto page lives in `manifesto/` — open `index.html` locally.
+
+---
+
+## C tools
+
+`c/` holds small, dependency-free C programs — "Reject Electron. Return to C."
+made literal. No runtime, no framework, no build system inside a build system;
+just `cc` and a `Makefile`.
+
+- **`fetch-c`** — the manifesto spite binary in C: flies the flag, prints the
+  manifesto and neofetch-style system info read from `/proc` and `uname(2)`.
+  The C sibling of the Rust `fetch` (`fetch.rs`); both are kept.
+- **`legendstatus`** — a status line for dwm/dwl (battery, load, memory,
+  temperature, clock), read straight from `/proc` and `/sys`.
+
+**Build and run** without installing anything:
+
+```bash
+cd c
+make                 # builds ./fetch-c and ./legendstatus
+./fetch-c            # run the manifesto fetch
+./legendstatus -1    # print one status line; -n N loops every N seconds
+```
+
+**Install** to `/usr/local/bin` so both are on your `PATH`:
+
+```bash
+doas make -C c install                      # system-wide
+make -C c PREFIX="$HOME/.local" install     # or per-user, no root
+```
+
+The Rust `fetch` builds separately with `rustc fetch.rs -o fetch`; both
+`Bootstrap.sh` and `EndeavourRecovery.sh` compile the Rust and C versions
+together on a fresh deploy. See `c/README.md` for wiring `legendstatus` into
+a dwm root-name loop or a dwl/dwlb stdin bar.
 
 ---
 
