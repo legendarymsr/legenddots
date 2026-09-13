@@ -127,7 +127,7 @@
                         </div>
                     </div>
                     <div id="subtext-container">
-                        <span class="prompt">➜</span> <span class="cmd-dynamic" id="typewriter"></span><span class="cursor">█</span>
+                        <span class="prompt">➜</span> <span class="cmd-dynamic">USE FOSS. USE NEOVIM. USE GENTOO.</span><span class="cursor">█</span>
                     </div>
                 </div>
             </div>
@@ -157,68 +157,5 @@
         <img src="https://upload.wikimedia.org/wikipedia/en/e/e5/Clippy-letter.PNG" alt="Clippy" class="clippy-img">
     </div>
 
-    <!-- JS LOGIC -->
-    <script>
-        const words = ["USE FOSS.", "USE NEOVIM.", "USE GENTOO."];
-        const el = document.getElementById("typewriter");
-        let wordIndex = 0; let charIndex = 0; let isDeleting = false;
-
-        function type() {
-            if(!el) return;
-            const currentWord = words[wordIndex];
-            let typeSpeed = isDeleting ? 50 : 100; 
-            if (!isDeleting && charIndex < currentWord.length) {
-                el.innerText = currentWord.substring(0, charIndex + 1); charIndex++;
-            } else if (isDeleting && charIndex > 0) {
-                el.innerText = currentWord.substring(0, charIndex - 1); charIndex--;
-            } else {
-                if (!isDeleting) { typeSpeed = 3000; isDeleting = true; } 
-                else { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typeSpeed = 200; }
-            }
-            setTimeout(type, typeSpeed);
-        }
-
-        function startSequence() {
-            console.log("Sequence Started");
-            const countdownEl = document.getElementById("countdown");
-            const vsContent = document.getElementById("vscode-content");
-            const bsod = document.getElementById("bsod");
-            const vsWindow = document.getElementById("vscode-window");
-            const popup = document.getElementById("popup");
-            const clippy = document.getElementById("clippy");
-            
-            // 1. Popup (5s)
-            setTimeout(() => { 
-                if(popup) popup.classList.add('visible'); 
-            }, 5000);
-
-            // 2. Crash (15s)
-            let secondsLeft = 15;
-            const timer = setInterval(() => {
-                secondsLeft--;
-                const m = Math.floor(secondsLeft / 60);
-                const s = secondsLeft % 60;
-                if(countdownEl) countdownEl.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-
-                if (secondsLeft <= 0) {
-                    clearInterval(timer);
-                    console.log("CRASHING");
-                    if(vsContent) vsContent.style.display = 'none';
-                    if(bsod) {
-                        bsod.classList.remove('hidden');
-                        bsod.style.display = 'flex'; // Force display
-                    }
-                    if(vsWindow) vsWindow.classList.add('crashed');
-                }
-            }, 1000);
-
-            // 3. Clippy Slide In (25s)
-            setTimeout(() => { 
-                if(clippy) clippy.classList.add('visible'); 
-            }, 25000);
-        }
-
-        document.addEventListener("DOMContentLoaded", () => { type(); startSequence(); });
-    </script>
 </body>
 </html>
