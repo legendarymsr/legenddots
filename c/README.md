@@ -134,3 +134,20 @@ legendtimer 25m focus  # labelled: "focus  24:59 remaining"
 A bare number is seconds; `h`/`m`/`s` suffixes combine in any order. Counts
 down on one live-updating line (`\r`), then prints `time's up!` and rings the
 terminal bell three times. No notification daemon — just the terminal.
+
+### Pomodoro
+
+Drop a couple of aliases in your `.zshrc` (or `.bashrc`) for a classic
+25-min-work / 5-min-break Pomodoro:
+
+```sh
+pom()   { legendtimer 25m "${*:-focus}"; }   # a work sprint (optional label)
+pombrk() { legendtimer 5m break; }           # a short break
+```
+
+Then `pom write the report` runs a labelled 25-minute sprint and beeps when
+it's done; `pombrk` runs the break. Chain them for a full cycle:
+
+```sh
+pom deep work && pombrk
+```
