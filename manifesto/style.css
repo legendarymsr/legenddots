@@ -6,7 +6,7 @@
     --yellow: #e0af68; --blue: #7aa2f7; --purple: #bb9af7; --cyan: #7dcfff;
     --orange: #ff9e64; --gray: #565f89; --black: #15161e; --vscode-side: #1f2335;
     --vscode-status: #f7768e; --vscode-toast: #252526; --bsod-blue: #0078d7;
-    --xp-gray: #ECE9D8; --clippy-bg: #FFFFE1;
+    --xp-gray: #ECE9D8; --clippy-bg: #1f2335;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -120,17 +120,17 @@ body {
 @keyframes flash { 0%, 100% { background: var(--red); color: black; } 50% { background: black; color: var(--red); } }
 
 /* CLIPPY */
-.clippy-container { position: fixed; bottom: -300px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; transition: bottom 1s cubic-bezier(0.68, -0.55, 0.27, 1.55); z-index: 100; animation: float 3s ease-in-out infinite; }
+.clippy-container { position: fixed; bottom: -300px; right: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-end; z-index: 100; animation: float 3s ease-in-out infinite; }
 .clippy-container.visible { bottom: 20px; }
 @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-.speech-bubble { background: var(--clippy-bg); color: black; border: 1px solid black; border-radius: 10px; padding: 10px 15px; margin-bottom: 10px; font-family: 'Tahoma', sans-serif; font-size: 0.8rem; box-shadow: 4px 4px 0px rgba(0,0,0,0.2); width: 250px; position: relative; }
+.speech-bubble { background: var(--clippy-bg); color: var(--fg); border: 1px solid var(--blue); border-radius: 10px; padding: 10px 15px; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; box-shadow: 4px 4px 0px rgba(0,0,0,0.4); width: min(260px, 100%); position: relative; }
 .speech-bubble::after { content: ''; position: absolute; bottom: -10px; right: 40px; border-width: 10px 10px 0; border-style: solid; border-color: var(--clippy-bg) transparent; display: block; width: 0; }
-.speech-bubble strong { display: block; margin-bottom: 5px; } .speech-bubble hr { border: 0; border-top: 1px solid #aaa; margin: 5px 0; }
-.speech-bubble ul { padding-left: 20px; margin: 0; } .speech-bubble li { margin-bottom: 4px; } .speech-bubble a { color: blue; text-decoration: underline; cursor: pointer; }
-.clippy-img { width: 80px; height: auto; margin-right: 20px; filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.5)); }
+.speech-bubble strong { display: block; margin-bottom: 5px; color: var(--purple); } .speech-bubble hr { border: 0; border-top: 1px solid #414868; margin: 5px 0; }
+.speech-bubble ul { padding-left: 20px; margin: 0; } .speech-bubble li { margin-bottom: 4px; } .speech-bubble a { color: var(--blue); text-decoration: underline; cursor: pointer; }
+.clippy-img { width: 80px; height: auto; margin-right: 6px; filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.5)); }
 
 /* MOBILE */
-@media (max-width: 600px) { .container { gap: 20px; } .vscode { height: 320px; } .xp-window { width: 90%; } .logo { font-size: 0.65rem; } .fetch-container { gap: 15px; align-items: flex-start; } .spec-grid { font-size: 0.75rem; column-gap: 15px; } .segment { font-size: 0.6rem; padding: 0 10px; } .nvim-body { padding: 15px; gap: 10px; } .clippy-container { right: 10px; } .speech-bubble { width: 200px; font-size: 0.75rem; } .clippy-img { width: 60px; } 
+@media (max-width: 600px) { .container { gap: 20px; } .vscode { height: 320px; } .xp-window { width: 90%; } .logo { font-size: 0.65rem; } .fetch-container { gap: 15px; align-items: flex-start; } .spec-grid { font-size: 0.75rem; column-gap: 15px; } .segment { font-size: 0.6rem; padding: 0 10px; } .nvim-body { padding: 15px; gap: 10px; } .clippy-container { right: 10px; left: 10px; } .speech-bubble { font-size: 0.75rem; } .clippy-img { width: 60px; }
     .watermark { font-size: 0.9rem; right: 20px; bottom: 30px; text-shadow: 0 0 2px black; }
 }
 
@@ -209,7 +209,7 @@ body { padding: 46px 15px 36px; }   /* clear the two fixed bars */
 @keyframes crash-show { to { opacity: 1; visibility: visible; } }
 
 /* Clippy slides up from the corner at 25s, keeping its idle float. */
-#clippy { animation: float 3s ease-in-out infinite, clippy-in 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) 25s forwards; }
+#clippy { animation: float 3s ease-in-out infinite, clippy-in 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) 8s forwards; }
 @keyframes clippy-in { to { bottom: 34px; } }
 
 /* Accessibility: users who ask for less motion get the calm static version. */
