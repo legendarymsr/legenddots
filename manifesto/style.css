@@ -133,3 +133,58 @@ body {
 @media (max-width: 600px) { .container { gap: 20px; } .vscode { height: 320px; } .xp-window { width: 90%; } .logo { font-size: 0.65rem; } .fetch-container { gap: 15px; align-items: flex-start; } .spec-grid { font-size: 0.75rem; column-gap: 15px; } .segment { font-size: 0.6rem; padding: 0 10px; } .nvim-body { padding: 15px; gap: 10px; } .clippy-container { right: 10px; } .speech-bubble { width: 200px; font-size: 0.75rem; } .clippy-img { width: 60px; } 
     .watermark { font-size: 0.9rem; right: 20px; bottom: 30px; text-shadow: 0 0 2px black; }
 }
+
+/* ==========================================================================
+   PURE-CSS SEQUENCE  (no JavaScript)
+   Reimplements the old inline script with @keyframes + animation-delay:
+     - typewriter cycles three phrases forever
+     - the "Copilot" toast slides in at 5s
+     - the countdown ticks 0:15 -> 0:00 and the editor crashes into the BSOD at 15s
+     - Clippy slides up at 25s
+   ========================================================================== */
+
+/* Typewriter: each phrase types in, holds, erases; the three share an 18s loop
+   (JetBrains Mono is monospace, so `ch` widths reveal one glyph per step). */
+.typewriter .tw-word {
+    display: inline-block; overflow: hidden; white-space: nowrap;
+    width: 0; vertical-align: bottom;
+}
+.typewriter .tw-word:nth-child(1) { animation: tw1 18s steps(9) infinite; }
+.typewriter .tw-word:nth-child(2) { animation: tw2 18s steps(11) infinite; }
+.typewriter .tw-word:nth-child(3) { animation: tw3 18s steps(11) infinite; }
+@keyframes tw1 { 0% { width: 0; } 10% { width: 9ch; } 28% { width: 9ch; } 33.33% { width: 0; } 100% { width: 0; } }
+@keyframes tw2 { 0%, 33.33% { width: 0; } 43.33% { width: 11ch; } 61% { width: 11ch; } 66.66% { width: 0; } 100% { width: 0; } }
+@keyframes tw3 { 0%, 66.66% { width: 0; } 76.66% { width: 11ch; } 94% { width: 11ch; } 100% { width: 0; } }
+
+/* VS Code "Copilot" toast slides in at 5s. */
+#popup { animation: toast-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 5s forwards; }
+@keyframes toast-in { to { right: 15px; } }
+
+/* Countdown ticks 0:15 -> 0:00 over 15 seconds (discrete `content` animation). */
+#countdown::after { content: "0:15"; animation: countdown 15s step-end forwards; }
+@keyframes countdown {
+    0%      { content: "0:15"; } 6.667%  { content: "0:14"; } 13.333% { content: "0:13"; }
+    20%     { content: "0:12"; } 26.667% { content: "0:11"; } 33.333% { content: "0:10"; }
+    40%     { content: "0:09"; } 46.667% { content: "0:08"; } 53.333% { content: "0:07"; }
+    60%     { content: "0:06"; } 66.667% { content: "0:05"; } 73.333% { content: "0:04"; }
+    80%     { content: "0:03"; } 86.667% { content: "0:02"; } 93.333% { content: "0:01"; }
+    100%    { content: "0:00"; }
+}
+
+/* At 15s the editor "crashes": the code fades out, the XP BSOD fades in over it. */
+#vscode-content { animation: crash-hide 0.3s 15s forwards; }
+@keyframes crash-hide { to { opacity: 0; visibility: hidden; } }
+#bsod { opacity: 0; visibility: hidden; animation: crash-show 0.4s 15s forwards; }
+@keyframes crash-show { to { opacity: 1; visibility: visible; } }
+
+/* Clippy slides up from the corner at 25s, keeping its idle float. */
+#clippy { animation: float 3s ease-in-out infinite, clippy-in 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) 25s forwards; }
+@keyframes clippy-in { to { bottom: 20px; } }
+
+/* Accessibility: users who ask for less motion get the calm static version. */
+@media (prefers-reduced-motion: reduce) {
+    .typewriter .tw-word { display: none; }
+    .typewriter .tw-word:first-child { display: inline-block; width: auto; }
+    #popup, #bsod, #clippy, #vscode-content, #countdown::after { animation: none; }
+    #countdown::after { content: "0:15"; }
+}
