@@ -56,7 +56,9 @@ legenddots/
 │   ├── legendpass.c           secure password generator (/dev/urandom, unbiased)
 │   ├── legendtimer.c          terminal countdown timer with a bell
 │   ├── legendtodo.c           plain-text todo list (~/.legendtodo)
-│   └── legendxd.c             hexdump -C-style hex viewer
+│   ├── legendxd.c             hexdump -C-style hex viewer
+│   ├── legendserve.c          minimal static HTTP file server (localhost default)
+│   └── legendcolors.c         terminal palette tester (16/256/truecolor)
 ├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
@@ -124,6 +126,11 @@ just `cc` and a `Makefile`.
 - **`legendtodo`** — a plain-text todo list (`add`/`done`/`rm`/`clear`) backed
   by `~/.legendtodo` — greppable, hand-editable, no database.
 - **`legendxd`** — a `hexdump -C`-style hex viewer for files or stdin.
+- **`legendserve`** — a minimal static HTTP file server (`python -m
+  http.server` in C): localhost by default, directory listings, path-traversal
+  protection.
+- **`legendcolors`** — a terminal palette tester (16-color, 256-color cube,
+  truecolor gradient) for tuning the Tokyo Night theme.
 
 **Build and run** without installing anything:
 

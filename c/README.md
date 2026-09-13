@@ -15,6 +15,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | `legendtimer` | a terminal countdown timer with a live line and a bell when time's up. |
 | `legendtodo` | a plain-text todo list (`add`/`done`/`rm`/`clear`) backed by `~/.legendtodo`. |
 | `legendxd` | a `hexdump -C`-style hex viewer for files or stdin. |
+| `legendserve` | a minimal static HTTP file server (localhost by default), no Python needed. |
+| `legendcolors` | a terminal palette tester: 16-color, 256-color cube, truecolor gradient. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -188,3 +190,33 @@ eight, and an ASCII gutter with non-printables shown as `.`:
 ```
 
 The trailing line is the total length, same as `hexdump -C`.
+
+## legendserve
+
+```sh
+legendserve                    # serve ./ on http://127.0.0.1:8000/
+legendserve -p 8080 public     # serve ./public on port 8080
+legendserve -b 0.0.0.0 -p 80   # expose on all interfaces (deliberate)
+```
+
+A no-Python, no-Node `http.server` for quick local testing: GET/HEAD, a small
+MIME table, `index.html` when present, and an auto directory listing
+otherwise. It **binds `127.0.0.1` by default** — you have to pass `-b 0.0.0.0`
+on purpose to expose it on the network. Every request is confined to the
+served directory: the resolved path must stay inside it (a `realpath` check),
+so `..` and symlink escapes are refused with `403`. Requests are logged to
+stderr. It's a dev server — single-threaded and plaintext — not a production
+web server.
+
+## legendcolors
+
+```sh
+legendcolors        # every section
+legendcolors -16    # just the 16 ANSI colors
+legendcolors -256   # just the 256-color cube + grayscale ramp
+legendcolors -t     # just the 24-bit truecolor gradient
+```
+
+Prints color swatches straight to the terminal so you can eyeball a theme and
+confirm what your terminal actually renders — handy when tuning the Tokyo
+Night palette across `st`/`foot`/`alacritty`.

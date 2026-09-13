@@ -21,7 +21,8 @@ LDFLAGS ?=
 
 # The Rust manifesto (../fetch.rs) keeps the name 'fetch'; the C port installs
 # as 'fetch-c' so the two coexist. Same output, different language.
-BINS = fetch-c legendstatus legendpass legendtimer legendtodo legendxd
+BINS = fetch-c legendstatus legendpass legendtimer legendtodo legendxd \
+       legendserve legendcolors
 
 all: $(BINS)
 
@@ -42,6 +43,12 @@ legendtodo: legendtodo.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 legendxd: legendxd.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+legendserve: legendserve.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+legendcolors: legendcolors.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 install: all
