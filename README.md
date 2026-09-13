@@ -103,7 +103,9 @@ Every package here is auditable. Every config is version controlled. Nothing run
 - Reproducibility is a security property.
 - Bloat is attack surface.
 
-The manifesto page lives in `manifesto/` — open `index.html` locally.
+The manifesto page lives in `manifesto/`. Serve it with the C tool —
+`legendserve manifesto` — and open <http://127.0.0.1:8000/> (or just open
+`manifesto/index.html` in a browser directly). No Python required.
 
 ---
 
