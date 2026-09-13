@@ -5,7 +5,7 @@
  * `sort | uniq -c | sort -rn` in one tool, with a little bar per line — hand
  * it a log and see the top offenders at a glance. No libraries.
  *
- *   legendfreq < access.log
+ *   legendfreq access.log
  *   awk '{print $1}' access.log | legendfreq | head
  *
  * Build:  cc -std=c99 -Os -o legendfreq legendfreq.c    (see c/Makefile)
@@ -33,17 +33,27 @@ static int cmp_pair(const void *a, const void *b)
 	return strcmp(x->s, y->s);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	char **lines = NULL, *line = NULL;
 	size_t n = 0, cap = 0, lc = 0;
 	ssize_t len;
+	FILE *in = stdin;
 
-	if (isatty(STDIN_FILENO)) {
-		fprintf(stderr, "legendfreq: reads lines on stdin — pipe something in\n");
+	if (argc == 2 && argv[1][0] != '-') {
+		in = fopen(argv[1], "r");
+		if (!in) {
+			perror(argv[1]);
+			return 1;
+		}
+	} else if (argc != 1) {
+		fprintf(stderr, "usage: %s [file]   (else reads stdin)\n", argv[0]);
+		return 2;
+	} else if (isatty(STDIN_FILENO)) {
+		fprintf(stderr, "legendfreq: give a file or pipe lines in\n");
 		return 2;
 	}
-	while ((len = getline(&line, &lc, stdin)) != -1) {
+	while ((len = getline(&line, &lc, in)) != -1) {
 		if (len && line[len - 1] == '\n')
 			line[--len] = '\0';
 		if (n == cap) {

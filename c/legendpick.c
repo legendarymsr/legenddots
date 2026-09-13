@@ -6,8 +6,9 @@
  * it picks uniformly from a stream of any size without loading it all or
  * needing a rewind. No libraries.
  *
- *   ls | legendpick            one random file
- *   legendpick -n 3 < list.txt three random lines
+ *   legendpick list.txt        one random line from a file
+ *   legendpick -n 3 list.txt   three random lines
+ *   ls | legendpick            one random line from a pipe
  *
  * Build:  cc -std=c99 -Os -o legendpick legendpick.c    (see c/Makefile)
  */
@@ -45,11 +46,14 @@ static unsigned long uniform(unsigned long n)
 int main(int argc, char **argv)
 {
 	int k = 1;
+	const char *file = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-n") && i + 1 < argc) {
 			k = atoi(argv[++i]);
+		} else if (argv[i][0] != '-' && !file) {
+			file = argv[i];
 		} else {
-			fprintf(stderr, "usage: %s [-n count]   (reads lines on stdin)\n",
+			fprintf(stderr, "usage: %s [-n count] [file]   (else reads stdin)\n",
 				argv[0]);
 			return 2;
 		}
@@ -70,14 +74,21 @@ int main(int argc, char **argv)
 		fprintf(stderr, "legendpick: out of memory\n");
 		return 1;
 	}
-	if (isatty(STDIN_FILENO)) {
-		fprintf(stderr, "legendpick: reads lines on stdin — pipe something in\n");
+	FILE *in = stdin;
+	if (file) {
+		in = fopen(file, "r");
+		if (!in) {
+			perror(file);
+			return 1;
+		}
+	} else if (isatty(STDIN_FILENO)) {
+		fprintf(stderr, "legendpick: give a file or pipe lines in\n");
 		return 2;
 	}
 	char *line = NULL;
 	size_t cap = 0, seen = 0;
 	ssize_t len;
-	while ((len = getline(&line, &cap, stdin)) != -1) {
+	while ((len = getline(&line, &cap, in)) != -1) {
 		if (len && line[len - 1] == '\n')
 			line[--len] = '\0';
 		if (seen < (size_t)k) {

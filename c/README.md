@@ -265,18 +265,22 @@ between the data's min and max — good for eyeballing a quick trend from a pipe
 ## legendpick
 
 ```sh
-ls | legendpick              # one random file
-legendpick -n 3 < list.txt   # three random lines
+legendpick list.txt          # one random line from a file
+legendpick -n 3 list.txt     # three random lines
+ls | legendpick              # or from a pipe
 ```
 
 Reservoir sampling with `/dev/urandom` (never `rand()`), so it picks uniformly
 from a stream of any size in one pass — no need to load or rewind the input.
+Give it a file, or pipe lines in.
 
 ## legendfreq
 
 ```sh
-awk '{print $1}' access.log | legendfreq | head    # top client IPs
+legendfreq access.log | head                        # top lines in a file
+awk '{print $1}' access.log | legendfreq | head     # or from a pipe
 ```
 
 `sort | uniq -c | sort -rn` in one tool: counts each unique line, sorts by
-frequency, and draws a bar so the top entries pop.
+frequency, and draws a bar so the top entries pop. Give it a file, or pipe
+lines in.
