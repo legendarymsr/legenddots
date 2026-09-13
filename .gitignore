@@ -19,3 +19,5 @@ suckless/vi/
 # c/ build artifacts (binaries, not sources)
 /c/fetch-c
 /c/legendstatus
+/c/legendpass
+/c/legendtimer

@@ -49,10 +49,12 @@ legenddots/
 │   └── vim/vimrc              minimal vim config → ~/.vimrc
 │
 ├── c/                         hand-written C tools — no deps, just cc + Makefile
-│   ├── README.md              build / run / install + bar-wiring docs
+│   ├── README.md              build / run / install + usage docs
 │   ├── Makefile               `make`; `doas make install`
 │   ├── fetch.c                'fetch-c' — the manifesto, in C (sibling of fetch.rs)
-│   └── legendstatus.c         status line for dwm/dwl (battery/load/mem/temp/clock)
+│   ├── legendstatus.c         status line for dwm/dwl (battery/disk/mem/load/temp/clock)
+│   ├── legendpass.c           secure password generator (/dev/urandom, unbiased)
+│   └── legendtimer.c          terminal countdown timer with a bell
 ├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
@@ -112,6 +114,11 @@ just `cc` and a `Makefile`.
   of the Rust `fetch` (`fetch.rs`); both are kept.
 - **`legendstatus`** — a status line for dwm/dwl (battery, disk, memory, load,
   temperature, clock), read straight from `/proc` and `/sys`.
+- **`legendpass`** — a secure password generator: `/dev/urandom` + unbiased
+  rejection sampling (never `rand()`), with length/count/symbol/no-ambiguous
+  options.
+- **`legendtimer`** — a terminal countdown timer (`legendtimer 25m focus`)
+  with a live line and a bell when time's up.
 
 **Build and run** without installing anything:
 
