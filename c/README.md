@@ -11,6 +11,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 |------|--------------|
 | `fetch-c` | states the manifesto and prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept. |
 | `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, disk, memory, load, temperature, clock. |
+| `legendpass` | a secure password generator — `/dev/urandom` + unbiased rejection sampling, never `rand()`. |
+| `legendtimer` | a terminal countdown timer with a live line and a bell when time's up. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -102,3 +104,33 @@ legendstatus -n 5 | dwlb -stdin -status-stdin all
 Battery status is shown with a trailing glyph: `+` charging, `-`
 discharging, `=` full, `•` unknown, followed by the runtime estimate when
 available (e.g. `bat 87%- 4h12m`).
+
+## legendpass
+
+```sh
+legendpass             # one 20-char alphanumeric password
+legendpass -l 32 -n 5  # five 32-char passwords
+legendpass -s          # include symbols (!@#$%^&*()-_=+[]{};:,.?/)
+legendpass -x          # exclude ambiguous chars (O0oIl1|`'")
+legendpass -e          # also print entropy in bits to stderr
+```
+
+Randomness comes straight from the kernel CSPRNG (`/dev/urandom`) — never
+`rand()`/`srand()`, which aren't cryptographically secure. Each character is
+drawn with **rejection sampling**, so every character in the set is equally
+likely (the naive `byte % setlen` is biased whenever 256 isn't a multiple of
+the set size). Passwords go to stdout, one per line; the optional entropy
+readout goes to stderr, so `legendpass | …` stays clean for piping.
+
+## legendtimer
+
+```sh
+legendtimer 90         # 90 seconds
+legendtimer 5m         # 5 minutes
+legendtimer 1h30m      # an hour and a half
+legendtimer 25m focus  # labelled: "focus  24:59 remaining"
+```
+
+A bare number is seconds; `h`/`m`/`s` suffixes combine in any order. Counts
+down on one live-updating line (`\r`), then prints `time's up!` and rings the
+terminal bell three times. No notification daemon — just the terminal.

@@ -21,7 +21,7 @@ LDFLAGS ?=
 
 # The Rust manifesto (../fetch.rs) keeps the name 'fetch'; the C port installs
 # as 'fetch-c' so the two coexist. Same output, different language.
-BINS = fetch-c legendstatus
+BINS = fetch-c legendstatus legendpass legendtimer
 
 all: $(BINS)
 
@@ -29,6 +29,13 @@ fetch-c: fetch.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 legendstatus: legendstatus.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+# legendpass uses log2() for the entropy readout, so it links libm.
+legendpass: legendpass.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lm
+
+legendtimer: legendtimer.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 install: all
