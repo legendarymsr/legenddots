@@ -29,7 +29,7 @@
                 </div>
                 
                 <div class="warning-banner" id="ram-warning">
-                    ⚠️ MEMORY CRITICAL (40GB). SHUTDOWN IN <span id="countdown">0:15</span>
+                    ⚠️ MEMORY CRITICAL (40GB). SHUTDOWN IN <span id="countdown"></span>
                 </div>
 
                 <div class="workspace">
@@ -72,8 +72,8 @@
                 </div>
             </div>
 
-            <!-- XP CRASH DIALOG (Hidden initially) -->
-            <div id="bsod" class="xp-crash hidden">
+            <!-- XP CRASH DIALOG (revealed at 15s by the CSS crash sequence) -->
+            <div id="bsod" class="xp-crash">
                 <div class="xp-window">
                     <div class="xp-title-bar">
                         <div class="xp-title">System Shutdown</div>
@@ -127,7 +127,7 @@
                         </div>
                     </div>
                     <div id="subtext-container">
-                        <span class="prompt">➜</span> <span class="cmd-dynamic">USE FOSS. USE NEOVIM. USE GENTOO.</span><span class="cursor">█</span>
+                        <span class="prompt">➜</span> <span class="cmd-dynamic typewriter"><span class="tw-word">USE FOSS.</span><span class="tw-word">USE NEOVIM.</span><span class="tw-word">USE GENTOO.</span></span><span class="cursor">█</span>
                     </div>
                 </div>
             </div>
