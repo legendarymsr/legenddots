@@ -13,6 +13,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, disk, memory, load, temperature, clock. |
 | `legendpass` | a secure password generator — `/dev/urandom` + unbiased rejection sampling, never `rand()`. |
 | `legendtimer` | a terminal countdown timer with a live line and a bell when time's up. |
+| `legendtodo` | a plain-text todo list (`add`/`done`/`rm`/`clear`) backed by `~/.legendtodo`. |
+| `legendxd` | a `hexdump -C`-style hex viewer for files or stdin. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -151,3 +153,38 @@ it's done; `pombrk` runs the break. Chain them for a full cycle:
 ```sh
 pom deep work && pombrk
 ```
+
+## legendtodo
+
+```sh
+legendtodo                 # list tasks
+legendtodo add buy milk    # append a task
+legendtodo done 2          # mark task 2 complete
+legendtodo undone 2        # mark task 2 incomplete again
+legendtodo rm 2            # delete task 2
+legendtodo clear           # remove all completed tasks
+```
+
+Tasks are just lines in a file — `[ ] task` (pending) or `[x] task` (done) —
+so they're greppable, editable by hand, and syncable however you like. The
+file is `$LEGENDTODO` if set, else `~/.legendtodo`. Completed tasks show
+dimmed, and each listing ends with a `N done, N left` summary.
+
+## legendxd
+
+```sh
+legendxd file.bin          # dump a file
+some-command | legendxd    # dump a pipe
+legendxd < /bin/ls | head  # dump stdin
+```
+
+`hexdump -C`-style output — offset, sixteen bytes of hex in two columns of
+eight, and an ASCII gutter with non-printables shown as `.`:
+
+```
+00000000  48 65 6c 6c 6f 2c 20 77  6f 72 6c 64 21 0a 41 73  |Hello, world!.As|
+00000010  63 69 69 5a 00 01 02 ff  20 65 6e 64              |ciiZ.... end|
+0000001c
+```
+
+The trailing line is the total length, same as `hexdump -C`.

@@ -54,7 +54,9 @@ legenddots/
 │   ├── fetch.c                'fetch-c' — the manifesto, in C (sibling of fetch.rs)
 │   ├── legendstatus.c         status line for dwm/dwl (battery/disk/mem/load/temp/clock)
 │   ├── legendpass.c           secure password generator (/dev/urandom, unbiased)
-│   └── legendtimer.c          terminal countdown timer with a bell
+│   ├── legendtimer.c          terminal countdown timer with a bell
+│   ├── legendtodo.c           plain-text todo list (~/.legendtodo)
+│   └── legendxd.c             hexdump -C-style hex viewer
 ├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
@@ -119,6 +121,9 @@ just `cc` and a `Makefile`.
   options.
 - **`legendtimer`** — a terminal countdown timer (`legendtimer 25m focus`)
   with a live line and a bell when time's up.
+- **`legendtodo`** — a plain-text todo list (`add`/`done`/`rm`/`clear`) backed
+  by `~/.legendtodo` — greppable, hand-editable, no database.
+- **`legendxd`** — a `hexdump -C`-style hex viewer for files or stdin.
 
 **Build and run** without installing anything:
 
