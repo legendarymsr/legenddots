@@ -16,6 +16,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static const char *TICKS[] = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
 
@@ -42,6 +43,11 @@ int main(int argc, char **argv)
 			}
 			PUSH(x);
 		}
+	} else if (isatty(STDIN_FILENO)) {
+		/* No args and no pipe: don't hang waiting on the terminal. */
+		fprintf(stderr, "usage: %s N N N ...   (or pipe numbers on stdin)\n",
+			argv[0]);
+		return 2;
 	} else {
 		while (scanf("%lf", &x) == 1)
 			PUSH(x);
