@@ -135,6 +135,37 @@ body {
 }
 
 /* ==========================================================================
+   NEOVIM FRAME — Tokyo Night bufferline (top) + lualine (bottom)
+   Makes the whole page read like one Neovim session; the VS Code/BSOD and the
+   fetch windows are the "buffers" living inside it.
+   ========================================================================== */
+body { padding: 46px 15px 36px; }   /* clear the two fixed bars */
+
+/* Bufferline (bufferline.nvim vibe) */
+.nvim-tabline {
+    position: fixed; top: 0; left: 0; width: 100%; height: 34px; z-index: 200;
+    display: flex; align-items: stretch; overflow: hidden; white-space: nowrap;
+    background: #16161e; border-bottom: 1px solid #0d0d12;
+    font-size: 0.72rem; font-weight: 800;
+}
+.tl-logo { display: flex; align-items: center; padding: 0 14px; background: var(--blue); color: var(--black); font-weight: 900; letter-spacing: 2px; }
+.tl-buf { display: flex; align-items: center; gap: 8px; padding: 0 16px; color: var(--gray); border-right: 1px solid #0d0d12; }
+.tl-buf.active { color: var(--blue); background: var(--bg); box-shadow: inset 0 2px 0 var(--blue); }
+.tl-buf.villain { color: var(--red); }
+.tl-mod { color: var(--yellow); font-size: 0.6rem; }
+.tl-fill { flex: 1; border-bottom: 1px solid #0d0d12; }
+.tl-tab { display: flex; align-items: center; padding: 0 14px; color: var(--gray); background: #1f2335; }
+
+/* Global lualine (reuses the .segment powerline styles from the fetch window) */
+.nvim-statusline-global {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 24px; z-index: 200;
+    display: flex; background: #16161e; font-size: 0.72rem; font-weight: 800;
+    line-height: 24px; box-shadow: 0 -1px 0 #0d0d12;
+}
+.nvim-statusline-global .segment.mode { background: var(--blue); color: var(--black); }
+.nvim-statusline-global .segment.mode::after { border-left-color: var(--blue); }
+
+/* ==========================================================================
    PURE-CSS SEQUENCE  (no JavaScript)
    Reimplements the old inline script with @keyframes + animation-delay:
      - typewriter cycles three phrases forever
@@ -179,7 +210,7 @@ body {
 
 /* Clippy slides up from the corner at 25s, keeping its idle float. */
 #clippy { animation: float 3s ease-in-out infinite, clippy-in 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) 25s forwards; }
-@keyframes clippy-in { to { bottom: 20px; } }
+@keyframes clippy-in { to { bottom: 34px; } }
 
 /* Accessibility: users who ask for less motion get the calm static version. */
 @media (prefers-reduced-motion: reduce) {
