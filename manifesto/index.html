@@ -8,7 +8,16 @@
 </head>
 <body>
     <div class="grid-bg"></div>
-    
+
+    <!-- NEOVIM BUFFERLINE (top) -->
+    <div class="nvim-tabline">
+        <div class="tl-logo">NVIM</div>
+        <div class="tl-buf villain">bloatware.ts <span class="tl-mod">●</span></div>
+        <div class="tl-buf active">manifesto.lua</div>
+        <div class="tl-fill"></div>
+        <div class="tl-tab">buffers 1,2</div>
+    </div>
+
     <div class="watermark">
         Activate Windows<br>
         Go to Settings to surrender your privacy.
@@ -141,6 +150,14 @@
 
         <div class="footer">REJECT ELECTRON. RETURN TO C.</div>
 
+    </div>
+
+    <!-- NEOVIM LUALINE (bottom, frames the whole page) -->
+    <div class="nvim-statusline-global">
+        <div class="segment mode nrm">NORMAL</div>
+        <div class="segment branch"> master</div>
+        <div class="segment file">~/freedom/manifesto.lua</div>
+        <div class="segment pos">lua · 100% · 42:7</div>
     </div>
 
     <!-- CLIPPY -->
