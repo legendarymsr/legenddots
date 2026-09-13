@@ -60,7 +60,9 @@ legenddots/
 │   ├── legendserve.c          minimal static HTTP file server (localhost default)
 │   ├── legendcolors.c         terminal palette tester (16/256/truecolor)
 │   ├── legendcal.c            cal-style month calendar
-│   └── legendbar.c            unicode sparkline from numbers
+│   ├── legendbar.c            unicode sparkline from numbers
+│   ├── legendpick.c           random line picker (/dev/urandom, reservoir)
+│   └── legendfreq.c           frequency count of stdin lines, with bars
 ├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
@@ -137,6 +139,9 @@ just `cc` and a `Makefile`.
   truecolor gradient) for tuning the Tokyo Night theme.
 - **`legendcal`** — a `cal`-style month calendar with today highlighted.
 - **`legendbar`** — a Unicode sparkline from numbers on args or stdin.
+- **`legendpick`** — pick random lines from stdin (`/dev/urandom`, reservoir
+  sampling; like `shuf`).
+- **`legendfreq`** — frequency count of stdin lines with a bar per entry.
 
 **Build and run** without installing anything:
 
