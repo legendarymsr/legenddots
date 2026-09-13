@@ -19,6 +19,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | `legendcolors` | a terminal palette tester: 16-color, 256-color cube, truecolor gradient. |
 | `legendcal` | a `cal`-style month calendar with today highlighted. |
 | `legendbar` | a Unicode sparkline (▁▂▃▄▅▆▇█) from numbers on args or stdin. |
+| `legendpick` | pick random lines from stdin (`/dev/urandom`, reservoir sampling). |
+| `legendfreq` | frequency count of stdin lines with a bar (`sort\|uniq -c\|sort -rn`). |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -259,3 +261,22 @@ echo "3 1 4 1 5 9 2 6" | legendbar
 
 Turns numbers (from args, or piped on stdin) into a one-line sparkline scaled
 between the data's min and max — good for eyeballing a quick trend from a pipe.
+
+## legendpick
+
+```sh
+ls | legendpick              # one random file
+legendpick -n 3 < list.txt   # three random lines
+```
+
+Reservoir sampling with `/dev/urandom` (never `rand()`), so it picks uniformly
+from a stream of any size in one pass — no need to load or rewind the input.
+
+## legendfreq
+
+```sh
+awk '{print $1}' access.log | legendfreq | head    # top client IPs
+```
+
+`sort | uniq -c | sort -rn` in one tool: counts each unique line, sorts by
+frequency, and draws a bar so the top entries pop.
