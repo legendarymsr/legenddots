@@ -58,7 +58,9 @@ legenddots/
 │   ├── legendtodo.c           plain-text todo list (~/.legendtodo)
 │   ├── legendxd.c             hexdump -C-style hex viewer
 │   ├── legendserve.c          minimal static HTTP file server (localhost default)
-│   └── legendcolors.c         terminal palette tester (16/256/truecolor)
+│   ├── legendcolors.c         terminal palette tester (16/256/truecolor)
+│   ├── legendcal.c            cal-style month calendar
+│   └── legendbar.c            unicode sparkline from numbers
 ├── fetch.rs                   'fetch' — the manifesto spite binary, in Rust
 │
 ├── init.lua                   Neovim config (lazy.nvim; yazi.nvim file manager)
@@ -133,6 +135,8 @@ just `cc` and a `Makefile`.
   protection.
 - **`legendcolors`** — a terminal palette tester (16-color, 256-color cube,
   truecolor gradient) for tuning the Tokyo Night theme.
+- **`legendcal`** — a `cal`-style month calendar with today highlighted.
+- **`legendbar`** — a Unicode sparkline from numbers on args or stdin.
 
 **Build and run** without installing anything:
 

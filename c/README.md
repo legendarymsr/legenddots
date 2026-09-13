@@ -17,6 +17,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | `legendxd` | a `hexdump -C`-style hex viewer for files or stdin. |
 | `legendserve` | a minimal static HTTP file server (localhost by default), no Python needed. |
 | `legendcolors` | a terminal palette tester: 16-color, 256-color cube, truecolor gradient. |
+| `legendcal` | a `cal`-style month calendar with today highlighted. |
+| `legendbar` | a Unicode sparkline (▁▂▃▄▅▆▇█) from numbers on args or stdin. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -237,3 +239,23 @@ legendcolors -t     # just the 24-bit truecolor gradient
 Prints color swatches straight to the terminal so you can eyeball a theme and
 confirm what your terminal actually renders — handy when tuning the Tokyo
 Night palette across `st`/`foot`/`alacritty`.
+
+## legendcal
+
+```sh
+legendcal            # this month, today highlighted (reverse video)
+legendcal 2026 9     # September 2026
+```
+
+A pocket `cal`: month name, weekday header, and the grid, with the current
+day highlighted when you're viewing this month.
+
+## legendbar
+
+```sh
+legendbar 1 2 3 4 3 2 1        # ▁▃▆█▆▃▁
+echo "3 1 4 1 5 9 2 6" | legendbar
+```
+
+Turns numbers (from args, or piped on stdin) into a one-line sparkline scaled
+between the data's min and max — good for eyeballing a quick trend from a pipe.
