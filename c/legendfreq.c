@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 struct pair { char *s; size_t n; };
 
@@ -38,6 +39,10 @@ int main(void)
 	size_t n = 0, cap = 0, lc = 0;
 	ssize_t len;
 
+	if (isatty(STDIN_FILENO)) {
+		fprintf(stderr, "legendfreq: reads lines on stdin — pipe something in\n");
+		return 2;
+	}
 	while ((len = getline(&line, &lc, stdin)) != -1) {
 		if (len && line[len - 1] == '\n')
 			line[--len] = '\0';

@@ -70,6 +70,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "legendpick: out of memory\n");
 		return 1;
 	}
+	if (isatty(STDIN_FILENO)) {
+		fprintf(stderr, "legendpick: reads lines on stdin — pipe something in\n");
+		return 2;
+	}
 	char *line = NULL;
 	size_t cap = 0, seen = 0;
 	ssize_t len;
