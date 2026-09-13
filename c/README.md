@@ -47,12 +47,29 @@ make PREFIX="$HOME/.local" install    # ensure ~/.local/bin is on your PATH
 
 Remove them again with `doas make uninstall` (same `PREFIX`).
 
+### Termux (Android)
+
+No `doas`/root — install into Termux's own prefix, which is already on your
+`PATH`:
+
+```sh
+pkg install clang make            # once, if you haven't
+cd ~/legenddots
+make -C c
+make -C c PREFIX="$PREFIX" install   # $PREFIX is Termux's /…/usr
+```
+
+Then everything runs on the phone: `legendpass`, `legendstatus`,
+`legendserve ~/legenddots/manifesto` (open <http://127.0.0.1:8000/> in your
+Android browser), etc. `legendstatus` even shows the phone's battery and the
+data-partition disk usage.
+
 `Bootstrap.sh` / `EndeavourRecovery.sh` already run `make -C c && make -C c
-install` for you, so a fresh deploy compiles these automatically.
+install` for you, so a fresh desktop deploy compiles these automatically.
 
 Build flags are hardened and warning-clean (`-Wall -Wextra -pedantic
 -D_FORTIFY_SOURCE=2 -fstack-protector-strong`) — a good fit for hardened
-Gentoo. Both binaries come out around 16 KB.
+Gentoo. Each binary comes out around 16 KB.
 
 ## fetch-c
 
