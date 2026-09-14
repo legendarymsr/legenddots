@@ -19,8 +19,8 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 | `legendcolors` | a terminal palette tester: 16-color, 256-color cube, truecolor gradient. |
 | `legendcal` | a `cal`-style month calendar with today highlighted. |
 | `legendbar` | a Unicode sparkline (▁▂▃▄▅▆▇█) from numbers on args or stdin. |
-| `legendpick` | pick random lines from stdin (`/dev/urandom`, reservoir sampling). |
-| `legendfreq` | frequency count of stdin lines with a bar (`sort\|uniq -c\|sort -rn`). |
+| `legendpick` | pick random item(s) from args or stdin (`/dev/urandom`, unbiased). |
+| `legendfreq` | frequency count of items from args or stdin, with a bar. |
 
 > The Rust manifesto (`../fetch.rs`) keeps the name `fetch`; this C port
 > installs as `fetch-c` so the two live side by side.
@@ -265,22 +265,22 @@ between the data's min and max — good for eyeballing a quick trend from a pipe
 ## legendpick
 
 ```sh
-legendpick list.txt          # one random line from a file
-legendpick -n 3 list.txt     # three random lines
-ls | legendpick              # or from a pipe
+legendpick heads tails       # one of two, typed inline
+legendpick -n 3 a b c d e     # three of five (no repeats)
+ls | legendpick               # or from a pipe
 ```
 
-Reservoir sampling with `/dev/urandom` (never `rand()`), so it picks uniformly
-from a stream of any size in one pass — no need to load or rewind the input.
-Give it a file, or pipe lines in.
+Randomness from `/dev/urandom` (never `rand()`), picked with a partial
+Fisher-Yates shuffle so choices are uniform and never repeat. Give the choices
+as arguments, or pipe lines in.
 
 ## legendfreq
 
 ```sh
-legendfreq access.log | head                        # top lines in a file
+legendfreq apple banana apple cherry apple          # counted inline
 awk '{print $1}' access.log | legendfreq | head     # or from a pipe
 ```
 
-`sort | uniq -c | sort -rn` in one tool: counts each unique line, sorts by
-frequency, and draws a bar so the top entries pop. Give it a file, or pipe
-lines in.
+`sort | uniq -c | sort -rn` in one tool: counts each unique item, sorts by
+frequency, and draws a bar so the top entries pop. Give the items as
+arguments, or pipe lines in.

@@ -1,14 +1,14 @@
-/* legendpick — pick random lines from stdin, in C.
+/* legendpick — pick random items, in C.
  *
  * "Reject Electron. Return to C."
  *
- * Reservoir sampling with kernel randomness (/dev/urandom, never rand()), so
- * it picks uniformly from a stream of any size without loading it all or
- * needing a rewind. No libraries.
+ * Give the choices right on the command line, or pipe them in — one is chosen
+ * (or -n of them) with kernel randomness (/dev/urandom, never rand()). No
+ * libraries.
  *
- *   legendpick list.txt        one random line from a file
- *   legendpick -n 3 list.txt   three random lines
- *   ls | legendpick            one random line from a pipe
+ *   legendpick heads tails            one of two
+ *   legendpick -n 3 a b c d e         three of five (no repeats)
+ *   ls | legendpick                   one random line from a pipe
  *
  * Build:  cc -std=c99 -Os -o legendpick legendpick.c    (see c/Makefile)
  */
@@ -43,19 +43,36 @@ static unsigned long uniform(unsigned long n)
 	return r % n;
 }
 
+static void push(char ***a, size_t *n, size_t *cap, char *s)
+{
+	if (*n == *cap) {
+		*cap = *cap ? *cap * 2 : 16;
+		*a = realloc(*a, *cap * sizeof **a);
+		if (!*a) {
+			fprintf(stderr, "legendpick: out of memory\n");
+			exit(1);
+		}
+	}
+	(*a)[(*n)++] = s;
+}
+
 int main(int argc, char **argv)
 {
 	int k = 1;
-	const char *file = NULL;
+	char **items = NULL;
+	size_t n = 0, cap = 0;
+	int have_items = 0;
+
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-n") && i + 1 < argc) {
 			k = atoi(argv[++i]);
-		} else if (argv[i][0] != '-' && !file) {
-			file = argv[i];
-		} else {
-			fprintf(stderr, "usage: %s [-n count] [file]   (else reads stdin)\n",
-				argv[0]);
+		} else if (argv[i][0] == '-' && argv[i][1]) {
+			fprintf(stderr, "usage: %s [-n count] item item ...   "
+				"(or pipe lines in)\n", argv[0]);
 			return 2;
+		} else {
+			push(&items, &n, &cap, argv[i]); /* item straight from argv */
+			have_items = 1;
 		}
 	}
 	if (k < 1) {
@@ -63,50 +80,39 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
+	if (!have_items) {
+		if (isatty(STDIN_FILENO)) {
+			fprintf(stderr, "usage: %s [-n count] item item ...   "
+				"(or pipe lines in)\n", argv[0]);
+			return 2;
+		}
+		char *line = NULL;
+		size_t lc = 0;
+		ssize_t len;
+		while ((len = getline(&line, &lc, stdin)) != -1) {
+			if (len && line[len - 1] == '\n')
+				line[--len] = '\0';
+			push(&items, &n, &cap, strdup(line));
+		}
+		free(line);
+	}
+	if (n == 0)
+		return 0;
+
 	urandom = open("/dev/urandom", O_RDONLY);
 	if (urandom < 0) {
 		perror("legendpick: open /dev/urandom");
 		return 1;
 	}
 
-	char **res = calloc((size_t)k, sizeof *res);
-	if (!res) {
-		fprintf(stderr, "legendpick: out of memory\n");
-		return 1;
+	/* Partial Fisher-Yates: shuffle the first `out` slots, print them. */
+	size_t out = (size_t)k < n ? (size_t)k : n;
+	for (size_t i = 0; i < out; i++) {
+		size_t j = i + uniform(n - i);
+		char *t = items[i];
+		items[i] = items[j];
+		items[j] = t;
+		puts(items[i]);
 	}
-	FILE *in = stdin;
-	if (file) {
-		in = fopen(file, "r");
-		if (!in) {
-			perror(file);
-			return 1;
-		}
-	} else if (isatty(STDIN_FILENO)) {
-		fprintf(stderr, "legendpick: give a file or pipe lines in\n");
-		return 2;
-	}
-	char *line = NULL;
-	size_t cap = 0, seen = 0;
-	ssize_t len;
-	while ((len = getline(&line, &cap, in)) != -1) {
-		if (len && line[len - 1] == '\n')
-			line[--len] = '\0';
-		if (seen < (size_t)k) {
-			res[seen] = strdup(line);
-		} else {
-			unsigned long j = uniform(seen + 1);
-			if (j < (size_t)k) {
-				free(res[j]);
-				res[j] = strdup(line);
-			}
-		}
-		seen++;
-	}
-	free(line);
-	close(urandom);
-
-	size_t out = seen < (size_t)k ? seen : (size_t)k;
-	for (size_t i = 0; i < out; i++)
-		puts(res[i]);
 	return 0;
 }

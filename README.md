@@ -139,9 +139,9 @@ just `cc` and a `Makefile`.
   truecolor gradient) for tuning the Tokyo Night theme.
 - **`legendcal`** — a `cal`-style month calendar with today highlighted.
 - **`legendbar`** — a Unicode sparkline from numbers on args or stdin.
-- **`legendpick`** — pick random lines from stdin (`/dev/urandom`, reservoir
-  sampling; like `shuf`).
-- **`legendfreq`** — frequency count of stdin lines with a bar per entry.
+- **`legendpick`** — pick random item(s) from args or stdin (`/dev/urandom`,
+  unbiased; like `shuf`).
+- **`legendfreq`** — frequency count of items from args or stdin, bar per entry.
 
 **Build and run** without installing anything:
 
