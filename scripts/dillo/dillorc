@@ -1,6 +1,11 @@
-# Dillo — minimal, Tokyo Night, JetBrainsMono. Symlink to ~/.dillo/dillorc
-# (Dillo <=3.0) or ~/.config/dillo/dillorc (Dillo 3.1+). Dillo has NO JavaScript
-# by design, so it's already a lean, low-tracking browser out of the box.
+# Dillo — minimal, Tokyo Night, JetBrainsMono. Symlink to ~/.dillo/dillorc.
+# Dillo reads its config ONLY from ~/.dillo/ (then /etc/dillo) — every version,
+# including the revived Dillo 3.1/3.2/3.3. There is NO ~/.config/dillo/ (XDG)
+# support, so a config placed there is silently ignored and Dillo uses defaults.
+# The full, authoritative option list lives in the system dillorc, usually
+# /etc/dillo/dillorc — copy that and edit if a key here is ever rejected.
+# Dillo has NO JavaScript by design, so it's already a lean, low-tracking
+# browser out of the box.
 
 # home / search  (first search_url = default)
 home="about:blank"
@@ -15,9 +20,13 @@ font_cursive="JetBrainsMono Nerd Font"
 font_fantasy="JetBrainsMono Nerd Font"
 font_factor=1.0
 
-# colors — applied to pages that don't set their own (Tokyo Night)
+# colors — Tokyo Night. bg_color is used when a page sets no background of its
+# own; allow_white_bg=NO catches pages that DO set a white/near-white background
+# and swaps it for white_bg_replacement (which defaults to a light cream, NOT
+# bg_color) — so set that to the dark bg too, or most sites stay light.
 bg_color=0x1a1b26
 allow_white_bg=NO
+white_bg_replacement=0x1a1b26
 text_color=0xc0caf5
 link_color=0x7aa2f7
 visited_color=0xbb9af7
