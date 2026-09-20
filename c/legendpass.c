@@ -205,6 +205,11 @@ int main(int argc, char **argv)
 		}
 		char path[700];
 		snprintf(path, sizeof path, "%s/%s.gpg", store_dir(), get_name);
+		/* Forget any passphrase gpg-agent cached, so a passphrase-protected
+		 * key always prompts before revealing the password (no gpg-agent.conf
+		 * tweaking needed). Harmless if the key has no passphrase. */
+		if (system("gpg-connect-agent reloadagent /bye >/dev/null 2>&1"))
+			; /* best-effort; fall through to gpg either way */
 		execlp("gpg", "gpg", "--quiet", "--decrypt", path, (char *)NULL);
 		perror("legendpass: gpg (is gnupg installed?)");
 		return 127;
