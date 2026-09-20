@@ -208,7 +208,8 @@ int main(int argc, char **argv)
 		/* Forget any passphrase gpg-agent cached, so a passphrase-protected
 		 * key always prompts before revealing the password (no gpg-agent.conf
 		 * tweaking needed). Best-effort; harmless if the key has no passphrase. */
-		(void)system("gpg-connect-agent reloadagent /bye >/dev/null 2>&1");
+		int agent_rc = system("gpg-connect-agent reloadagent /bye >/dev/null 2>&1");
+		(void)agent_rc;
 		execlp("gpg", "gpg", "--quiet", "--decrypt", path, (char *)NULL);
 		perror("legendpass: gpg (is gnupg installed?)");
 		return 127;
