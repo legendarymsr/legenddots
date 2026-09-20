@@ -305,24 +305,25 @@ JavaScript engine at all**, so it's tiny, fast, and low-tracking by nature. Conf
 here is `dillo/dillorc` (+ `dillo/cookiesrc`), themed Tokyo Night + JetBrainsMono to
 match everything else — plain `key=value`, no build step.
 
-Dillo reads `~/.dillo/` (Dillo ≤3.0) or `~/.config/dillo/` (Dillo 3.1+); symlink
-into whichever your version uses:
+Dillo reads its config **only** from `~/.dillo/` (then `/etc/dillo`) — every
+version, including the revived Dillo 3.1/3.2/3.3. There is **no** XDG
+`~/.config/dillo/` support (the official manual documents only `~/.dillo/`), so
+a config placed there is silently ignored and Dillo falls back to defaults.
+Symlink into `~/.dillo/`:
 
 ```sh
-# Dillo <= 3.0
+mkdir -p ~/.dillo
 ln -sfn "$PWD/dillo/dillorc"   ~/.dillo/dillorc
 ln -sfn "$PWD/dillo/cookiesrc" ~/.dillo/cookiesrc
-# Dillo 3.1+ (XDG)
-mkdir -p ~/.config/dillo
-ln -sfn "$PWD/dillo/dillorc"   ~/.config/dillo/dillorc
-ln -sfn "$PWD/dillo/cookiesrc" ~/.config/dillo/cookiesrc
 ```
 
 Install: `sudo emerge -av www-client/dillo` (Gentoo) · `pkg install dillo`
 (Termux) · `pacman -S dillo` (Arch). What's set:
 
 - **fonts** JetBrainsMono Nerd Font across serif/sans/mono; **colors** Tokyo Night
-  for pages that don't bring their own (`allow_white_bg=NO`).
+  (`bg_color` for pages with no background of their own, plus `allow_white_bg=NO`
+  with `white_bg_replacement` set to the dark bg so white pages go dark too — set
+  it explicitly, since the replacement otherwise defaults to a light cream).
 - **privacy** `cookiesrc` defaults to `DENY`, `filter_auto_requests=same_domain`
   (no cross-site auto-fetches), `http_referer=host` (send only the host, not the
   full path). Add per-host cookie exceptions above the `DEFAULT` line.
