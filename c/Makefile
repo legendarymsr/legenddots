@@ -14,6 +14,12 @@
 PREFIX ?= /usr/local
 BINDIR  = $(PREFIX)/bin
 
+# Compiler: use cc if present, else clang (Termux ships clang, often with no
+# `cc` alias). Override with `make CC=...` for anything else.
+ifeq ($(shell command -v cc 2>/dev/null),)
+  CC := clang
+endif
+
 # Hardened, warning-clean, size-optimized — a good fit for hardened Gentoo.
 CFLAGS ?= -std=c99 -Os -Wall -Wextra -pedantic \
           -D_FORTIFY_SOURCE=2 -fstack-protector-strong
