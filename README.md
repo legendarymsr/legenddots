@@ -126,7 +126,7 @@ just `cc` and a `Makefile`.
   temperature, clock), read straight from `/proc` and `/sys`.
 - **`legendpass`** — a secure password generator: `/dev/urandom` + unbiased
   rejection sampling (never `rand()`), with length/count/symbol/no-ambiguous
-  options.
+  options and an optional GnuPG-encrypted store (`-S`/`-g`/`-L`, like `pass`).
 - **`legendtimer`** — a terminal countdown timer (`legendtimer 25m focus`)
   with a live line and a bell when time's up.
 - **`legendtodo`** — a plain-text todo list (`add`/`done`/`rm`/`clear`) backed

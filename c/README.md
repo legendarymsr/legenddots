@@ -11,7 +11,7 @@ kernel's own `/proc` and `/sys` and talks straight to libc.
 |------|--------------|
 | `fetch-c` | states the manifesto and prints neofetch-style system info. The C sibling of the Rust `fetch` (`../fetch.rs`); both are kept. |
 | `legendstatus` | a pocket status line for **dwm**/**dwl**: battery, disk, memory, load, temperature, clock. |
-| `legendpass` | a secure password generator — `/dev/urandom` + unbiased rejection sampling, never `rand()`. |
+| `legendpass` | a secure password generator (`/dev/urandom`, unbiased), with an optional GnuPG-encrypted on-disk store. |
 | `legendtimer` | a terminal countdown timer with a live line and a bell when time's up. |
 | `legendtodo` | a plain-text todo list (`add`/`done`/`rm`/`clear`) backed by `~/.legendtodo`. |
 | `legendxd` | a `hexdump -C`-style hex viewer for files or stdin. |
@@ -146,6 +146,29 @@ drawn with **rejection sampling**, so every character in the set is equally
 likely (the naive `byte % setlen` is biased whenever 256 isn't a multiple of
 the set size). Passwords go to stdout, one per line; the optional entropy
 readout goes to stderr, so `legendpass | …` stays clean for piping.
+
+### Encrypted store (GnuPG)
+
+Save a generated password encrypted on disk — the same public-key model
+[`pass`](https://www.passwordstore.org/) uses, so **saving needs only your
+public key** (no passphrase prompt); decrypting asks your key's passphrase.
+
+```sh
+# one-time: install gpg and point legendpass at your key
+pkg install gnupg                                    # Termux (Gentoo: app-crypt/gnupg)
+gpg --quick-generate-key "You <you@example.com>"     # if you don't have one
+export LEGENDPASS_GPG_KEY=you@example.com             # put in ~/.zshrc
+
+legendpass -S github -l 32     # generate one, encrypt to ~/.legendpass/github.gpg, print it once
+legendpass -g github           # decrypt & print it (asks your key passphrase)
+legendpass -L                  # list saved names
+legendpass -S vps -r other@key # encrypt to a specific recipient instead of $LEGENDPASS_GPG_KEY
+```
+
+Files land in `$LEGENDPASS_DIR` (default `~/.legendpass/`), one `name.gpg`
+per entry — plain GPG files, so `gpg -d`, `pass`, or any OpenPGP tool can read
+them too. Names are restricted to letters/digits/`._-@` (no path escapes). The
+password is fed to `gpg` over a pipe, never written to a temp file or argv.
 
 ## legendtimer
 
