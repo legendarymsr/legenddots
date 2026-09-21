@@ -10,8 +10,8 @@ success() { echo -e "${GREEN}ok${NC}  $1"; }
 warn()    { echo -e "${YELLOW}warn${NC} $1"; }
 
 PKGS=(
-    xmonad xmonad-contrib xmobar   # WM + lean bar
-    picom dmenu alacritty          # compositor, launcher, terminal
+    xmonad xmonad-contrib xmobar   # WM + simple bar
+    picom rofi dunst alacritty     # compositor, launcher, notifications, terminal
     ly                             # display manager
     xorg-server xorg-xinit
     ttf-jetbrains-mono-nerd
@@ -32,9 +32,11 @@ link() {
 }
 
 info "Linking configs..."
-link "$REPO_DIR/xmonad.hs"  "$HOME/.config/xmonad/xmonad.hs"
-link "$REPO_DIR/xmobarrc"   "$HOME/.xmobarrc"
-link "$REPO_DIR/picom.conf" "$HOME/.config/picom/picom.conf"
+link "$REPO_DIR/xmonad.hs"        "$HOME/.config/xmonad/xmonad.hs"
+link "$REPO_DIR/xmobarrc"         "$HOME/.xmobarrc"
+link "$REPO_DIR/picom.conf"       "$HOME/.config/picom/picom.conf"
+link "$REPO_DIR/rofi/config.rasi" "$HOME/.config/rofi/config.rasi"
+link "$REPO_DIR/dunst/dunstrc"    "$HOME/.config/dunst/dunstrc"
 
 info "Installing the ly config and the XMonad session..."
 [[ -e /etc/ly/config.ini && ! -L /etc/ly/config.ini ]] && sudo cp -n /etc/ly/config.ini /etc/ly/config.ini.bak || true
@@ -52,4 +54,4 @@ sudo systemctl enable ly.service && success "ly enabled" || warn "could not enab
 
 echo ""
 echo -e "${GREEN}Minimal XMonad + ly installed.${NC} Reboot, pick XMonad at the ly login."
-echo "Keys: Mod(Super)+Return = alacritty · Mod+p = dmenu · Mod+Space = layout · Mod+b = toggle bar · Mod+q = reload"
+echo "Keys: Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = toggle bar · Mod+q = reload"
