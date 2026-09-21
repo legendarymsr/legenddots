@@ -1,5 +1,9 @@
 # xmonad — minimal XMonad setup
 
+> So you suck at suckless but still want minimal? XMonad is about as close as
+> you'll get — same tiling spirit as dwm, but you configure it in one file it
+> recompiles itself, instead of patching `config.h` in C by hand.
+
 A deliberately small XMonad rice: the window manager, a bare **xmobar**
 (ram · battery · date), ultra-minimal **picom / rofi / dunst**, a **ly** login,
 and a **TTY-style lock**. Tokyo Night, Super as the mod key. No workspace applet,
