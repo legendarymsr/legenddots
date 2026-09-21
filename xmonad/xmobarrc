@@ -1,13 +1,13 @@
--- ~/.xmobarrc — legenddots (lean)
--- Just workspaces + window title on the left, a clock on the right.
+-- ~/.xmobarrc — dead simple: ram, battery, date.
 Config { font     = "JetBrainsMono Nerd Font 10"
        , bgColor  = "#1a1b26"
        , fgColor  = "#c0caf5"
        , position = TopH 24
-       , commands = [ Run XMonadLog
+       , commands = [ Run Memory  [ "-t", "ram <usedratio>%" ] 20
+                    , Run Battery [ "-t", "bat <left>%" ] 60   -- laptops only; delete on a desktop
                     , Run Date "%a %d %b  %H:%M" "date" 60
                     ]
        , sepChar  = "%"
        , alignSep = "}{"
-       , template = " %XMonadLog% }{ <fc=#7aa2f7>%date%</fc> "
+       , template = " %memory%   %battery%   %date% }{ "
        }
