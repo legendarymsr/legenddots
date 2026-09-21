@@ -1,5 +1,5 @@
 -- ~/.config/xmonad/xmonad.hs — legenddots (minimal)
--- Super mod, alacritty, rofi, a dead-simple xmobar. Mod-q recompiles live.
+-- Super mod, alacritty, rofi, dillo, a dead-simple xmobar. Mod-q recompiles live.
 
 import XMonad
 import XMonad.Hooks.ManageDocks (docks, avoidStruts, manageDocks, ToggleStruts(..))
@@ -19,6 +19,7 @@ main = xmonad $ docks def
   } `additionalKeysP`
   [ ("M-<Return>", spawn "alacritty")
   , ("M-p",        spawn "rofi -show drun")
+  , ("M-w",        spawn "dillo")               -- browser (lightweight, no Electron)
   , ("M-S-c",      kill)
   , ("M-<Space>",  sendMessage NextLayout)
   , ("M-b",        sendMessage ToggleStruts)   -- show/hide the bar

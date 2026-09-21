@@ -88,8 +88,8 @@ stays tiny.
 What it sets up, for the regular user you create:
 
 - **Xorg** (`xorg-server`, `xinit`) plus the X11 dev headers cabal needs, and the
-  tools the shared config spawns — `alacritty`, `rofi`, `picom`, `dunst`,
-  `physlock` — from the KISS `xorg`/`community` repos.
+  tools the shared config spawns — `alacritty`, `rofi`, `dillo`, `picom`,
+  `dunst`, `physlock` — from the KISS `xorg`/`community` repos.
 - **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib` + `xmobar`.
 - The config at `~/.xmonad/xmonad.hs` and a `~/.xinitrc` that `exec xmonad`.
 - `physlock` is set setuid so the `Mod-Shift-l` TTY lock works.
@@ -100,6 +100,7 @@ Then log in as that user and run **`startx`**. Default keys (Mod = **Super**):
 |-----|--------|
 | `Mod-Return` | open `alacritty` |
 | `Mod-p` | `rofi` launcher |
+| `Mod-w` | `dillo` browser |
 | `Mod-Space` | cycle layout (tiled / full) |
 | `Mod-j` / `Mod-k` | focus next / prev |
 | `Mod-S-j` / `Mod-S-k` | move window down / up |

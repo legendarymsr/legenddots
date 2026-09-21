@@ -5,9 +5,10 @@
 > recompiles itself, instead of patching `config.h` in C by hand.
 
 A deliberately small XMonad rice: the window manager, a bare **xmobar**
-(ram · battery · date), ultra-minimal **picom / rofi / dunst**, a **ly** login,
-and a **TTY-style lock**. Tokyo Night, Super as the mod key. No workspace applet,
-no system tray, no gaps — just enough to live in.
+(ram · battery · date), ultra-minimal **picom / rofi / dunst**, **dillo** for a
+browser (lightweight, no Electron), a **ly** login, and a **TTY-style lock**.
+Tokyo Night, Super as the mod key. No workspace applet, no system tray, no
+gaps — just enough to live in.
 
 ## Install (Arch or KISS)
 
@@ -48,6 +49,7 @@ XMonad session, and sets `physlock` setuid for the TTY lock.
 |-----|--------|
 | `Mod-Return` | alacritty |
 | `Mod-p` | rofi |
+| `Mod-w` | dillo (browser) |
 | `Mod-Space` | cycle layout |
 | `Mod-b` | toggle the bar |
 | `Mod-Shift-c` | close window |
