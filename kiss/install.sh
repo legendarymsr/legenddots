@@ -34,6 +34,11 @@ if [[ -z "${PRIV_ESC:-}" ]]; then
   read -t 10 -r ANS || true; echo
   case "${ANS,,}" in sudo) PRIV_ESC="sudo" ;; *) PRIV_ESC="doas" ;; esac
 fi
+if [[ -z "${INSTALL_XMONAD:-}" ]]; then
+  echo -e "${CYAN}Install the XMonad desktop (Xorg + GHC/Haskell)? [yes/no] (10s, default: yes)${NC}"
+  read -t 10 -r ANS || true; echo
+  case "${ANS,,}" in n|no) INSTALL_XMONAD="false" ;; *) INSTALL_XMONAD="true" ;; esac
+fi
 HOSTNAME_="${HOSTNAME_:-kiss}"
 TIMEZONE="${TIMEZONE:-America/New_York}"
 # Rebuild the whole base with your CFLAGS after extracting (slow but the KISS
@@ -109,9 +114,12 @@ cp -L /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 
 # ── Hand off to the in-chroot phase ───────────────────────────────────────────
 header "Entering chroot to configure & build"
-install -Dm755 "$(dirname "$(readlink -f "$0")")/kiss-setup.sh" "$MNT/root/kiss-setup.sh"
+SELF_DIR="$(dirname "$(readlink -f "$0")")"
+install -Dm755 "$SELF_DIR/kiss-setup.sh" "$MNT/root/kiss-setup.sh"
+# Stage the XMonad config so the in-chroot phase can drop it into the user's home.
+install -Dm644 "$SELF_DIR/xmonad.hs" "$MNT/root/xmonad.hs" 2>/dev/null || true
 # Pass config through the environment; kiss-chroot ships inside the tarball.
-export HOSTNAME_ TIMEZONE PRIV_ESC REBUILD_WORLD KISS_VER
+export HOSTNAME_ TIMEZONE PRIV_ESC REBUILD_WORLD KISS_VER INSTALL_XMONAD
 if ! "$MNT/bin/kiss-chroot" "$MNT" /root/kiss-setup.sh; then
   echo -e "${YEL}kiss-chroot could not run the setup script directly.${NC}"
   echo -e "Enter the chroot yourself and run it:\n  ${GREEN}${MNT}/bin/kiss-chroot ${MNT}${NC}\n  ${GREEN}HOSTNAME_=${HOSTNAME_} TIMEZONE=${TIMEZONE} PRIV_ESC=${PRIV_ESC} /root/kiss-setup.sh${NC}"
