@@ -71,8 +71,13 @@ KISS is about **simple, not just small**. The obvious suckless pick, **dwm**,
 is tiny — but you configure it by editing `config.h` in C and **recompiling the
 window manager by hand** for every change. **XMonad** keeps the same tiling
 minimalism, but the whole config is one Haskell file — `~/.xmonad/xmonad.hs`
-(shipped here as [`xmonad.hs`](xmonad.hs)) — that XMonad **recompiles itself**
-when you hit `Mod-q`. No C surgery to move a keybind.
+that XMonad **recompiles itself** when you hit `Mod-q`. No C surgery to move a
+keybind.
+
+The config is **shared with the repo's `xmonad/` rice**: [`kiss/xmonad.hs`](xmonad.hs)
+is a symlink to [`../xmonad/xmonad.hs`](../xmonad/xmonad.hs), so KISS and the Arch
+setup never drift. See [`xmonad/README.md`](../xmonad/README.md) for the config
+itself, the bar, and the TTY-style lock.
 
 The one honest cost: XMonad needs **GHC (Haskell)** to build — the single heavy
 dependency in this installer. KISS packages no `ghc`, so `kiss-setup.sh`
@@ -82,27 +87,35 @@ stays tiny.
 
 What it sets up, for the regular user you create:
 
-- **Xorg** (`xorg-server`, `xinit`) plus the X11 dev headers cabal needs, `st`
-  (terminal) and `dmenu` (launcher), all from the KISS `xorg` repo.
-- **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib`.
+- **Xorg** (`xorg-server`, `xinit`) plus the X11 dev headers cabal needs, and the
+  tools the shared config spawns — `alacritty`, `rofi`, `picom`, `dunst`,
+  `physlock` — from the KISS `xorg`/`community` repos.
+- **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib` + `xmobar`.
 - The config at `~/.xmonad/xmonad.hs` and a `~/.xinitrc` that `exec xmonad`.
+- `physlock` is set setuid so the `Mod-Shift-l` TTY lock works.
 
 Then log in as that user and run **`startx`**. Default keys (Mod = **Super**):
 
 | key | action |
 |-----|--------|
-| `Mod-Return` | open `st` |
-| `Mod-p` | `dmenu_run` |
+| `Mod-Return` | open `alacritty` |
+| `Mod-p` | `rofi` launcher |
 | `Mod-Space` | cycle layout (tiled / full) |
 | `Mod-j` / `Mod-k` | focus next / prev |
 | `Mod-S-j` / `Mod-S-k` | move window down / up |
 | `Mod-h` / `Mod-l` | shrink / grow master |
+| `Mod-b` | toggle the bar |
+| `Mod-S-l` | **lock** (physlock, TTY-style) |
 | `Mod-S-c` | close window |
 | `Mod-q` | **recompile this file & restart** |
 
-Don't want it? Pass `INSTALL_XMONAD=false` for a base system only. Package names
-in the `xorg` repo can drift between revisions — the build loop tolerates a miss
-and tells you which package to build by hand.
+Don't want it? Pass `INSTALL_XMONAD=false` for a base system only.
+
+Two caveats: package names in the `xorg`/`community` repos drift between
+revisions — the build loop tolerates a miss and names what to build by hand — and
+**`alacritty` is Rust**, which cuts against the WD-40 "reject rust" ethos. To keep
+a KISS box Rust-free, swap the terminal in `../xmonad/xmonad.hs` for `st` and
+build that instead.
 
 ## Tuning the kernel
 

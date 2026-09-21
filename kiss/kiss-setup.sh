@@ -126,21 +126,28 @@ fi
 #   (Haskell) to build — the single heavy dependency here — but the running WM
 #   stays tiny. KISS ships no ghc in core/extra, so we bootstrap the Haskell
 #   toolchain with ghcup and build xmonad from Hackage with cabal.
+#   The config itself is the repo's SHARED one — kiss/xmonad.hs is a symlink to
+#   ../xmonad/xmonad.hs, so KISS and the Arch xmonad/ rice stay in lockstep.
 if [ "$INSTALL_XMONAD" = "true" ] && [ -n "${USERNAME:-}" ]; then
   header "Desktop: Xorg + XMonad for ${USERNAME}"
 
-  # 1) X server + the tools XMonad drives + X11 dev headers cabal needs to build
-  #    the Haskell X11 binding. All from the KISS xorg repo (names can vary by
-  #    repo revision — the loop tolerates a miss and tells you to build it later).
+  # 1) X server + the tools the SHARED config (../xmonad/xmonad.hs) spawns +
+  #    the X11 dev headers cabal needs to build the Haskell X11 binding. From the
+  #    KISS xorg/community repos (names vary by repo revision — the loop tolerates
+  #    a miss and tells you to build it by hand).
+  #    NOTE: alacritty is Rust; on a KISS box you may prefer to swap the terminal
+  #    in ../xmonad/xmonad.hs for st and build st instead.
   for pkg in xorg-server xinit xsetroot xrdb \
              libx11 libxext libxft libxinerama libxrandr libxss \
-             st dmenu ttf-dejavu; do
+             alacritty rofi picom dunst physlock ttf-dejavu; do
     if kiss build "$pkg" && kiss install "$pkg"; then
       printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
     else
       printf '%b!! %s not found in KISS_PATH — build it by hand later%b\n' "$YEL" "$pkg" "$NC"
     fi
   done
+  # physlock needs root so the Mod-Shift-l TTY lock works from a keybind.
+  [ -x /usr/bin/physlock ] && chmod u+s /usr/bin/physlock 2>/dev/null || true
 
   # 2) Haskell toolchain via ghcup (self-contained, no root; lands in the user's
   #    home). This is the heavy step — GHC is a large download/build.
@@ -165,6 +172,7 @@ set -eu
 cabal update
 cabal install --lib xmonad xmonad-contrib
 cabal install xmonad
+cabal install xmobar || true   # the bar the shared config spawns
 mkdir -p "$HOME/.xmonad"
 XM
 
@@ -182,7 +190,7 @@ exec xmonad
 EOF
   chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.xmonad" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
   printf '%bXMonad ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
-  printf '  Mod(Super)+Return = st · Mod+p = dmenu · Mod+Space = layout · Mod+q = reload\n'
+  printf '  Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = bar · Mod+S+l = lock · Mod+q = reload\n'
 fi
 
 header "chroot setup complete"
