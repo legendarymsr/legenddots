@@ -14,6 +14,9 @@ HOSTNAME_="${HOSTNAME_:-kiss}"
 TIMEZONE="${TIMEZONE:-America/New_York}"
 PRIV_ESC="${PRIV_ESC:-doas}"
 REBUILD_WORLD="${REBUILD_WORLD:-false}"
+# Build the XMonad desktop (Xorg + GHC/Haskell) for the regular user. On by
+# default — a KISS box with a real, simple-to-config tiling WM. See below.
+INSTALL_XMONAD="${INSTALL_XMONAD:-true}"
 export KISS_PROMPT=0          # don't stop for "Continue?" confirmations
 export CFLAGS="${CFLAGS:--O2 -pipe -march=native}"
 export CXXFLAGS="$CFLAGS"
@@ -112,6 +115,74 @@ if [ -n "$USERNAME" ]; then
     addgroup wheel 2>/dev/null || true
     adduser "$USERNAME" wheel 2>/dev/null || true
   fi
+fi
+
+# ── Desktop: Xorg + XMonad (optional) ─────────────────────────────────────────
+# WHY XMONAD, NOT DWM:
+#   KISS is about SIMPLE, not just small. dwm makes you edit config.h and
+#   recompile the WM in C by hand for every change; XMonad keeps the same tiling
+#   minimalism but its whole config is one Haskell file (~/.xmonad/xmonad.hs)
+#   that it recompiles itself on Mod-q. The one honest cost: XMonad needs GHC
+#   (Haskell) to build — the single heavy dependency here — but the running WM
+#   stays tiny. KISS ships no ghc in core/extra, so we bootstrap the Haskell
+#   toolchain with ghcup and build xmonad from Hackage with cabal.
+if [ "$INSTALL_XMONAD" = "true" ] && [ -n "${USERNAME:-}" ]; then
+  header "Desktop: Xorg + XMonad for ${USERNAME}"
+
+  # 1) X server + the tools XMonad drives + X11 dev headers cabal needs to build
+  #    the Haskell X11 binding. All from the KISS xorg repo (names can vary by
+  #    repo revision — the loop tolerates a miss and tells you to build it later).
+  for pkg in xorg-server xinit xsetroot xrdb \
+             libx11 libxext libxft libxinerama libxrandr libxss \
+             st dmenu ttf-dejavu; do
+    if kiss build "$pkg" && kiss install "$pkg"; then
+      printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
+    else
+      printf '%b!! %s not found in KISS_PATH — build it by hand later%b\n' "$YEL" "$pkg" "$NC"
+    fi
+  done
+
+  # 2) Haskell toolchain via ghcup (self-contained, no root; lands in the user's
+  #    home). This is the heavy step — GHC is a large download/build.
+  header "Installing GHC + cabal via ghcup (the one heavy dep)"
+  su - "$USERNAME" -s /bin/sh <<'GHCUP' || printf '%bghcup step failed — install GHC/cabal by hand, then `cabal install xmonad`%b\n' "$YEL" "$NC"
+set -eu
+export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+export BOOTSTRAP_HASKELL_MINIMAL=1
+curl -fsSL https://get-ghcup.haskell.org | sh
+. "$HOME/.ghcup/env"
+ghcup install ghc    --set recommended
+ghcup install cabal  --set recommended
+GHCUP
+
+  # 3) Build xmonad + xmonad-contrib from Hackage and install the xmonad binary
+  #    onto the user's PATH (~/.cabal/bin). The --lib install gives the libraries
+  #    XMonad needs to recompile ~/.xmonad/xmonad.hs on Mod-q.
+  header "Building xmonad + xmonad-contrib (cabal)"
+  su - "$USERNAME" -s /bin/sh <<'XM' || printf '%bcabal build failed — run `cabal install --lib xmonad xmonad-contrib && cabal install xmonad` yourself%b\n' "$YEL" "$NC"
+set -eu
+. "$HOME/.ghcup/env" 2>/dev/null || true
+cabal update
+cabal install --lib xmonad xmonad-contrib
+cabal install xmonad
+mkdir -p "$HOME/.xmonad"
+XM
+
+  # 4) Drop in the config + a startx entry, owned by the user.
+  if [ -f /root/xmonad.hs ]; then
+    install -Dm644 /root/xmonad.hs "/home/$USERNAME/.xmonad/xmonad.hs"
+  else
+    printf '%bxmonad.hs not staged in /root — copy kiss/xmonad.hs to ~/.xmonad/ by hand%b\n' "$YEL" "$NC"
+  fi
+  cat > "/home/$USERNAME/.xinitrc" <<'EOF'
+# Put ghcup/cabal binaries on PATH so `xmonad` is found, then launch it.
+[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
+export PATH="$HOME/.cabal/bin:$HOME/.local/bin:$PATH"
+exec xmonad
+EOF
+  chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.xmonad" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
+  printf '%bXMonad ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
+  printf '  Mod(Super)+Return = st · Mod+p = dmenu · Mod+Space = layout · Mod+q = reload\n'
 fi
 
 header "chroot setup complete"

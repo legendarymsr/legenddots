@@ -31,8 +31,9 @@ commands to do it by hand.
 kiss-community repos and sets `KISS_PATH`, builds the baseline
 (`baseinit`, `e2fsprogs`, `dosfstools`, `eudev`, `linux-firmware`, `grub`,
 `efibootmgr`, doas/sudo), **builds a kernel** (`defconfig`), installs **GRUB**
-(`--removable`, so a Mac's firmware finds it), and sets passwords / an optional
-`wheel` user.
+(`--removable`, so a Mac's firmware finds it), sets passwords / an optional
+`wheel` user, and — unless you decline — builds the **XMonad desktop** for that
+user (see below).
 
 ## Knobs (environment variables)
 
@@ -45,6 +46,7 @@ kiss-community repos and sets `KISS_PATH`, builds the baseline
 | `HOSTNAME_` | `kiss` | hostname |
 | `TIMEZONE` | `America/New_York` | `/usr/share/zoneinfo/...` |
 | `REBUILD_WORLD` | `false` | `true` = rebuild the whole base with your CFLAGS first (slow, the purist path) |
+| `INSTALL_XMONAD` | `true` | build the XMonad desktop (Xorg + GHC) for the created user; `false` = base system only |
 | `KSERIES` | `6.18` | LTS kernel series to build (see "Why this kernel" below) |
 | `KVER` | newest of `KSERIES` | exact kernel version; auto-resolved to the latest point release of `KSERIES`, else set it yourself |
 
@@ -62,6 +64,45 @@ newer drivers for this MacBook's hardware (i915 graphics, Broadcom wifi, etc.).
 6.12 was the earlier, over-cautious pick; set `KSERIES=6.12` if you specifically
 want it. The exact point release is resolved from kernel.org at build time, so
 it's never stale.
+
+## Desktop: XMonad (why, not dwm)
+
+KISS is about **simple, not just small**. The obvious suckless pick, **dwm**,
+is tiny — but you configure it by editing `config.h` in C and **recompiling the
+window manager by hand** for every change. **XMonad** keeps the same tiling
+minimalism, but the whole config is one Haskell file — `~/.xmonad/xmonad.hs`
+(shipped here as [`xmonad.hs`](xmonad.hs)) — that XMonad **recompiles itself**
+when you hit `Mod-q`. No C surgery to move a keybind.
+
+The one honest cost: XMonad needs **GHC (Haskell)** to build — the single heavy
+dependency in this installer. KISS packages no `ghc`, so `kiss-setup.sh`
+bootstraps the toolchain with **ghcup** (in the user's home, no root) and builds
+`xmonad` + `xmonad-contrib` from Hackage with **cabal**. The running WM itself
+stays tiny.
+
+What it sets up, for the regular user you create:
+
+- **Xorg** (`xorg-server`, `xinit`) plus the X11 dev headers cabal needs, `st`
+  (terminal) and `dmenu` (launcher), all from the KISS `xorg` repo.
+- **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib`.
+- The config at `~/.xmonad/xmonad.hs` and a `~/.xinitrc` that `exec xmonad`.
+
+Then log in as that user and run **`startx`**. Default keys (Mod = **Super**):
+
+| key | action |
+|-----|--------|
+| `Mod-Return` | open `st` |
+| `Mod-p` | `dmenu_run` |
+| `Mod-Space` | cycle layout (tiled / full) |
+| `Mod-j` / `Mod-k` | focus next / prev |
+| `Mod-S-j` / `Mod-S-k` | move window down / up |
+| `Mod-h` / `Mod-l` | shrink / grow master |
+| `Mod-S-c` | close window |
+| `Mod-q` | **recompile this file & restart** |
+
+Don't want it? Pass `INSTALL_XMONAD=false` for a base system only. Package names
+in the `xorg` repo can drift between revisions — the build loop tolerates a miss
+and tells you which package to build by hand.
 
 ## Tuning the kernel
 
