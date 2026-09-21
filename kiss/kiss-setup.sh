@@ -59,13 +59,26 @@ for pkg in baseinit e2fsprogs dosfstools eudev linux-firmware grub efibootmgr "$
 done
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
-# KISS does not package the kernel — you build your own. defconfig gives a
-# generic bootable kernel; run `make menuconfig` first to tune it for this
-# MacBook's hardware (i915, wifi, etc.). Swap kernel.org for linux-libre if you
-# want a fully-free kernel (see the repo's libre/ notes).
-header "Building the Linux kernel (defconfig)"
+# WHY AN LTS KERNEL, AND WHY 6.18:
+#   KISS ships NO kernel — you build your own — and this is a set-and-forget
+#   install, so we pin a LONGTERM (LTS) series that gets security patches for
+#   years, not a mainline kernel that goes EOL ~2 months after release.
+#   As of 2026 both 6.12 and 6.18 are current LTS kernels, and — this is the key
+#   point — they carry the SAME projected EOL (Dec 2028). So an older LTS buys
+#   no extra longevity; we default to the NEWEST LTS, 6.18, for better hardware
+#   support (this MacBook's i915 graphics, Broadcom wifi, etc.) at identical
+#   support length. (6.12 was the earlier, over-cautious pick — set KSERIES=6.12
+#   if you want it.) Swap the kernel.org URL for linux-libre for a fully-free
+#   kernel (see the repo's libre/ notes).
+# defconfig gives a generic bootable kernel; uncomment `make menuconfig` to tune.
+KSERIES="${KSERIES:-6.18}"
+# Resolve the newest point release of the series at build time (so it never goes
+# stale); fall back to the series' initial release if the lookup can't run.
+KVER="${KVER:-$(curl -fsSL https://www.kernel.org/releases.json 2>/dev/null \
+  | grep -oE "\"${KSERIES}\.[0-9]+\"" | tr -d '"' | sort -V | tail -1)}"
+KVER="${KVER:-$KSERIES}"
+header "Building the Linux kernel (LTS ${KVER}, defconfig)"
 kiss build bc perl 2>/dev/null || true; kiss install bc perl 2>/dev/null || true
-KVER="${KVER:-6.12.9}"
 cd /usr/src
 if [ ! -d "linux-${KVER}" ]; then
   curl -fL# -O "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz"
