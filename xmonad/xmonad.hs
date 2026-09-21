@@ -22,6 +22,7 @@ main = xmonad $ docks def
   , ("M-S-c",      kill)
   , ("M-<Space>",  sendMessage NextLayout)
   , ("M-b",        sendMessage ToggleStruts)   -- show/hide the bar
+  , ("M-S-l",      spawn "physlock")           -- TTY-style lock (all VTs)
   , ("M-q",        spawn "xmonad --recompile && xmonad --restart")
   ]
 

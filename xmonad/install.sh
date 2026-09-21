@@ -13,6 +13,7 @@ PKGS=(
     xmonad xmonad-contrib xmobar   # WM + simple bar
     picom rofi dunst alacritty     # compositor, launcher, notifications, terminal
     ly                             # display manager
+    physlock                       # TTY-style screen lock
     xorg-server xorg-xinit
     ttf-jetbrains-mono-nerd
 )
@@ -43,6 +44,9 @@ info "Installing the ly config and the XMonad session..."
 sudo install -Dm644 "$REPO_DIR/ly/config.ini"    /etc/ly/config.ini
 sudo install -Dm644 "$REPO_DIR/xmonad.desktop"   /usr/share/xsessions/xmonad.desktop
 
+info "Making physlock runnable from a keybind (setuid root)..."
+sudo chmod u+s /usr/bin/physlock 2>/dev/null && success "physlock setuid" || warn "physlock not found — set it up by hand"
+
 info "Compiling xmonad..."
 if command -v xmonad &>/dev/null; then
     xmonad --recompile && success "xmonad compiled" || warn "recompile failed — check ~/.config/xmonad/xmonad.hs"
@@ -54,4 +58,4 @@ sudo systemctl enable ly.service && success "ly enabled" || warn "could not enab
 
 echo ""
 echo -e "${GREEN}Minimal XMonad + ly installed.${NC} Reboot, pick XMonad at the ly login."
-echo "Keys: Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = toggle bar · Mod+q = reload"
+echo "Keys: Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = toggle bar · Mod+Shift+l = lock · Mod+q = reload"

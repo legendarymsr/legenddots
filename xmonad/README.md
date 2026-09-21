@@ -1,0 +1,73 @@
+# xmonad — minimal XMonad setup
+
+A deliberately small XMonad rice: the window manager, a bare **xmobar**
+(ram · battery · date), ultra-minimal **picom / rofi / dunst**, a **ly** login,
+and a **TTY-style lock**. Tokyo Night, Super as the mod key. No workspace applet,
+no system tray, no gaps — just enough to live in.
+
+## Install (Arch)
+
+```sh
+./install.sh
+```
+
+Everything is in the official repos (no AUR). The script installs the packages,
+symlinks the configs into `~/.config`, drops the `ly` config and the XMonad
+session into place, sets `physlock` setuid, compiles the config, and enables
+`ly`. Reboot and pick **XMonad** at the login.
+
+## What's here
+
+| file | linked to | what |
+|------|-----------|------|
+| `xmonad.hs` | `~/.config/xmonad/xmonad.hs` | the whole window manager |
+| `xmobarrc` | `~/.xmobarrc` | the bar — ram · battery · date |
+| `picom.conf` | `~/.config/picom/picom.conf` | vsync, nothing else |
+| `rofi/config.rasi` | `~/.config/rofi/config.rasi` | launcher (stock theme, no icons) |
+| `dunst/dunstrc` | `~/.config/dunst/dunstrc` | notifications |
+| `ly/config.ini` | `/etc/ly/config.ini` | display manager |
+| `xmonad.desktop` | `/usr/share/xsessions/` | the session `ly` lists |
+
+## Keys (Mod = Super)
+
+| key | action |
+|-----|--------|
+| `Mod-Return` | alacritty |
+| `Mod-p` | rofi |
+| `Mod-Space` | cycle layout |
+| `Mod-b` | toggle the bar |
+| `Mod-Shift-c` | close window |
+| `Mod-Shift-l` | **lock** (physlock) |
+| `Mod-q` | recompile this config & restart |
+| `Mod-Shift-q` | quit XMonad (drops to the tty under startx) |
+
+Plus the XMonad defaults: `Mod-1..9` switch workspace, `Mod-Shift-1..9` move a
+window there, `Mod-j`/`Mod-k` focus, `Mod-h`/`Mod-l` resize the master pane.
+
+## Lock (TTY-style)
+
+`physlock` is a **console locker**, not a graphical lockscreen: `Mod-Shift-l`
+switches to a bare console and locks every virtual terminal until you type your
+password — exactly the "TTY lock" feel.
+
+It needs root, so `install.sh` makes it setuid:
+
+```sh
+sudo chmod u+s /usr/bin/physlock
+```
+
+Prefer not to setuid it? Drop a `doas`/`sudo` rule for `physlock` and change the
+keybind to `doas physlock` instead.
+
+## The bar
+
+xmobar, kept bare on purpose — `ram <usedratio>%`, `bat <left>%`, and the date.
+**On a desktop**, delete the `Battery` line in `xmobarrc` (there's nothing for it
+to read). Add more by dropping extra `Run …` commands into `commands` and fields
+into `template`.
+
+## Notes
+
+- Config path is the XDG `~/.config/xmonad/`; `xmonad --recompile` (and
+  `Mod-q`) rebuild from there. Needs `ghc`, which the `xmonad` package pulls in.
+- Package names assume an Arch base, like the other rices in this repo.
