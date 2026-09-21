@@ -1,0 +1,13 @@
+-- ~/.xmobarrc — legenddots (lean)
+-- Just workspaces + window title on the left, a clock on the right.
+Config { font     = "JetBrainsMono Nerd Font 10"
+       , bgColor  = "#1a1b26"
+       , fgColor  = "#c0caf5"
+       , position = TopH 24
+       , commands = [ Run XMonadLog
+                    , Run Date "%a %d %b  %H:%M" "date" 60
+                    ]
+       , sepChar  = "%"
+       , alignSep = "}{"
+       , template = " %XMonadLog% }{ <fc=#7aa2f7>%date%</fc> "
+       }
