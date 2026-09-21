@@ -45,7 +45,23 @@ kiss-community repos and sets `KISS_PATH`, builds the baseline
 | `HOSTNAME_` | `kiss` | hostname |
 | `TIMEZONE` | `America/New_York` | `/usr/share/zoneinfo/...` |
 | `REBUILD_WORLD` | `false` | `true` = rebuild the whole base with your CFLAGS first (slow, the purist path) |
-| `KVER` | `6.12.9` | kernel version to fetch from kernel.org |
+| `KSERIES` | `6.18` | LTS kernel series to build (see "Why this kernel" below) |
+| `KVER` | newest of `KSERIES` | exact kernel version; auto-resolved to the latest point release of `KSERIES`, else set it yourself |
+
+## Why this kernel (LTS, and 6.18 over 6.12)
+
+KISS packages **no kernel** — you build your own — and this is a set-and-forget
+box, so the installer pins a **Longterm (LTS)** series that gets security fixes
+for *years*, rather than a mainline kernel that goes EOL roughly two months
+after release.
+
+Both **6.12** and **6.18** are current LTS kernels — and they share the **same
+projected EOL, December 2028**. Since an older LTS buys no extra support
+lifetime here, the default is the **newest LTS, 6.18**: identical longevity, but
+newer drivers for this MacBook's hardware (i915 graphics, Broadcom wifi, etc.).
+6.12 was the earlier, over-cautious pick; set `KSERIES=6.12` if you specifically
+want it. The exact point release is resolved from kernel.org at build time, so
+it's never stale.
 
 ## Tuning the kernel
 
