@@ -9,16 +9,26 @@ A deliberately small XMonad rice: the window manager, a bare **xmobar**
 and a **TTY-style lock**. Tokyo Night, Super as the mod key. No workspace applet,
 no system tray, no gaps — just enough to live in.
 
-## Install (Arch)
+## Install (Arch or KISS)
 
 ```sh
 ./install.sh
 ```
 
-Everything is in the official repos (no AUR). The script installs the packages,
-symlinks the configs into `~/.config`, drops the `ly` config and the XMonad
-session into place, sets `physlock` setuid, compiles the config, and enables
-`ly`. Reboot and pick **XMonad** at the login.
+The script detects your distro and does the right thing:
+
+- **Arch** — `pacman` installs everything (official repos, no AUR), then it
+  enables `ly` via systemd. Reboot and pick **XMonad** at the login.
+- **KISS** — `kiss` builds the tools; since KISS ships no `ghc`, it bootstraps
+  the Haskell toolchain with **ghcup** and builds `xmonad`/`xmobar` with cabal.
+  It wires up `~/.xinitrc` so you launch with **`startx`** (enabling `ly` is left
+  to you — KISS isn't systemd). `doas` is used for the root steps.
+
+Either way it symlinks the configs into `~/.config`, installs the `ly` config +
+XMonad session, and sets `physlock` setuid for the TTY lock.
+
+> The KISS installer (`../kiss/`) already runs this same desktop build during a
+> fresh install; use this script to add XMonad to an already-running system.
 
 ## What's here
 
