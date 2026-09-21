@@ -139,7 +139,7 @@ if [ "$INSTALL_XMONAD" = "true" ] && [ -n "${USERNAME:-}" ]; then
   #    in ../xmonad/xmonad.hs for st and build st instead.
   for pkg in xorg-server xinit xsetroot xrdb \
              libx11 libxext libxft libxinerama libxrandr libxss \
-             alacritty rofi picom dunst physlock ttf-dejavu; do
+             alacritty rofi picom dunst physlock dillo ttf-dejavu; do
     if kiss build "$pkg" && kiss install "$pkg"; then
       printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
     else
@@ -190,7 +190,7 @@ exec xmonad
 EOF
   chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.xmonad" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
   printf '%bXMonad ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
-  printf '  Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = bar · Mod+S+l = lock · Mod+q = reload\n'
+  printf '  Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+w = dillo · Mod+Space = layout · Mod+b = bar · Mod+S+l = lock · Mod+q = reload\n'
 fi
 
 header "chroot setup complete"

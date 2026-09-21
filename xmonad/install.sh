@@ -59,7 +59,7 @@ finish() {
 install_arch() {
     local PKGS=(
         xmonad xmonad-contrib xmobar
-        picom rofi dunst alacritty
+        picom rofi dunst alacritty dillo
         ly physlock
         xorg-server xorg-xinit
         ttf-jetbrains-mono-nerd
@@ -81,7 +81,7 @@ install_kiss() {
     info "Building packages (kiss)... (names can vary by repo revision)"
     for pkg in xorg-server xinit xsetroot \
                libx11 libxext libxft libxinerama libxrandr libxss \
-               alacritty rofi picom dunst physlock ttf-dejavu ly; do
+               alacritty rofi picom dunst physlock dillo ttf-dejavu ly; do
         if kiss build "$pkg" && kiss install "$pkg"; then success "$pkg"
         else warn "$pkg not in KISS_PATH — build it by hand later"; fi
     done
@@ -126,4 +126,4 @@ else
     die "no supported package manager found (need pacman for Arch or kiss for KISS)"
 fi
 
-echo "Keys: Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+Space = layout · Mod+b = toggle bar · Mod+Shift+l = lock · Mod+q = reload"
+echo "Keys: Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+w = dillo · Mod+Space = layout · Mod+b = toggle bar · Mod+Shift+l = lock · Mod+q = reload"
