@@ -18,6 +18,11 @@ die()    { echo -e "${RED}error:${NC} $*" >&2; exit 1; }
 # The kiss-community rootfs release to install. Check the releases page for the
 # current tag: https://codeberg.org/kiss-community/repo/releases
 KISS_VER="${KISS_VER:-24.12.18}"
+# The rootfs tarball is NOT signed and ships NO .sha256 asset — its checksum is
+# published in the release NOTES. This is the sha256 for KISS_VER 24.12.18; bump
+# both from https://codeberg.org/kiss-community/repo/releases when upgrading.
+# Set empty to skip verification (not recommended).
+KISS_SHA256="${KISS_SHA256:-4e5ecef56e747029d2665a038b17a156a0cffd8ba9c99a776226aaf02bd9ff72}"
 # Target disk (MacBook Air 6,2 = /dev/sda, like the Gentoo installer).
 if [[ -z "${DISK:-}" ]]; then
   echo -e "${CYAN}Target disk to WIPE? (10s, default: /dev/sda)${NC}"
@@ -80,15 +85,15 @@ mount "$EFI" "$MNT/boot/efi"
 header "Downloading rootfs ${TARBALL}"
 cd "$MNT"
 curl -fL# -O "${BASE_URL}/${TARBALL}"
-curl -fL# -O "${BASE_URL}/${TARBALL}.sha256" \
-  || echo -e "${YEL}no .sha256 asset; skipping checksum (verify manually!)${NC}"
-if [[ -f "${TARBALL}.sha256" ]]; then
-  header "Verifying checksum"
-  sha256sum -c "${TARBALL}.sha256" || die "checksum mismatch — aborting"
+if [[ -n "$KISS_SHA256" ]]; then
+  header "Verifying sha256"
+  echo "${KISS_SHA256}  ${TARBALL}" | sha256sum -c - || die "checksum mismatch — aborting"
+else
+  echo -e "${YEL}KISS_SHA256 empty — skipping checksum verification!${NC}"
 fi
-header "Unpacking rootfs"
-tar xf "$TARBALL" --strip-components=1   # tarball contains a top-level dir
-rm -f "$TARBALL" "${TARBALL}.sha256"
+header "Unpacking rootfs (extracts bin/ etc/ usr/ … straight into ${MNT})"
+tar xf "$TARBALL"          # no top-level dir; do NOT --strip-components
+rm -f "$TARBALL"
 
 # ── /etc/fstab from real UUIDs ────────────────────────────────────────────────
 header "Generating /etc/fstab"

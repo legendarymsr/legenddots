@@ -39,6 +39,7 @@ kiss-community repos and sets `KISS_PATH`, builds the baseline
 | var | default | meaning |
 |-----|---------|---------|
 | `KISS_VER` | `24.12.18` | rootfs release tag (check the [releases page](https://codeberg.org/kiss-community/repo/releases)) |
+| `KISS_SHA256` | `4e5ece…30fd` | sha256 of the tarball (from the release notes; bump with `KISS_VER`). Empty = skip verify |
 | `DISK` | `/dev/sda` | disk to wipe (MacBook Air 6,2) |
 | `PRIV_ESC` | `doas` | `doas` or `sudo` for the installed system |
 | `HOSTNAME_` | `kiss` | hostname |
@@ -59,6 +60,8 @@ fully-free kernel? Swap the kernel.org URL for **linux-libre** (see `libre/`).
 - Community differences (repos, tarball host, signing): <https://kisscommunity.org/kiss/install/>
 - Repos & rootfs releases: <https://codeberg.org/kiss-community/repo>
 
-The kiss-community rootfs tarball is **not GPG-signed** — this installer
-verifies the published **sha256** instead. Git commit signing (ssh) can be
-enabled per the community guide if you want it.
+The kiss-community rootfs tarball is **not GPG-signed** and ships **no `.sha256`
+asset** — the checksum is published in the release notes, so the installer
+verifies against the `KISS_SHA256` value baked in above (update it whenever you
+bump `KISS_VER`). Git commit signing (ssh) can be enabled per the community
+guide if you want it.
