@@ -118,6 +118,10 @@ SELF_DIR="$(dirname "$(readlink -f "$0")")"
 install -Dm755 "$SELF_DIR/kiss-setup.sh" "$MNT/root/kiss-setup.sh"
 # Stage the XMonad config so the in-chroot phase can drop it into the user's home.
 install -Dm644 "$SELF_DIR/xmonad.hs" "$MNT/root/xmonad.hs" 2>/dev/null || true
+# Stage the Dillo config too (copied into ~/.dillo/ in the chroot — the repo
+# isn't on the installed system to symlink to).
+install -Dm644 "$SELF_DIR/../scripts/dillo/dillorc"   "$MNT/root/dillo/dillorc"   2>/dev/null || true
+install -Dm644 "$SELF_DIR/../scripts/dillo/cookiesrc" "$MNT/root/dillo/cookiesrc" 2>/dev/null || true
 # Pass config through the environment; kiss-chroot ships inside the tarball.
 export HOSTNAME_ TIMEZONE PRIV_ESC REBUILD_WORLD KISS_VER INSTALL_XMONAD
 if ! "$MNT/bin/kiss-chroot" "$MNT" /root/kiss-setup.sh; then

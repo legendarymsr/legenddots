@@ -92,6 +92,7 @@ What it sets up, for the regular user you create:
   `dunst`, `physlock` — from the KISS `xorg`/`community` repos.
 - **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib` + `xmobar`.
 - The config at `~/.xmonad/xmonad.hs` and a `~/.xinitrc` that `exec xmonad`.
+- The repo's Dillo config copied into `~/.dillo/` (Dillo reads only from there).
 - `physlock` is set setuid so the `Mod-Shift-l` TTY lock works.
 
 Then log in as that user and run **`startx`**. Default keys (Mod = **Super**):

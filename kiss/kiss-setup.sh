@@ -182,6 +182,13 @@ XM
   else
     printf '%bxmonad.hs not staged in /root — copy kiss/xmonad.hs to ~/.xmonad/ by hand%b\n' "$YEL" "$NC"
   fi
+  # Dillo config — copied (Dillo reads only ~/.dillo/; the repo isn't on the
+  # installed system to symlink to, so copy the staged files in).
+  if [ -d /root/dillo ]; then
+    mkdir -p "/home/$USERNAME/.dillo"
+    cp /root/dillo/dillorc /root/dillo/cookiesrc "/home/$USERNAME/.dillo/" 2>/dev/null || true
+    chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.dillo"
+  fi
   cat > "/home/$USERNAME/.xinitrc" <<'EOF'
 # Put ghcup/cabal binaries on PATH so `xmonad` is found, then launch it.
 [ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
