@@ -28,6 +28,10 @@ situation. If you already have a live USB you like, use that; only the two above
 are recommendations, not requirements.
 
 ```sh
+# attach to a persistent session first, so the long build survives a
+# disconnect (detach with Ctrl-a d, reattach later with `screen -DR kiss`)
+screen -DR kiss
+
 git clone https://github.com/legendarymsr/legenddots
 cd legenddots/kiss
 # defaults: /dev/sda, doas, hostname 'kiss', America/New_York
