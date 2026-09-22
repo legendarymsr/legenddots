@@ -140,6 +140,33 @@ One caveat: package names in the `xorg`/`community` repos drift between revision
 is **st**, built from source with your suckless `config.h`, so the whole desktop
 is Rust-free.
 
+## System services & tuning
+
+Beyond the base, `kiss-setup.sh` also sets these up (all tolerant — a package
+not in your repo checkout is skipped with a note):
+
+- **Networking** — `dhcpcd` for wired / USB-tether DHCP, plus `wpa_supplicant`
+  for wifi. **MacBook Air caveat:** its BCM4360 wifi needs the proprietary `wl`
+  (`broadcom-sta`) out-of-tree driver, which KISS doesn't package — build it
+  against your kernel by hand (see `gentoo/`) and load `wl`; ethernet / tether
+  work out of the box.
+- **Time** — `openntpd` (on musl a skewed clock breaks TLS, so this matters).
+- **Audio** — `alsa-utils` (unmute with `alsamixer`; the mixer is restored at
+  boot once you `alsactl store` a state).
+- **zram swap** — half of RAM, zstd-compressed, brought up at boot.
+- **Console keymap** — `loadkeys us` (change it to match `setxkbmap` in
+  `bspwm/bspwmrc`).
+- **CPU microcode** — `intel-ucode` firmware installed. Early load needs an
+  initramfs, which this defconfig-kernel setup doesn't build; add one for early
+  application, otherwise the kernel applies it late.
+- **The C tools** — `make -C c install` puts `fetch-c`, `legendstatus`,
+  `legendpass`, `legendserve`, … in `/usr/local/bin`.
+- **zsh** — set as the created user's login shell, with the repo's `.zshrc`.
+
+Daemons and tuning live in `/etc/rc.local` (also wired into `/etc/inittab` for
+busybox init). If your init runs neither, source `/etc/rc.local` from its own
+boot script.
+
 ## Tuning the kernel
 
 `defconfig` gives a generic bootable kernel. For this MacBook's hardware

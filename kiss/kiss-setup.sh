@@ -117,6 +117,79 @@ if [ -n "$USERNAME" ]; then
   fi
 fi
 
+# ── System services & tuning (network · time · audio · zram · keymap · ucode) ─
+header "System services & tuning"
+
+# Packages (tolerant — names vary by KISS repo revision).
+for pkg in dhcpcd wpa_supplicant openntpd alsa-utils zsh kbd intel-ucode; do
+  if kiss build "$pkg" && kiss install "$pkg"; then
+    printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
+  else
+    printf '%b!! %s not in KISS_PATH — skip / build by hand%b\n' "$YEL" "$pkg" "$NC"
+  fi
+done
+
+# NOTE — MacBook Air wifi: the BCM4360 needs the proprietary 'wl' (broadcom-sta)
+# out-of-tree driver, which KISS doesn't package. Ethernet / USB-tether works via
+# dhcpcd below; for wifi, build broadcom-sta against your kernel by hand (see the
+# repo's gentoo/ notes), load 'wl', then wpa_supplicant + dhcpcd handle it.
+
+# A boot hook. Most minimal inits run /etc/rc.local; for busybox init we also
+# wire it into /etc/inittab. If your init does neither, source it yourself.
+cat > /etc/rc.local <<'RC'
+#!/bin/sh
+# legenddots — daemons & tuning at boot
+
+# console keymap (change to match setxkbmap in bspwm/bspwmrc)
+loadkeys us 2>/dev/null || true
+
+# zram swap: half of RAM, zstd-compressed
+if modprobe zram 2>/dev/null || [ -e /sys/class/zram-control ]; then
+  z=$(cat /sys/class/zram-control/hot_add 2>/dev/null || echo 0)
+  b=$(awk '/MemTotal/{print int($2*512)}' /proc/meminfo)   # bytes = KB*1024/2
+  echo zstd > "/sys/block/zram${z}/comp_algorithm" 2>/dev/null || true
+  echo "$b"  > "/sys/block/zram${z}/disksize"       2>/dev/null || true
+  mkswap "/dev/zram${z}" >/dev/null 2>&1 && swapon -p 100 "/dev/zram${z}" 2>/dev/null || true
+fi
+
+# network: DHCP on wired (and wifi once wl + wpa_supplicant are set up)
+command -v dhcpcd >/dev/null 2>&1 && dhcpcd -b 2>/dev/null || true
+
+# time sync
+command -v ntpd >/dev/null 2>&1 && ntpd -s 2>/dev/null &
+
+# restore the ALSA mixer (unmute) if a saved state exists
+command -v alsactl >/dev/null 2>&1 && alsactl restore 2>/dev/null || true
+RC
+chmod +x /etc/rc.local
+if [ -f /etc/inittab ] && ! grep -q 'rc.local' /etc/inittab 2>/dev/null; then
+  printf '::once:/etc/rc.local\n' >> /etc/inittab
+fi
+
+# CPU microcode: the firmware is now on disk (/lib/firmware). EARLY load needs an
+# initramfs, which this defconfig-kernel setup doesn't build — add one (booster /
+# dracut) for early application, otherwise the kernel applies it late.
+
+# The legenddots C tools (fetch-c, legendstatus, legendpass, legendserve, …).
+if [ -d /root/c ]; then
+  header "Building the legenddots C tools"
+  if ( cd /root/c && make && make install ); then
+    printf '%b>> C tools installed to /usr/local/bin%b\n' "$GRN" "$NC"
+  else
+    printf '%b!! C tools build failed — run `make -C c install` by hand%b\n' "$YEL" "$NC"
+  fi
+fi
+
+# zsh as the user's login shell + the repo's .zshrc.
+if [ -n "${USERNAME:-}" ] && command -v zsh >/dev/null 2>&1; then
+  ZSH_BIN=$(command -v zsh)
+  sed -i "/^${USERNAME}:/ s|[^:]*\$|${ZSH_BIN}|" /etc/passwd 2>/dev/null || true
+  if [ -f /root/zshrc ]; then
+    install -Dm644 /root/zshrc "/home/$USERNAME/.zshrc"
+    chown "$USERNAME":"$USERNAME" "/home/$USERNAME/.zshrc"
+  fi
+fi
+
 # ── Desktop: Xorg + bspwm (optional) ──────────────────────────────────────────
 # WHY BSPWM, NOT DWM:
 #   KISS is about SIMPLE, not just small. dwm makes you edit config.h and
