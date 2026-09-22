@@ -132,18 +132,31 @@ is interrupted, rerun the same command to resume.
 
 ### Phase 2 — booted into LFS (as root)
 
+A fresh LFS base has no `screen` yet, so build it on its own first, then run the
+long desktop build inside it:
+
 ```sh
 git clone https://github.com/legendarymsr/legenddots ~/legenddots
+
+# 1) build screen by itself first (small, ~1 min) — the LFS base already has
+#    gcc + ncurses, so this is a quick standalone BLFS build
+wget https://ftp.gnu.org/gnu/screen/screen-4.9.1.tar.gz
+tar -xf screen-4.9.1.tar.gz && cd screen-4.9.1
+./configure --prefix=/usr --mandir=/usr/share/man \
+    --with-socket-dir=/run/screen --with-pty-group=5 \
+    --with-system-screenrc=/etc/screenrc
+make && make install
+cd .. && rm -rf screen-4.9.1
+
+# 2) now continue Phase 2 inside a persistent session
+screen -DR lfs
 bash ~/legenddots/blfs/setup
 ```
 
 The script detects the `lfs_complete` marker written by Phase 1 and skips
 straight to the BLFS desktop steps. Completed steps are checkpointed to
-`/etc/blfs-setup.state`.
-
-A bare LFS base may not have `screen` yet — run this under it if it's there,
-otherwise just run it directly; either way the checkpointing means a dropped
-connection only costs you a rerun, which resumes where it left off.
+`/etc/blfs-setup.state`, so if the build is interrupted, rerunning resumes
+where it left off.
 
 To reset a specific step and force it to rerun:
 
