@@ -91,7 +91,7 @@ Boot the Gentoo minimal or LiveGUI ISO, tether your phone via USB for
 internet (BCM4360 has no in-tree driver), then:
 
 ```sh
-tmux new -s install   # so a dropped connection doesn't kill the build
+screen -DR install    # persistent session, so a dropped connection can't kill the build (screen ships on the ISO; tmux often doesn't)
 bash install.sh
 ```
 
