@@ -38,11 +38,12 @@ cd legenddots/kiss
 DISK=/dev/sda ./install.sh
 ```
 
-> **Staying minimal:** KISS is meant to be simple, so lean on the small tools.
-> For editing, just use `vi` — it's always there and fits the ethos; `nano` works
-> if vi keybindings aren't your thing, but vi is the recommendation on KISS. To
-> browse from the terminal, reach for a TUI browser like `w3m`, `lynx` or `links`;
-> and if you already run emacs (bloat), `eww` does it too.
+> **Editing files:** if you ever need to change something by hand, `vi` is
+> already on every live environment; use `nano` instead if vi keybindings aren't
+> your thing (it's on most live media too).
+
+> **Terminal browsing:** prefer TUIs? Browse with `w3m`, `lynx` or `links`; and
+> if you already run emacs (bloat), `eww` works too.
 
 `install.sh` (host side) partitions `512M EFI + 4G swap + rest root`, downloads
 and **sha256-verifies** the kiss-community rootfs tarball, unpacks it, writes
