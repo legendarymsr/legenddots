@@ -139,14 +139,18 @@ long desktop build inside it:
 git clone https://github.com/legendarymsr/legenddots ~/legenddots
 
 # 1) build screen by itself first (small, ~1 min) — the LFS base already has
-#    gcc + ncurses, so this is a quick standalone BLFS build
-wget https://ftp.gnu.org/gnu/screen/screen-4.9.1.tar.gz
-tar -xf screen-4.9.1.tar.gz && cd screen-4.9.1
+#    gcc + ncurses, so this is a quick standalone BLFS build. Resolve the
+#    latest GNU screen release rather than pinning a version.
+SCREEN_VER=$(wget -qO- https://ftp.gnu.org/gnu/screen/ \
+    | grep -oE 'screen-[0-9]+\.[0-9.]+\.tar\.gz' \
+    | sed -E 's/screen-(.*)\.tar\.gz/\1/' | sort -V | tail -1)
+wget "https://ftp.gnu.org/gnu/screen/screen-${SCREEN_VER}.tar.gz"
+tar -xf "screen-${SCREEN_VER}.tar.gz" && cd "screen-${SCREEN_VER}"
 ./configure --prefix=/usr --mandir=/usr/share/man \
     --with-socket-dir=/run/screen --with-pty-group=5 \
     --with-system-screenrc=/etc/screenrc
 make && make install
-cd .. && rm -rf screen-4.9.1
+cd .. && rm -rf "screen-${SCREEN_VER}"
 
 # 2) now continue Phase 2 inside a persistent session
 screen -DR lfs
