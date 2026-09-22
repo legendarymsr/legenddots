@@ -14,9 +14,9 @@ HOSTNAME_="${HOSTNAME_:-kiss}"
 TIMEZONE="${TIMEZONE:-America/New_York}"
 PRIV_ESC="${PRIV_ESC:-doas}"
 REBUILD_WORLD="${REBUILD_WORLD:-false}"
-# Build the XMonad desktop (Xorg + GHC/Haskell) for the regular user. On by
-# default — a KISS box with a real, simple-to-config tiling WM. See below.
-INSTALL_XMONAD="${INSTALL_XMONAD:-true}"
+# Build the bspwm desktop (Xorg + bspwm, all C) for the regular user. On by
+# default — a KISS box with a small, config-file-driven tiling WM. See below.
+INSTALL_BSPWM="${INSTALL_BSPWM:-true}"
 export KISS_PROMPT=0          # don't stop for "Continue?" confirmations
 export CFLAGS="${CFLAGS:--O2 -pipe -march=native}"
 export CXXFLAGS="$CFLAGS"
@@ -117,87 +117,59 @@ if [ -n "$USERNAME" ]; then
   fi
 fi
 
-# ── Desktop: Xorg + XMonad (optional) ─────────────────────────────────────────
-# WHY XMONAD, NOT DWM:
+# ── Desktop: Xorg + bspwm (optional) ──────────────────────────────────────────
+# WHY BSPWM, NOT DWM:
 #   KISS is about SIMPLE, not just small. dwm makes you edit config.h and
-#   recompile the WM in C by hand for every change; XMonad keeps the same tiling
-#   minimalism but its whole config is one Haskell file (~/.xmonad/xmonad.hs)
-#   that it recompiles itself on Mod-q. The one honest cost: XMonad needs GHC
-#   (Haskell) to build — the single heavy dependency here — but the running WM
-#   stays tiny. KISS ships no ghc in core/extra, so we bootstrap the Haskell
-#   toolchain with ghcup and build xmonad from Hackage with cabal.
-#   The config itself is the repo's SHARED one — kiss/xmonad.hs is a symlink to
-#   ../xmonad/xmonad.hs, so KISS and the Arch xmonad/ rice stay in lockstep.
-if [ "$INSTALL_XMONAD" = "true" ] && [ -n "${USERNAME:-}" ]; then
-  header "Desktop: Xorg + XMonad for ${USERNAME}"
+#   recompile the WM in C for every change; bspwm does nothing on its own — you
+#   configure it with a shell script (~/.config/bspwm/bspwmrc) and bind keys with
+#   sxhkd. No recompiles, and — unlike XMonad — NO GHC/Haskell toolchain, which
+#   sits far better on musl. Everything here is plain C.
+#   The config is the repo's shared bspwm/ rice; install.sh stages it into the
+#   chroot (/root/wm) and we copy it into the user's ~/.config below.
+if [ "$INSTALL_BSPWM" = "true" ] && [ -n "${USERNAME:-}" ]; then
+  header "Desktop: Xorg + bspwm for ${USERNAME}"
 
-  # 1) X server + the tools the SHARED config (../xmonad/xmonad.hs) spawns +
-  #    the X11 dev headers cabal needs to build the Haskell X11 binding. From the
-  #    KISS xorg/community repos (names vary by repo revision — the loop tolerates
-  #    a miss and tells you to build it by hand).
-  #    NOTE: alacritty is Rust; on a KISS box you may prefer to swap the terminal
-  #    in ../xmonad/xmonad.hs for st and build st instead.
-  for pkg in xorg-server xinit xsetroot xrdb \
-             libx11 libxext libxft libxinerama libxrandr libxss \
-             alacritty rofi picom dunst physlock dillo ttf-dejavu; do
+  # X server + the tools the shared config uses, from the KISS xorg/community
+  # repos (names vary by repo revision — the loop tolerates a miss and tells you
+  # to build it by hand). alacritty is Rust; swap it for st in bspwm/bspwmrc +
+  # sxhkdrc if you'd rather keep the box Rust-free.
+  for pkg in xorg-server xinit xsetroot \
+             libx11 libxext libxft libxinerama libxrandr \
+             bspwm sxhkd polybar picom rofi dunst physlock dillo alacritty \
+             ttf-dejavu; do
     if kiss build "$pkg" && kiss install "$pkg"; then
       printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
     else
       printf '%b!! %s not found in KISS_PATH — build it by hand later%b\n' "$YEL" "$pkg" "$NC"
     fi
   done
-  # physlock needs root so the Mod-Shift-l TTY lock works from a keybind.
+  # physlock needs root so the super+shift+x TTY lock works from a keybind.
   [ -x /usr/bin/physlock ] && chmod u+s /usr/bin/physlock 2>/dev/null || true
 
-  # 2) Haskell toolchain via ghcup (self-contained, no root; lands in the user's
-  #    home). This is the heavy step — GHC is a large download/build.
-  header "Installing GHC + cabal via ghcup (the one heavy dep)"
-  su - "$USERNAME" -s /bin/sh <<'GHCUP' || printf '%bghcup step failed — install GHC/cabal by hand, then `cabal install xmonad`%b\n' "$YEL" "$NC"
-set -eu
-export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
-export BOOTSTRAP_HASKELL_MINIMAL=1
-curl -fsSL https://get-ghcup.haskell.org | sh
-. "$HOME/.ghcup/env"
-ghcup install ghc    --set recommended
-ghcup install cabal  --set recommended
-GHCUP
-
-  # 3) Build xmonad + xmonad-contrib from Hackage and install the xmonad binary
-  #    onto the user's PATH (~/.cabal/bin). The --lib install gives the libraries
-  #    XMonad needs to recompile ~/.xmonad/xmonad.hs on Mod-q.
-  header "Building xmonad + xmonad-contrib (cabal)"
-  su - "$USERNAME" -s /bin/sh <<'XM' || printf '%bcabal build failed — run `cabal install --lib xmonad xmonad-contrib && cabal install xmonad` yourself%b\n' "$YEL" "$NC"
-set -eu
-. "$HOME/.ghcup/env" 2>/dev/null || true
-cabal update
-cabal install --lib xmonad xmonad-contrib
-cabal install xmonad
-cabal install xmobar || true   # the bar the shared config spawns
-mkdir -p "$HOME/.xmonad"
-XM
-
-  # 4) Drop in the config + a startx entry, owned by the user.
-  if [ -f /root/xmonad.hs ]; then
-    install -Dm644 /root/xmonad.hs "/home/$USERNAME/.xmonad/xmonad.hs"
+  # Copy the staged bspwm config into ~/.config (the repo isn't on the installed
+  # system to symlink to), owned by the user.
+  if [ -d /root/wm ]; then
+    install -Dm755 /root/wm/bspwmrc    "/home/$USERNAME/.config/bspwm/bspwmrc"
+    install -Dm644 /root/wm/sxhkdrc    "/home/$USERNAME/.config/sxhkd/sxhkdrc"
+    install -Dm644 /root/wm/config.ini "/home/$USERNAME/.config/polybar/config.ini"
+    install -Dm755 /root/wm/launch.sh  "/home/$USERNAME/.config/polybar/launch.sh"
+    chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.config"
   else
-    printf '%bxmonad.hs not staged in /root — copy kiss/xmonad.hs to ~/.xmonad/ by hand%b\n' "$YEL" "$NC"
+    printf '%bbspwm config not staged in /root/wm — copy bspwm/ into ~/.config by hand%b\n' "$YEL" "$NC"
   fi
-  # Dillo config — copied (Dillo reads only ~/.dillo/; the repo isn't on the
-  # installed system to symlink to, so copy the staged files in).
+
+  # Dillo config — copied (Dillo reads only ~/.dillo/).
   if [ -d /root/dillo ]; then
     mkdir -p "/home/$USERNAME/.dillo"
     cp /root/dillo/dillorc /root/dillo/cookiesrc "/home/$USERNAME/.dillo/" 2>/dev/null || true
     chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.dillo"
   fi
-  cat > "/home/$USERNAME/.xinitrc" <<'EOF'
-# Put ghcup/cabal binaries on PATH so `xmonad` is found, then launch it.
-[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
-export PATH="$HOME/.cabal/bin:$HOME/.local/bin:$PATH"
-exec xmonad
-EOF
-  chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME/.xmonad" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
-  printf '%bXMonad ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
-  printf '  Mod(Super)+Return = alacritty · Mod+p = rofi · Mod+w = dillo · Mod+Space = layout · Mod+b = bar · Mod+S+l = lock · Mod+q = reload\n'
+
+  printf 'exec bspwm\n' > "/home/$USERNAME/.xinitrc"
+  chown "$USERNAME":"$USERNAME" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
+
+  printf '%bbspwm ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
+  printf '  super+Return = alacritty · super+p = rofi · super+w = dillo · super+shift+x = lock · super+alt+q = quit\n'
 fi
 
 header "chroot setup complete"

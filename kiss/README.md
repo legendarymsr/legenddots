@@ -13,7 +13,8 @@ chroot → configure & build.
 ## Run it
 
 From any Linux live environment, as root. It needs a working network (rootfs
-download, `git clone`, ghcup), so pick the live medium by how you get online:
+download, `git clone`, package sources), so pick the live medium by how you get
+online:
 
 - **Wifi → [EndeavourOS](https://endeavouros.com) live ISO.** It ships
   NetworkManager/iwd, so `nmtui` (or `iwctl`) gets you connected in seconds —
@@ -58,7 +59,7 @@ kiss-community repos and sets `KISS_PATH`, builds the baseline
 (`baseinit`, `e2fsprogs`, `dosfstools`, `eudev`, `linux-firmware`, `grub`,
 `efibootmgr`, doas/sudo), **builds a kernel** (`defconfig`), installs **GRUB**
 (`--removable`, so a Mac's firmware finds it), sets passwords / an optional
-`wheel` user, and — unless you decline — builds the **XMonad desktop** for that
+`wheel` user, and — unless you decline — builds the **bspwm desktop** for that
 user (see below).
 
 ## Knobs (environment variables)
@@ -72,7 +73,7 @@ user (see below).
 | `HOSTNAME_` | `kiss` | hostname |
 | `TIMEZONE` | `America/New_York` | `/usr/share/zoneinfo/...` |
 | `REBUILD_WORLD` | `false` | `true` = rebuild the whole base with your CFLAGS first (slow, the purist path) |
-| `INSTALL_XMONAD` | `true` | build the XMonad desktop (Xorg + GHC) for the created user; `false` = base system only |
+| `INSTALL_BSPWM` | `true` | build the bspwm desktop (Xorg + bspwm, all C) for the created user; `false` = base system only |
 | `KSERIES` | `6.18` | LTS kernel series to build (see "Why this kernel" below) |
 | `KVER` | newest of `KSERIES` | exact kernel version; auto-resolved to the latest point release of `KSERIES`, else set it yourself |
 
@@ -91,59 +92,53 @@ newer drivers for this MacBook's hardware (i915 graphics, Broadcom wifi, etc.).
 want it. The exact point release is resolved from kernel.org at build time, so
 it's never stale.
 
-## Desktop: XMonad (why, not dwm)
+## Desktop: bspwm (why, not dwm)
 
-KISS is about **simple, not just small**. The obvious suckless pick, **dwm**,
-is tiny — but you configure it by editing `config.h` in C and **recompiling the
-window manager by hand** for every change. **XMonad** keeps the same tiling
-minimalism, but the whole config is one Haskell file — `~/.xmonad/xmonad.hs`
-that XMonad **recompiles itself** when you hit `Mod-q`. No C surgery to move a
-keybind.
+KISS is about **simple, not just small**. The obvious suckless pick, **dwm**, is
+tiny — but you configure it by editing `config.h` in C and **recompiling the
+window manager by hand** for every change. **bspwm** is just as small, but it
+does nothing on its own: you configure it with a shell script
+(`~/.config/bspwm/bspwmrc`) and bind keys with **sxhkd**. No recompiles — and,
+unlike XMonad, **no GHC/Haskell toolchain**, so it's all plain C and sits far
+better on musl.
 
-The config is **shared with the repo's `xmonad/` rice**: [`kiss/xmonad.hs`](xmonad.hs)
-is a symlink to [`../xmonad/xmonad.hs`](../xmonad/xmonad.hs), so KISS and the Arch
-setup never drift. See [`xmonad/README.md`](../xmonad/README.md) for the config
-itself, the bar, and the TTY-style lock.
-
-The one honest cost: XMonad needs **GHC (Haskell)** to build — the single heavy
-dependency in this installer. KISS packages no `ghc`, so `kiss-setup.sh`
-bootstraps the toolchain with **ghcup** (in the user's home, no root) and builds
-`xmonad` + `xmonad-contrib` from Hackage with **cabal**. The running WM itself
-stays tiny.
+The config is **shared with the repo's `bspwm/` rice**: `kiss-setup.sh` deploys
+the same `bspwmrc` / `sxhkdrc` / polybar config. See
+[`bspwm/README.md`](../bspwm/README.md) for the full keybind table, the bar, and
+the TTY-style lock.
 
 What it sets up, for the regular user you create:
 
-- **Xorg** (`xorg-server`, `xinit`) plus the X11 dev headers cabal needs, and the
-  tools the shared config spawns — `alacritty`, `rofi`, `dillo`, `picom`,
-  `dunst`, `physlock` — from the KISS `xorg`/`community` repos.
-- **GHC + cabal** via ghcup, then `xmonad` + `xmonad-contrib` + `xmobar`.
-- The config at `~/.xmonad/xmonad.hs` and a `~/.xinitrc` that `exec xmonad`.
+- **Xorg** (`xorg-server`, `xinit`) plus `bspwm`, `sxhkd`, `polybar`, and the
+  tools the config uses — `alacritty`, `rofi`, `dillo`, `picom`, `dunst`,
+  `physlock` — from the KISS `xorg`/`community` repos.
+- The config in `~/.config/{bspwm,sxhkd,polybar}` and a `~/.xinitrc` that
+  `exec bspwm`.
 - The repo's Dillo config copied into `~/.dillo/` (Dillo reads only from there).
-- `physlock` is set setuid so the `Mod-Shift-l` TTY lock works.
+- `physlock` is set setuid so the `super+shift+x` TTY lock works.
 
-Then log in as that user and run **`startx`**. Default keys (Mod = **Super**):
+Then log in as that user and run **`startx`**. Default keys (super = **Super**):
 
 | key | action |
 |-----|--------|
-| `Mod-Return` | open `alacritty` |
-| `Mod-p` | `rofi` launcher |
-| `Mod-w` | `dillo` browser |
-| `Mod-Space` | cycle layout (tiled / full) |
-| `Mod-j` / `Mod-k` | focus next / prev |
-| `Mod-S-j` / `Mod-S-k` | move window down / up |
-| `Mod-h` / `Mod-l` | shrink / grow master |
-| `Mod-b` | toggle the bar |
-| `Mod-S-l` | **lock** (physlock, TTY-style) |
-| `Mod-S-c` | close window |
-| `Mod-q` | **recompile this file & restart** |
+| `super-Return` | open `alacritty` |
+| `super-p` | `rofi` launcher |
+| `super-w` | `dillo` browser |
+| `super-q` / `super-shift-q` | close / kill window |
+| `super-{h,j,k,l}` | focus in a direction |
+| `super-shift-{h,j,k,l}` | move window |
+| `super-{1..9}` | switch desktop |
+| `super-shift-x` | **lock** (physlock, TTY-style) |
+| `super-alt-r` / `super-alt-q` | restart / quit bspwm |
+| `super-Escape` | reload sxhkd |
 
-Don't want it? Pass `INSTALL_XMONAD=false` for a base system only.
+Don't want it? Pass `INSTALL_BSPWM=false` for a base system only.
 
 Two caveats: package names in the `xorg`/`community` repos drift between
 revisions — the build loop tolerates a miss and names what to build by hand — and
 **`alacritty` is Rust**, which cuts against the WD-40 "reject rust" ethos. To keep
-a KISS box Rust-free, swap the terminal in `../xmonad/xmonad.hs` for `st` and
-build that instead.
+a KISS box Rust-free, swap the terminal in `bspwm/bspwmrc` + `sxhkdrc` for `st`
+and build that instead.
 
 ## Tuning the kernel
 

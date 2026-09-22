@@ -34,10 +34,10 @@ if [[ -z "${PRIV_ESC:-}" ]]; then
   read -t 10 -r ANS || true; echo
   case "${ANS,,}" in sudo) PRIV_ESC="sudo" ;; *) PRIV_ESC="doas" ;; esac
 fi
-if [[ -z "${INSTALL_XMONAD:-}" ]]; then
-  echo -e "${CYAN}Install the XMonad desktop (Xorg + GHC/Haskell)? [yes/no] (10s, default: yes)${NC}"
+if [[ -z "${INSTALL_BSPWM:-}" ]]; then
+  echo -e "${CYAN}Install the bspwm desktop (Xorg + bspwm, all C)? [yes/no] (10s, default: yes)${NC}"
   read -t 10 -r ANS || true; echo
-  case "${ANS,,}" in n|no) INSTALL_XMONAD="false" ;; *) INSTALL_XMONAD="true" ;; esac
+  case "${ANS,,}" in n|no) INSTALL_BSPWM="false" ;; *) INSTALL_BSPWM="true" ;; esac
 fi
 HOSTNAME_="${HOSTNAME_:-kiss}"
 TIMEZONE="${TIMEZONE:-America/New_York}"
@@ -116,14 +116,17 @@ cp -L /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 header "Entering chroot to configure & build"
 SELF_DIR="$(dirname "$(readlink -f "$0")")"
 install -Dm755 "$SELF_DIR/kiss-setup.sh" "$MNT/root/kiss-setup.sh"
-# Stage the XMonad config so the in-chroot phase can drop it into the user's home.
-install -Dm644 "$SELF_DIR/xmonad.hs" "$MNT/root/xmonad.hs" 2>/dev/null || true
+# Stage the shared bspwm config so the in-chroot phase can copy it into ~/.config.
+install -Dm755 "$SELF_DIR/../bspwm/bspwmrc"            "$MNT/root/wm/bspwmrc"    2>/dev/null || true
+install -Dm644 "$SELF_DIR/../bspwm/sxhkdrc"            "$MNT/root/wm/sxhkdrc"    2>/dev/null || true
+install -Dm644 "$SELF_DIR/../bspwm/polybar/config.ini" "$MNT/root/wm/config.ini" 2>/dev/null || true
+install -Dm755 "$SELF_DIR/../bspwm/polybar/launch.sh"  "$MNT/root/wm/launch.sh"  2>/dev/null || true
 # Stage the Dillo config too (copied into ~/.dillo/ in the chroot — the repo
 # isn't on the installed system to symlink to).
 install -Dm644 "$SELF_DIR/../scripts/dillo/dillorc"   "$MNT/root/dillo/dillorc"   2>/dev/null || true
 install -Dm644 "$SELF_DIR/../scripts/dillo/cookiesrc" "$MNT/root/dillo/cookiesrc" 2>/dev/null || true
 # Pass config through the environment; kiss-chroot ships inside the tarball.
-export HOSTNAME_ TIMEZONE PRIV_ESC REBUILD_WORLD KISS_VER INSTALL_XMONAD
+export HOSTNAME_ TIMEZONE PRIV_ESC REBUILD_WORLD KISS_VER INSTALL_BSPWM
 if ! "$MNT/bin/kiss-chroot" "$MNT" /root/kiss-setup.sh; then
   echo -e "${YEL}kiss-chroot could not run the setup script directly.${NC}"
   echo -e "Enter the chroot yourself and run it:\n  ${GREEN}${MNT}/bin/kiss-chroot ${MNT}${NC}\n  ${GREEN}HOSTNAME_=${HOSTNAME_} TIMEZONE=${TIMEZONE} PRIV_ESC=${PRIV_ESC} /root/kiss-setup.sh${NC}"
