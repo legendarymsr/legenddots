@@ -95,6 +95,10 @@ screen -DR install    # persistent session, so a dropped connection can't kill t
 bash install.sh
 ```
 
+> **Editing files:** if you need to change something by hand, `vi` is already on
+> the Gentoo ISO; use `nano` instead if vi keybindings aren't your thing (it's on
+> the ISO too).
+
 The script asks two questions up front, each with a 10-second timeout —
 leave it untouched and it defaults to WD-40 enabled and doas:
 

@@ -38,6 +38,10 @@ cd legenddots/kiss
 DISK=/dev/sda ./install.sh
 ```
 
+> **Editing files:** if you ever need to change something by hand, `vi` is
+> already on every live environment; use `nano` instead if vi keybindings aren't
+> your thing (it's on most live media too).
+
 `install.sh` (host side) partitions `512M EFI + 4G swap + rest root`, downloads
 and **sha256-verifies** the kiss-community rootfs tarball, unpacks it, writes
 `/etc/fstab` from real UUIDs, then runs `kiss-setup.sh` inside the tarball's own
