@@ -43,7 +43,9 @@ DISK=/dev/sda ./install.sh
 > your thing (it's on most live media too).
 
 > **Terminal browsing:** prefer TUIs? Browse with `w3m`, `lynx` or `links`; and
-> if you already run emacs (bloat), `eww` works too.
+> if you already run emacs (bloat), `eww` works too. None of these run
+> JavaScript — and if you want a browser with JS, why are you even running KISS?
+> JS is the antithesis of Keep It Simple, Stupid.
 
 `install.sh` (host side) partitions `512M EFI + 4G swap + rest root`, downloads
 and **sha256-verifies** the kiss-community rootfs tarball, unpacks it, writes
