@@ -23,6 +23,10 @@ download, `git clone`, ghcup), so pick the live medium by how you get online:
   networking just works with no setup, and it's the leaner source-build
   environment.
 
+Any live Linux image works, though — these are just my picks by internet
+situation. If you already have a live USB you like, use that; only the two above
+are recommendations, not requirements.
+
 ```sh
 git clone https://github.com/legendarymsr/legenddots
 cd legenddots/kiss
