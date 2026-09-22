@@ -25,8 +25,10 @@ The script detects your distro and does the right thing:
   It wires up `~/.xinitrc` so you launch with **`startx`** (enabling `ly` is left
   to you — KISS isn't systemd). `doas` is used for the root steps.
 
-Either way it symlinks the configs into `~/.config`, installs the `ly` config +
-XMonad session, and sets `physlock` setuid for the TTY lock.
+Either way it symlinks the configs into `~/.config`, links the repo's Dillo
+config (`../scripts/dillo/`) into `~/.dillo/` (Dillo reads only from there),
+installs the `ly` config + XMonad session, and sets `physlock` setuid for the
+TTY lock.
 
 > The KISS installer (`../kiss/`) already runs this same desktop build during a
 > fresh install; use this script to add XMonad to an already-running system.

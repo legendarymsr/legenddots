@@ -35,6 +35,9 @@ deploy_configs() {
     link "$REPO_DIR/picom.conf"       "$HOME/.config/picom/picom.conf"
     link "$REPO_DIR/rofi/config.rasi" "$HOME/.config/rofi/config.rasi"
     link "$REPO_DIR/dunst/dunstrc"    "$HOME/.config/dunst/dunstrc"
+    # Dillo reads its config ONLY from ~/.dillo/ (no XDG). Link the repo's copy.
+    link "$REPO_DIR/../scripts/dillo/dillorc"   "$HOME/.dillo/dillorc"
+    link "$REPO_DIR/../scripts/dillo/cookiesrc" "$HOME/.dillo/cookiesrc"
 
     info "Installing the ly config and the XMonad session..."
     [[ -e /etc/ly/config.ini && ! -L /etc/ly/config.ini ]] && $SUDO cp -n /etc/ly/config.ini /etc/ly/config.ini.bak || true
