@@ -46,7 +46,7 @@ and sets `physlock` setuid.
 
 | key | action |
 |-----|--------|
-| `super-Return` | alacritty |
+| `super-Return` | st |
 | `super-p` | rofi |
 | `super-w` | dillo |
 | `super-q` / `super-shift-q` | close / kill window |
@@ -76,6 +76,10 @@ desktop with no battery the module just shows nothing.
 
 ## Notes
 
+- The terminal is **st**, built from source with your
+  [`suckless/st/config.h`](../suckless/st/config.h) symlinked in — `install.sh`
+  clones st into `~/.local/src/st`, links your config.h, and `make install`s it.
+  Edit that config.h and rerun to rebuild. All C, no Rust.
 - The bspwm config is `~/.config/bspwm/bspwmrc`, a shell script bspwm re-runs on
   `super-alt-r`; `sxhkd` owns the keys.
 - Package names assume an Arch base, or your KISS repo checkout.

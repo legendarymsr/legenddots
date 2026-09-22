@@ -47,6 +47,24 @@ deploy_configs() {
     $SUDO install -Dm644 "$REPO_DIR/bspwm.desktop"  /usr/share/xsessions/bspwm.desktop
 }
 
+# st is configured at compile time, so build it from source with your suckless
+# config.h symlinked in (edit suckless/st/config.h and rerun to rebuild).
+build_st() {
+    info "Building st from your suckless config.h..."
+    local SRC="$HOME/.local/src/st"
+    mkdir -p "$(dirname "$SRC")"
+    if [[ ! -d "$SRC/.git" ]]; then
+        git clone https://git.suckless.org/st "$SRC" 2>/dev/null \
+            || { warn "st clone failed — build it by hand from suckless/st/config.h"; return 0; }
+    fi
+    ln -sfn "$REPO_DIR/../suckless/st/config.h" "$SRC/config.h"   # your Tokyo Night st
+    if ( cd "$SRC" && make clean >/dev/null 2>&1; make && $SUDO make install ); then
+        success "st installed (from suckless/st/config.h)"
+    else
+        warn "st build failed — need make, gcc, libx11, libxft, pkgconf"
+    fi
+}
+
 finish() {
     if [[ -x /usr/bin/physlock ]]; then
         $SUDO chmod u+s /usr/bin/physlock && success "physlock setuid" || warn "couldn't setuid physlock"
@@ -59,14 +77,16 @@ finish() {
 install_arch() {
     local PKGS=(
         bspwm sxhkd polybar
-        picom rofi dunst alacritty dillo
+        picom rofi dunst dillo
         ly physlock
         xorg-server xorg-xinit
+        git make gcc pkgconf libx11 libxft   # to build st from your config.h
         ttf-jetbrains-mono-nerd
     )
     info "Installing packages (pacman)..."
     $SUDO pacman -S --needed --noconfirm "${PKGS[@]}"
     deploy_configs
+    build_st
     finish
     info "Enabling ly (disabling any other display manager)..."
     $SUDO systemctl disable display-manager.service 2>/dev/null || true
@@ -81,13 +101,14 @@ install_kiss() {
     info "Building packages (kiss)... (names can vary by repo revision)"
     for pkg in xorg-server xinit xsetroot \
                libx11 libxext libxft libxinerama libxrandr \
-               bspwm sxhkd polybar picom rofi dunst physlock dillo alacritty \
-               ttf-dejavu ly; do
+               bspwm sxhkd polybar picom rofi dunst physlock dillo \
+               git pkgconf ttf-dejavu ly; do
         if kiss build "$pkg" && kiss install "$pkg"; then success "$pkg"
         else warn "$pkg not in KISS_PATH — build it by hand later"; fi
     done
 
     deploy_configs
+    build_st
     finish
 
     # ly's service depends on your init (KISS isn't systemd), so wire up startx
@@ -109,4 +130,4 @@ else
     die "no supported package manager found (need pacman for Arch or kiss for KISS)"
 fi
 
-echo "Keys: super+Return = alacritty · super+p = rofi · super+w = dillo · super+shift+x = lock · super+{h,j,k,l} = focus · super+alt+q = quit"
+echo "Keys: super+Return = st · super+p = rofi · super+w = dillo · super+shift+x = lock · super+{h,j,k,l} = focus · super+alt+q = quit"
