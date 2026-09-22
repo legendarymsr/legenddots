@@ -115,6 +115,10 @@ git clone https://github.com/legendarymsr/legenddots ~/legenddots
 # the /dev/vdX device if attaching a real disk to the VM
 export LFS_DISK=/dev/vdb
 
+# persistent session, so a dropped connection can't kill the multi-hour build
+# (detach: Ctrl-a d · reattach: screen -DR lfs). screen ships on the Gentoo host.
+screen -DR lfs
+
 bash ~/legenddots/blfs/setup
 ```
 
@@ -136,6 +140,10 @@ bash ~/legenddots/blfs/setup
 The script detects the `lfs_complete` marker written by Phase 1 and skips
 straight to the BLFS desktop steps. Completed steps are checkpointed to
 `/etc/blfs-setup.state`.
+
+A bare LFS base may not have `screen` yet — run this under it if it's there,
+otherwise just run it directly; either way the checkpointing means a dropped
+connection only costs you a rerun, which resumes where it left off.
 
 To reset a specific step and force it to rerun:
 
