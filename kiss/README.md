@@ -12,7 +12,15 @@ chroot → configure & build.
 
 ## Run it
 
-From any Linux live environment, as root:
+From any Linux live environment, as root. It needs a working network (rootfs
+download, `git clone`, ghcup), so pick the live medium by how you get online:
+
+- **Wifi → [EndeavourOS](https://endeavouros.com) live ISO.** It ships
+  NetworkManager/iwd, so `nmtui` (or `iwctl`) gets you connected in seconds —
+  by far the least painful way to reach the internet from a live USB.
+- **Ethernet → the [Gentoo](https://www.gentoo.org/downloads/) minimal/live CD.**
+  Wired just works with no setup, and it's the leaner, same-family source-build
+  environment (also what `gentoo/install.sh` and `blfs/` expect).
 
 ```sh
 git clone https://github.com/legendarymsr/legenddots
