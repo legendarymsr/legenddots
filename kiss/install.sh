@@ -123,6 +123,9 @@ install -Dm644 "$SELF_DIR/../bspwm/polybar/config.ini" "$MNT/root/wm/config.ini"
 install -Dm755 "$SELF_DIR/../bspwm/polybar/launch.sh"  "$MNT/root/wm/launch.sh"  2>/dev/null || true
 # Stage your suckless st config.h so the chroot builds st with it.
 install -Dm644 "$SELF_DIR/../suckless/st/config.h"     "$MNT/root/wm/st-config.h" 2>/dev/null || true
+# Stage the C tools + .zshrc so the chroot can build/deploy them.
+cp -a "$SELF_DIR/../c"        "$MNT/root/c"     2>/dev/null || true
+install -Dm644 "$SELF_DIR/../.zshrc" "$MNT/root/zshrc" 2>/dev/null || true
 # Stage the Dillo config too (copied into ~/.dillo/ in the chroot — the repo
 # isn't on the installed system to symlink to).
 install -Dm644 "$SELF_DIR/../scripts/dillo/dillorc"   "$MNT/root/dillo/dillorc"   2>/dev/null || true
