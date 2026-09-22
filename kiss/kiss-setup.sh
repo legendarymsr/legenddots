@@ -131,12 +131,12 @@ if [ "$INSTALL_BSPWM" = "true" ] && [ -n "${USERNAME:-}" ]; then
 
   # X server + the tools the shared config uses, from the KISS xorg/community
   # repos (names vary by repo revision — the loop tolerates a miss and tells you
-  # to build it by hand). alacritty is Rust; swap it for st in bspwm/bspwmrc +
-  # sxhkdrc if you'd rather keep the box Rust-free.
+  # to build it by hand). The terminal is st, built from source below with your
+  # suckless config.h — no Rust, no alacritty.
   for pkg in xorg-server xinit xsetroot \
              libx11 libxext libxft libxinerama libxrandr \
-             bspwm sxhkd polybar picom rofi dunst physlock dillo alacritty \
-             ttf-dejavu; do
+             bspwm sxhkd polybar picom rofi dunst physlock dillo \
+             git pkgconf ttf-dejavu; do
     if kiss build "$pkg" && kiss install "$pkg"; then
       printf '%b>> %s%b\n' "$GRN" "$pkg" "$NC"
     else
@@ -145,6 +145,21 @@ if [ "$INSTALL_BSPWM" = "true" ] && [ -n "${USERNAME:-}" ]; then
   done
   # physlock needs root so the super+shift+x TTY lock works from a keybind.
   [ -x /usr/bin/physlock ] && chmod u+s /usr/bin/physlock 2>/dev/null || true
+
+  # st is a compile-time-configured terminal, so build it from source with your
+  # suckless config.h (staged at /root/wm/st-config.h). All C — no Rust.
+  if [ -f /root/wm/st-config.h ] && command -v git >/dev/null 2>&1; then
+    header "Building st with your suckless config.h"
+    [ -d /root/src/st/.git ] || git clone https://git.suckless.org/st /root/src/st 2>/dev/null || true
+    if [ -d /root/src/st ]; then
+      ln -sfn /root/wm/st-config.h /root/src/st/config.h
+      if ( cd /root/src/st && make clean >/dev/null 2>&1; make && make install ); then
+        printf '%b>> st installed%b\n' "$GRN" "$NC"
+      else
+        printf '%b!! st build failed — build it by hand from suckless/st/config.h%b\n' "$YEL" "$NC"
+      fi
+    fi
+  fi
 
   # Copy the staged bspwm config into ~/.config (the repo isn't on the installed
   # system to symlink to), owned by the user.
@@ -169,7 +184,7 @@ if [ "$INSTALL_BSPWM" = "true" ] && [ -n "${USERNAME:-}" ]; then
   chown "$USERNAME":"$USERNAME" "/home/$USERNAME/.xinitrc" 2>/dev/null || true
 
   printf '%bbspwm ready — log in as %s and run `startx`.%b\n' "$GRN" "$USERNAME" "$NC"
-  printf '  super+Return = alacritty · super+p = rofi · super+w = dillo · super+shift+x = lock · super+alt+q = quit\n'
+  printf '  super+Return = st · super+p = rofi · super+w = dillo · super+shift+x = lock · super+alt+q = quit\n'
 fi
 
 header "chroot setup complete"

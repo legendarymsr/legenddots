@@ -3,7 +3,7 @@
 
 # terminal · launcher · browser
 super + Return
-	alacritty
+	st
 super + p
 	rofi -show drun
 super + w

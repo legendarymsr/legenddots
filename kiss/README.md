@@ -110,8 +110,9 @@ the TTY-style lock.
 What it sets up, for the regular user you create:
 
 - **Xorg** (`xorg-server`, `xinit`) plus `bspwm`, `sxhkd`, `polybar`, and the
-  tools the config uses — `alacritty`, `rofi`, `dillo`, `picom`, `dunst`,
-  `physlock` — from the KISS `xorg`/`community` repos.
+  tools the config uses — `rofi`, `dillo`, `picom`, `dunst`, `physlock` — from
+  the KISS `xorg`/`community` repos, plus **st** built from source with your
+  `suckless/st/config.h`.
 - The config in `~/.config/{bspwm,sxhkd,polybar}` and a `~/.xinitrc` that
   `exec bspwm`.
 - The repo's Dillo config copied into `~/.dillo/` (Dillo reads only from there).
@@ -121,7 +122,7 @@ Then log in as that user and run **`startx`**. Default keys (super = **Super**):
 
 | key | action |
 |-----|--------|
-| `super-Return` | open `alacritty` |
+| `super-Return` | open `st` |
 | `super-p` | `rofi` launcher |
 | `super-w` | `dillo` browser |
 | `super-q` / `super-shift-q` | close / kill window |
@@ -134,11 +135,10 @@ Then log in as that user and run **`startx`**. Default keys (super = **Super**):
 
 Don't want it? Pass `INSTALL_BSPWM=false` for a base system only.
 
-Two caveats: package names in the `xorg`/`community` repos drift between
-revisions — the build loop tolerates a miss and names what to build by hand — and
-**`alacritty` is Rust**, which cuts against the WD-40 "reject rust" ethos. To keep
-a KISS box Rust-free, swap the terminal in `bspwm/bspwmrc` + `sxhkdrc` for `st`
-and build that instead.
+One caveat: package names in the `xorg`/`community` repos drift between revisions
+— the build loop tolerates a miss and names what to build by hand. The terminal
+is **st**, built from source with your suckless `config.h`, so the whole desktop
+is Rust-free.
 
 ## Tuning the kernel
 
