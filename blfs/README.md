@@ -106,6 +106,11 @@ is functional but slow for a compositor.
 
 ## Usage
 
+> **Editing files:** if you need to change something by hand, use `vi` — it's on
+> the Gentoo host and in the LFS base already. `nano` is easier if vi keybindings
+> aren't your thing, but on a fresh LFS base it isn't built yet (it's a BLFS
+> package), so reach for `vi` there.
+
 ### Phase 1 — from Gentoo host (as root)
 
 ```sh
