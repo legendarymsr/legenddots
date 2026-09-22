@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=XMonad
+Name=bspwm
 Comment=Minimal tiling window manager
-Exec=xmonad
+Exec=bspwm
 Type=Application
