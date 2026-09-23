@@ -20,9 +20,9 @@ die()    { echo -e "${RED}error:${NC} $*" >&2; exit 1; }
 # ── Configuration (10s prompts, sane defaults if untouched) ───────────────────
 # The Exherbo stage to unpack. Stages live at https://dev.exherbo.org/stages/ —
 # variants exist (glibc/musl, gcc versions). "current" is the rolling default.
-STAGE_BASE="${STAGE_BASE:-https://dev.exherbo.org/stages}"
-STAGE_FILE="${STAGE_FILE:-exherbo-x86_64-current.tar.xz}"
-# Its sha256 is published beside it as <file>.sha256; we fetch and check it.
+STAGE_BASE="${STAGE_BASE:-https://stages.exherbo.org/x86_64-pc-linux-gnu}"
+STAGE_FILE="${STAGE_FILE:-exherbo-x86_64-pc-linux-gnu-gcc-current.tar.xz}"
+# Its checksum is published beside it as <file>.sha256sum; we fetch and check it.
 VERIFY="${VERIFY:-true}"
 
 if [[ -z "${DISK:-}" ]]; then
@@ -83,11 +83,11 @@ cd "$MNT"
 curl -fL# -O "${STAGE_BASE}/${STAGE_FILE}"
 if [[ "$VERIFY" == "true" ]]; then
   header "Verifying sha256"
-  if curl -fLs -O "${STAGE_BASE}/${STAGE_FILE}.sha256"; then
-    # the .sha256 file's hash must match the downloaded stage
-    awk '{print $1}' "${STAGE_FILE}.sha256" | head -1 > /tmp/want.sha
-    echo "$(cat /tmp/want.sha)  ${STAGE_FILE}" | sha256sum -c - || die "checksum mismatch — aborting"
-    rm -f "${STAGE_FILE}.sha256"
+  if curl -fLs -O "${STAGE_BASE}/${STAGE_FILE}.sha256sum"; then
+    # the .sha256sum file names a different local filename, so match on the hash only
+    WANT="$(awk '{print $1}' "${STAGE_FILE}.sha256sum" | head -1)"
+    echo "${WANT}  ${STAGE_FILE}" | sha256sum -c - || die "checksum mismatch — aborting"
+    rm -f "${STAGE_FILE}.sha256sum"
   else
     echo -e "${YEL}No .sha256 published for this stage — skipping verification.${NC}"
   fi

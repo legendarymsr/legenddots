@@ -65,7 +65,7 @@ sets up doas/sudo, and creates users.
 
 | var | default | meaning |
 |-----|---------|---------|
-| `STAGE_FILE` | `exherbo-x86_64-current.tar.xz` | which stage to unpack (glibc/musl, gcc variants at [dev.exherbo.org/stages](https://dev.exherbo.org/stages/)) |
+| `STAGE_FILE` | `exherbo-x86_64-pc-linux-gnu-gcc-current.tar.xz` | which stage to unpack; other arches/variants at [stages.exherbo.org](https://stages.exherbo.org/) (set `STAGE_BASE` too) |
 | `VERIFY` | `true` | check the stage against its published `.sha256` |
 | `DISK` | `/dev/sda` | disk to wipe (MacBook Air 6,2) |
 | `PRIV_ESC` | `doas` | `doas` or `sudo` for the installed system |
@@ -106,5 +106,5 @@ cave resolve repository/<name>  # add another repo, then `cave sync`
 ## Sources
 
 - Install guide: <https://exherbo.org/docs/install-guide.html>
-- Stages: <https://dev.exherbo.org/stages/>
+- Stages: <https://stages.exherbo.org/>
 - cave / paludis docs: <https://paludis.exherbo.org>
