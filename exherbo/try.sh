@@ -18,8 +18,8 @@ header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 die()    { echo -e "${RED}error:${NC} $*" >&2; exit 1; }
 
 DIR="${DIR:-/var/tmp/exherbo}"
-STAGE_BASE="${STAGE_BASE:-https://dev.exherbo.org/stages}"
-STAGE_FILE="${STAGE_FILE:-exherbo-x86_64-current.tar.xz}"
+STAGE_BASE="${STAGE_BASE:-https://stages.exherbo.org/x86_64-pc-linux-gnu}"
+STAGE_FILE="${STAGE_FILE:-exherbo-x86_64-pc-linux-gnu-gcc-current.tar.xz}"
 VERIFY="${VERIFY:-true}"
 
 [[ $EUID -eq 0 ]] || die "run as root (doas ./try.sh)"
@@ -42,11 +42,11 @@ if [[ ! -x "$DIR/bin/bash" ]]; then
   mkdir -p "$DIR"
   header "Downloading stage ${STAGE_FILE}"
   ( cd "$DIR" && curl -fL# -O "${STAGE_BASE}/${STAGE_FILE}" )
-  if [[ "$VERIFY" == "true" ]] && ( cd "$DIR" && curl -fLs -O "${STAGE_BASE}/${STAGE_FILE}.sha256" ); then
+  if [[ "$VERIFY" == "true" ]] && ( cd "$DIR" && curl -fLs -O "${STAGE_BASE}/${STAGE_FILE}.sha256sum" ); then
     header "Verifying sha256"
-    ( cd "$DIR" && echo "$(awk '{print $1}' "${STAGE_FILE}.sha256" | head -1)  ${STAGE_FILE}" | sha256sum -c - ) \
+    ( cd "$DIR" && echo "$(awk '{print $1}' "${STAGE_FILE}.sha256sum" | head -1)  ${STAGE_FILE}" | sha256sum -c - ) \
       || die "checksum mismatch — aborting"
-    rm -f "$DIR/${STAGE_FILE}.sha256"
+    rm -f "$DIR/${STAGE_FILE}.sha256sum"
   fi
   header "Unpacking into ${DIR}"
   tar xJpf "$DIR/${STAGE_FILE}" -C "$DIR" --xattrs-include='*.*' --numeric-owner
