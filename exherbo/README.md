@@ -13,6 +13,24 @@ unpack a stage → fstab → chroot → sync & build.
 > **Heads up:** source-based — it compiles a kernel and toolchain bits, so it
 > takes a while. It **wipes the target disk** and is **UEFI-only**.
 
+## Just want to try it? (no install)
+
+Already on Gentoo — or any Linux — and can't be bothered to repartition? Skip the
+whole install. `try.sh` unpacks a stage into a directory and chroots you in to
+play with cave/paludis. No partitioning, no bootloader, no reboot, fully
+removable:
+
+```sh
+doas ./try.sh          # download a stage + drop into an Exherbo chroot
+#   inside: cave sync · cave show arbor · cave resolve -x nano · Ctrl-D to leave
+doas ./try.sh --enter  # re-enter later (no re-download)
+doas ./try.sh --clean  # unmount + delete it, no trace on your host
+```
+
+Since you already run a source distro, **exheres will feel like ebuilds and cave
+like portage** — this is the zero-commitment way to kick the tyres before (or
+instead of) a real install.
+
 ## Run it
 
 From any Linux live environment, as root. It needs a working network (stage
