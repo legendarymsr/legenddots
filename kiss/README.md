@@ -10,6 +10,23 @@ chroot → configure & build.
 > installer also **compiles a kernel and the bootloader from source**, so it
 > takes a while. It **wipes the target disk** and is **UEFI-only**.
 
+## Just want to try it? (no install)
+
+Already on another Linux — Gentoo, whatever — and can't be bothered to
+repartition? `try.sh` unpacks the kiss-community rootfs into a directory and uses
+its own `kiss-chroot` to drop you in. No partitioning, no bootloader, no reboot,
+fully removable:
+
+```sh
+doas ./try.sh          # download the rootfs + chroot in
+#   inside: kiss version · git clone the repos · export KISS_PATH · kiss b <pkg>
+doas ./try.sh --enter  # re-enter later (no re-download)
+doas ./try.sh --clean  # unmount + delete it, no trace on your host
+```
+
+The rootfs is musl, but a chroot uses its own libc, so it runs fine from a glibc
+host. Zero-commitment way to poke at `kiss` before (or instead of) a real install.
+
 ## Run it
 
 From any Linux live environment, as root. It needs a working network (rootfs
