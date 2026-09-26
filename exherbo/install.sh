@@ -12,6 +12,10 @@
 # =============================================================================
 set -euo pipefail
 
+# Capture this script's own directory NOW, before any `cd` (we cd into $MNT
+# later, which would otherwise break a relative "$0").
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
 # ── Colours & helpers ─────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YEL='\033[0;33m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
@@ -114,7 +118,7 @@ mount -t proc none  "$MNT/proc"
 mount --rbind /run  "$MNT/run"  && mount --make-rslave "$MNT/run" || true
 
 header "Entering chroot to sync & build"
-install -Dm755 "$(dirname "$(readlink -f "$0")")/exherbo-setup.sh" "$MNT/exherbo-setup.sh"
+install -Dm755 "$SELF_DIR/exherbo-setup.sh" "$MNT/exherbo-setup.sh"
 export HOSTNAME_ TIMEZONE LOCALE PRIV_ESC
 # env -i gives a clean environment; Exherbo's /etc/profile sets the rest.
 env -i HOME=/root TERM="${TERM:-linux}" \
