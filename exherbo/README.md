@@ -158,6 +158,33 @@ Both build from source, but they're different beasts:
   for Gentoo* (~2005) before its authors forked off to build Exherbo around it —
   so Paludis predates Exherbo, it was a Portage competitor first.
 
+### Why they left — in their own words
+
+A cluster of Gentoo developers left in 2007–2008, several of whom went on to
+Exherbo. The mood of the time, from their own posts:
+
+> It is now clear to me that Gentoo is not moving in the direction I had wished
+> for, and the last council election indicates that most current Gentoo
+> developers appear to be satisfied with this current direction.
+> — **Bo Ørsted Andresen**, 2008
+
+> I'm not sure I see the technical advancements that I'd like happening in
+> Gentoo. That aside there're numerous non-technical problems behind the scenes
+> that most devs probably acknowledge by now…
+> — **Ingmar Vanhassel**, 2008
+
+> I feel like my efforts are being stymied by the lack of overall technical
+> progress and direction in the project.
+> — **Mike Kelly**, 2007
+
+> There's absolutely nothing for me to gain by being labelled an "official
+> Gentoo developer", and an awful lot to lose.
+> — **Ciaran McCreesh**, 2007
+
+> Over 8 months this council has achieved little… Vote for anyone from this
+> council again … vote for mediocrity at best.
+> — **Richard Brown**, 2008
+
 ## After boot
 
 - **Desktop:** add one with cave, e.g. a WM + terminal from the `x11` repos
