@@ -54,7 +54,7 @@ ACCEL=()
 if [[ -w /dev/kvm ]]; then
   ACCEL=(-enable-kvm -cpu host)
 else
-  warn "no /dev/kvm access — add yourself to the 'kvm' group (doas usermod -aG kvm \$USER; re-login)."
+  warn "no /dev/kvm access — run: doas usermod -aG kvm legend   (then re-login)."
   warn "running WITHOUT KVM — it'll be painfully slow."
   ACCEL=(-cpu qemu64)
 fi
