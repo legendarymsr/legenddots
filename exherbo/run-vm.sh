@@ -24,6 +24,12 @@ header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 warn()   { echo -e "${YEL}warn:${NC} $*" >&2; }
 die()    { echo -e "${RED}error:${NC} $*" >&2; exit 1; }
 
+# Must run as your user, NOT via doas/root: it calls doas itself where it needs
+# root, and the GUI needs your own X session (gtk init fails as root).
+if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+  die "don't run this with doas/root — run it as legend. It uses doas itself for emerge/kvm; the VM window needs your X session."
+fi
+
 USER_NAME="legend"
 VM_DIR="${VM_DIR:-$HOME/exherbo-vm}"
 DISK="$VM_DIR/exherbo.qcow2"
