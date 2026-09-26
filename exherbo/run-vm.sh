@@ -36,6 +36,7 @@ DISK="$VM_DIR/exherbo.qcow2"
 DISK_SIZE="${DISK_SIZE:-20G}"
 MEM="${MEM:-4G}"                       # 8GB host: 4G guest leaves the host room
 CPUS="${CPUS:-$(nproc)}"               # i5-4250U = 4 threads
+SSH_PORT="${SSH_PORT:-2222}"           # host port -> guest :22  (ssh -p 2222 root@localhost)
 ISO_DEFAULT="${ISO_DEFAULT:-$HOME/live.iso}"
 # Gentoo minimal install ISO (UEFI-bootable). Dated autobuilds rotate off the
 # mirror eventually — if this 404s, bump the date or pass your own ISO / ISO_URL.
@@ -158,7 +159,7 @@ ARGS=(
   -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE"
   -drive "if=pflash,format=raw,file=$NVRAM"
   -drive "file=$DISK,if=virtio"
-  -netdev user,id=n0 -device virtio-net,netdev=n0
+  -netdev "user,id=n0,hostfwd=tcp::${SSH_PORT}-:22" -device virtio-net,netdev=n0
   "${DISP[@]}"
 )
 if [[ "$MODE" == "install" ]]; then
@@ -169,5 +170,6 @@ else
   header "Boot mode — starting the installed system on $DISK"
 fi
 echo -e "  mem=$MEM  cpus=$CPUS  accel=${ACCEL[*]:-none}\n  firmware=$FW_CODE"
+echo -e "  ${GREEN}ssh from host:${NC}  ssh -p $SSH_PORT root@localhost   (in the guest first: passwd root)"
 
 exec qemu-system-x86_64 "${ARGS[@]}"
