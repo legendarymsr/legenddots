@@ -33,23 +33,28 @@ instead of) a real install.
 
 ## Install it in a VM (KVM)
 
-Want a real, bootable install without touching your disk? `run-vm.sh` spins up a
-UEFI KVM guest — it finds your OVMF firmware, creates the disk + NVRAM on first
-run, picks a working display, and boots.
+Want a real, bootable install without touching your disk? `run-vm.sh` is one
+command — it finds your OVMF firmware, makes the disk + NVRAM, **auto-downloads
+the Gentoo minimal ISO** the first time, and boots. Run it once to install, then
+again to boot what you installed.
 
 ```sh
-doas emerge -av app-emulation/qemu sys-firmware/edk2-bin   # once
-doas usermod -aG kvm legend                                # once, then re-login
+doas emerge -av app-emulation/qemu sys-firmware/edk2-bin
+doas usermod -aG kvm legend
 
-./run-vm.sh path/to/live.iso   # install: boot a Linux live ISO in the VM
-#   inside the VM:  DISK=/dev/vda ./install.sh   (virtio disk = /dev/vda)
-./run-vm.sh                    # afterwards: boot the installed system (no ISO)
+./run-vm.sh
 ```
 
-Tunable with env: `MEM=8G CPUS=4 DISK_SIZE=30G ./run-vm.sh live.iso`. The guest
-is UEFI (OVMF) so the installer's `/sys/firmware/efi` check passes; networking is
-user-mode NAT (works out of the box). If qemu wasn't built with `gtk`/`sdl` it
-falls back to VNC on `localhost:5900`.
+First run drops you into the Gentoo minimal live env — there, run
+`DISK=/dev/vda ./install.sh` (the virtio disk is `/dev/vda`). After that,
+`./run-vm.sh` with no args boots the installed system; `./run-vm.sh install`
+forces the installer again, and `./run-vm.sh /path/to/other.iso` uses a specific
+ISO instead of the default.
+
+Tunable via env: `MEM=8G CPUS=4 DISK_SIZE=30G ISO_URL=… ./run-vm.sh`. The guest is
+UEFI (OVMF) so the installer's `/sys/firmware/efi` check passes; networking is
+user-mode NAT. If qemu lacks `gtk`/`sdl` it falls back to VNC on
+`localhost:5900`.
 
 ## Run it
 
