@@ -115,6 +115,49 @@ cave resolve repository/<name>  # add another repo, then `cave sync`
 - `eclectic` manages alternatives (locale, the kernel symlink, etc.), like
   Gentoo's `eselect`.
 
+## Exherbo vs Gentoo · cave/paludis vs portage
+
+Exherbo was started around 2008 by ex-Gentoo developers who wanted Gentoo's
+ideas rebuilt cleaner and stricter, without the accumulated cruft. The DNA is
+shared — source-based, USE-flag-style configuration, bash-based package recipes
+— but nearly every piece was redesigned.
+
+### The distros
+
+| | **Gentoo** | **Exherbo** |
+|---|---|---|
+| Package format | `ebuild` (EAPI-versioned bash) | `exheres-0` (bash, far stricter, structured) |
+| Package manager | **Portage** (Python) | **Paludis**, driven by `cave` (C++) |
+| Releases | stable **and** `~arch` testing keywords | rolling only — no stable branch |
+| Cross-compile / multiarch | bolted on (`crossdev`) | first-class: target triples, subslots, built for it |
+| Repositories | one big `::gentoo` tree + overlays | many small git repos + the `unavailable` meta-repo |
+| Init | OpenRC default (systemd optional) | systemd-first |
+| Config | rich profile tree, `/etc/portage/` | direct, `/etc/paludis/` (`options.conf`) |
+| Scope | broad — many arches, huge package set, binhosts, big wiki | small, opinionated, source-only, sparse docs, power-user |
+
+Short version: **Gentoo is the big, broad, well-documented one; Exherbo is the
+small, strict, developer-focused one.** Exherbo ships fewer packages precisely
+*because* its QA bar is higher — an exheres has to be clean.
+
+### Portage vs Paludis (cave)
+
+Both build from source, but they're different beasts:
+
+- **Language & rigor.** Portage is Python; Paludis is **C++** with the `cave`
+  frontend. Paludis' resolver is stricter — it refuses ambiguous or unsafe
+  states rather than muddling through, where Portage is more permissive.
+- **Options vs USE flags.** Gentoo's USE flags are mostly on/off, spread across
+  `make.conf` + `package.use`. Exherbo's **options** are typed and can carry
+  *values* — `symbols=split`, `jobs=2`, `work=tidyup` — build knobs with defined
+  choices, kept in `/etc/paludis/options.conf`.
+- **Commands.** `emerge` → `cave resolve`; `emerge --sync` → `cave sync`;
+  `emerge -pv` → `cave resolve` (dry-run) / `cave show`; `eselect` → `eclectic`.
+- **Repos.** Portage: one tree + `repos.conf`. cave: git repos synced with
+  `cave sync`, third-party ones enabled with `cave resolve repository/<name>`.
+- **History twist.** Paludis actually began as an *alternative package manager
+  for Gentoo* (~2005) before its authors forked off to build Exherbo around it —
+  so Paludis predates Exherbo, it was a Portage competitor first.
+
 ## After boot
 
 - **Desktop:** add one with cave, e.g. a WM + terminal from the `x11` repos
