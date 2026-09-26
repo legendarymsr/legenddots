@@ -22,6 +22,11 @@ source /etc/profile 2>/dev/null || true
 # cave resolve with execution + as few prompts as possible.
 RESOLVE="cave resolve -x --continue-on-failure if-independent"
 
+# Download helpers — the Exherbo stage ships wget (paludis uses it), NOT always
+# curl, so never hard-depend on curl in here.
+fetch()   { if command -v curl >/dev/null 2>&1; then curl -fsSL "$1"; else wget -qO- "$1"; fi; }
+dl_file() { if command -v curl >/dev/null 2>&1; then curl -fL# -o "$2" "$1"; else wget -O "$2" "$1"; fi; }
+
 # ── System identity ───────────────────────────────────────────────────────────
 header "System configuration"
 printf '%s\n' "$HOSTNAME_" > /etc/hostname
@@ -79,14 +84,16 @@ $RESOLVE linux-firmware || warn "linux-firmware resolve failed (try: cave resolv
 # tools the kernel build wants; the gcc stage usually already has them
 $RESOLVE bc flex bison 2>/dev/null || true
 
-KVER="${KVER:-$(curl -fsSL https://www.kernel.org/finger_banner 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)}"
+KVER="${KVER:-$(fetch https://www.kernel.org/finger_banner 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)}"
 KVER="${KVER:-6.12.9}"
 cd /usr/src
 if [ ! -d "linux-${KVER}" ]; then
   header "Fetching linux-${KVER}"
-  curl -fL# -O "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz" \
-    && tar xf "linux-${KVER}.tar.xz" && rm -f "linux-${KVER}.tar.xz" \
-    || warn "kernel download/extract failed — build one by hand from kernel.org"
+  if dl_file "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz" "linux-${KVER}.tar.xz"; then
+    tar xf "linux-${KVER}.tar.xz" && rm -f "linux-${KVER}.tar.xz"
+  else
+    warn "kernel download failed (no curl/wget, or network) — build one by hand"
+  fi
 fi
 KSRC="/usr/src/linux-${KVER}"
 if [ -d "$KSRC" ]; then
