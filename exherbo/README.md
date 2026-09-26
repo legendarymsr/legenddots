@@ -71,10 +71,22 @@ cd legenddots/exherbo
 DISK=/dev/sda ./install.sh
 ```
 
-`install.sh` (host side) partitions `512M EFI + 4G swap + rest root`, downloads
-and **sha256-verifies** the current x86_64 stage, unpacks it, writes `/etc/fstab`
-from real UUIDs, binds the pseudo-filesystems, then runs `exherbo-setup.sh` in a
-clean-environment (`env -i`) chroot.
+**One command, and it does the rest.** It's *self-updating and resumable* — so
+if a build step ever fails (a flaky mirror, a download that times out), you just
+run the exact same command again and it continues where it left off:
+
+- `./install.sh` — **auto**: fresh install on an empty disk, or **resume** an
+  existing one (no wipe). On resume it re-mounts everything for you and re-enters
+  the chroot to finish the build. Run it as many times as you need.
+- `./install.sh fresh` — force a clean wipe + reinstall.
+- `./install.sh resume` — explicitly re-enter an existing install and continue.
+
+On each run it first `git pull`s the latest fixes and re-execs itself, so you're
+never running a stale copy. A **fresh** run partitions `512M EFI + 4G swap + rest
+root`, downloads and **sha256-verifies** the current x86_64 stage, unpacks it,
+writes `/etc/fstab` from real UUIDs, binds the pseudo-filesystems, then runs
+`exherbo-setup.sh` in a clean-environment (`env -i`) chroot. A **resume** run
+skips straight to that last step.
 
 `exherbo-setup.sh` (in chroot) sets hostname/timezone/locale, runs **`cave
 sync`**, wires DHCP via `systemd-networkd`, **builds a kernel from kernel.org**
