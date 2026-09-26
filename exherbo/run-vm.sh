@@ -64,7 +64,14 @@ ensure_prereqs() {
     header "Installing prerequisites: ${need[*]}"
     grep -q 'QEMU_SOFTMMU_TARGETS' /etc/portage/make.conf 2>/dev/null || \
       echo 'QEMU_SOFTMMU_TARGETS="x86_64"' | doas tee -a /etc/portage/make.conf >/dev/null
-    doas emerge -av "${need[@]}" || die "emerge failed — install ${need[*]} by hand"
+    # make sure a fresh qemu is built with a working GUI display (gtk) + the target
+    if printf '%s\n' "${need[@]}" | grep -q 'qemu'; then
+      local pu=/etc/portage/package.use
+      [[ -d "$pu" ]] && pu="$pu/qemu-vm"
+      grep -qs 'app-emulation/qemu .*gtk' "$pu" 2>/dev/null || \
+        echo 'app-emulation/qemu gtk vnc' | doas tee -a "$pu" >/dev/null
+    fi
+    doas emerge -avN "${need[@]}" || die "emerge failed — install ${need[*]} by hand"
     FW_CODE=""; detect_fw || true
   fi
   if ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
