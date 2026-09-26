@@ -9,6 +9,10 @@
 # =============================================================================
 set -euo pipefail
 
+# Capture this script's own directory NOW, before any `cd` (we cd into $MNT
+# later, which would otherwise break a relative "$0").
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
 # ── Colours & helpers ─────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YEL='\033[0;33m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
@@ -114,7 +118,6 @@ cp -L /etc/resolv.conf "$MNT/etc/resolv.conf" 2>/dev/null || true
 
 # ── Hand off to the in-chroot phase ───────────────────────────────────────────
 header "Entering chroot to configure & build"
-SELF_DIR="$(dirname "$(readlink -f "$0")")"
 install -Dm755 "$SELF_DIR/kiss-setup.sh" "$MNT/root/kiss-setup.sh"
 # Stage the shared bspwm config so the in-chroot phase can copy it into ~/.config.
 install -Dm755 "$SELF_DIR/../bspwm/bspwmrc"            "$MNT/root/wm/bspwmrc"    2>/dev/null || true
