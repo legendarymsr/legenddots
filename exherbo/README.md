@@ -31,6 +31,26 @@ Since you already run a source distro, **exheres will feel like ebuilds and cave
 like portage** — this is the zero-commitment way to kick the tyres before (or
 instead of) a real install.
 
+## Install it in a VM (KVM)
+
+Want a real, bootable install without touching your disk? `run-vm.sh` spins up a
+UEFI KVM guest — it finds your OVMF firmware, creates the disk + NVRAM on first
+run, picks a working display, and boots.
+
+```sh
+doas emerge -av app-emulation/qemu sys-firmware/edk2-bin   # once
+doas usermod -aG kvm "$USER"                               # once, then re-login
+
+./run-vm.sh path/to/live.iso   # install: boot a Linux live ISO in the VM
+#   inside the VM:  DISK=/dev/vda ./install.sh   (virtio disk = /dev/vda)
+./run-vm.sh                    # afterwards: boot the installed system (no ISO)
+```
+
+Tunable with env: `MEM=8G CPUS=4 DISK_SIZE=30G ./run-vm.sh live.iso`. The guest
+is UEFI (OVMF) so the installer's `/sys/firmware/efi` check passes; networking is
+user-mode NAT (works out of the box). If qemu wasn't built with `gtk`/`sdl` it
+falls back to VNC on `localhost:5900`.
+
 ## Run it
 
 From any Linux live environment, as root. It needs a working network (stage
