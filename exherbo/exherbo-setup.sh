@@ -63,42 +63,88 @@ ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || tru
 # (net-wireless/broadcom-sta), an out-of-tree module. Ethernet / USB-tether work
 # out of the box; build broadcom-sta after the kernel and load 'wl' for wifi.
 
-# ── Firmware, kernel & initramfs ──────────────────────────────────────────────
-header "Building the kernel (sys-kernel/linux) — this is the long part"
-$RESOLVE sys-kernel/linux sys-firmware/linux-firmware sys-kernel/dracut || \
-  warn "kernel/firmware resolve had issues — inspect the cave output"
+# ── Firmware + kernel (Exherbo does NOT package the kernel) ────────────────────
+# There's no sys-kernel/linux in Exherbo — you build the kernel from kernel.org,
+# like LFS/KISS. Only the firmware blobs come from cave (unqualified: linux-firmware).
+header "Installing firmware + building the kernel from kernel.org — the long part"
+$RESOLVE linux-firmware || warn "linux-firmware resolve failed (try: cave resolve -x linux-firmware)"
+# tools the kernel build wants; the gcc stage usually already has them
+$RESOLVE bc flex bison 2>/dev/null || true
 
-KSRC="$(ls -d /usr/src/linux-* 2>/dev/null | sort -V | tail -1 || true)"
-if [ -n "$KSRC" ] && [ -d "$KSRC" ]; then
+KVER="${KVER:-$(curl -fsSL https://www.kernel.org/finger_banner 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)}"
+KVER="${KVER:-6.12.9}"
+cd /usr/src
+if [ ! -d "linux-${KVER}" ]; then
+  header "Fetching linux-${KVER}"
+  curl -fL# -O "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz" \
+    && tar xf "linux-${KVER}.tar.xz" && rm -f "linux-${KVER}.tar.xz" \
+    || warn "kernel download/extract failed — build one by hand from kernel.org"
+fi
+KSRC="/usr/src/linux-${KVER}"
+if [ -d "$KSRC" ]; then
   cd "$KSRC"
-  # defconfig is generic + bootable. For this MacBook, enable i915 + SIMPLEDRM and
-  # trim with `make menuconfig` before `make`.
   make defconfig
+  # Build the disk/root/fs drivers straight IN so the box boots with NO initramfs,
+  # both in the KVM guest (virtio) and on the MacBook (AHCI/NVMe + the vfat ESP).
+  ./scripts/config \
+    -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE \
+    -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
+    -e EXT4_FS -e VFAT_FS -e FAT_FS \
+    -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE
+  make olddefconfig
   make -j"$(nproc)"
   make modules_install
-  make install
-  KVER="$(make -s kernelrelease 2>/dev/null || basename "$KSRC" | sed 's/^linux-//')"
-  command -v dracut >/dev/null 2>&1 && dracut --force "/boot/initramfs-${KVER}.img" "$KVER" || \
-    warn "dracut not available — generate an initramfs before rebooting"
+  # Put the kernel on the ESP (/boot) ourselves — don't rely on installkernel.
+  cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
+  cp -f System.map "/boot/System.map-${KVER}" 2>/dev/null || true
   cd /
 else
-  warn "kernel sources not found under /usr/src — build a kernel by hand"
+  warn "no kernel sources under /usr/src — build a kernel by hand (kernel.org)"
+  KVER=""
 fi
 
-# ── Bootloader (UEFI, GRUB --removable so a Mac's firmware finds it) ──────────
-header "Installing GRUB (UEFI)"
-$RESOLVE sys-boot/grub sys-boot/efibootmgr || warn "grub/efibootmgr resolve failed"
-grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=Exherbo --removable || \
-  warn "grub-install failed — check /boot is the mounted ESP"
-grub-mkconfig -o /boot/grub/grub.cfg || warn "grub-mkconfig failed"
+# ── Bootloader: systemd-boot (Exherbo is systemd-first — no grub needed) ───────
+# systemd-boot ships with systemd (bootctl): no build options, no efibootmgr, and
+# with the drivers built in above, no initramfs. Much simpler than grub here.
+header "Installing the bootloader (systemd-boot)"
+if bootctl install 2>/dev/null; then
+  ROOT_UUID="$(findmnt -no UUID / 2>/dev/null || true)"
+  [ -z "$ROOT_UUID" ] && ROOT_UUID="$(blkid -s UUID -o value "$(findmnt -no SOURCE / 2>/dev/null)" 2>/dev/null || true)"
+  mkdir -p /boot/loader/entries
+  cat > /boot/loader/loader.conf <<EOF
+default exherbo
+timeout 3
+editor  yes
+EOF
+  if [ -n "${KVER}" ] && [ -n "${ROOT_UUID}" ]; then
+    cat > /boot/loader/entries/exherbo.conf <<EOF
+title   Exherbo
+linux   /vmlinuz-${KVER}
+options root=UUID=${ROOT_UUID} rw
+EOF
+  else
+    warn "couldn't write the boot entry (KVER='${KVER}' ROOT_UUID='${ROOT_UUID}') — add /boot/loader/entries/exherbo.conf by hand"
+  fi
+else
+  warn "bootctl install failed — is /boot the mounted ESP? install a bootloader by hand"
+fi
 
 # ── Privilege escalation ──────────────────────────────────────────────────────
 header "Privilege escalation (${PRIV_ESC})"
 if [ "$PRIV_ESC" = "doas" ]; then
-  $RESOLVE app-admin/doas || warn "install doas by hand: cave resolve -x app-admin/doas"
-  echo "permit persist :wheel" > /etc/doas.conf && chmod 0400 /etc/doas.conf
+  # doas isn't in arbor — it lives in the third-party 'somasis' repo. Enable it,
+  # sync, then install (the same 'unavailable repo' dance as tombriden/fastfetch).
+  $RESOLVE repository/somasis 2>/dev/null || warn "couldn't add the somasis repo (doas lives there)"
+  cave sync somasis 2>/dev/null || cave sync 2>/dev/null || true
+  if $RESOLVE app-admin/doas; then
+    echo "permit persist :wheel" > /etc/doas.conf && chmod 0400 /etc/doas.conf
+  else
+    warn "doas install failed (somasis repo) — falling back to sudo"
+    $RESOLVE sudo && { mkdir -p /etc/sudoers.d; echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel; }
+  fi
 else
-  $RESOLVE app-admin/sudo || warn "install sudo by hand"
+  $RESOLVE sudo || warn "install sudo by hand"
+  mkdir -p /etc/sudoers.d
   echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 fi
 
