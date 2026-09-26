@@ -185,6 +185,10 @@ Exherbo. The mood of the time, from their own posts:
 > council again … vote for mediocrity at best.
 > — **Richard Brown**, 2008
 
+**TL;DR:** a chunk of Gentoo's own developers reckoned the project was going
+downhill around 2007–08 — technically stagnant, politically messy — so they
+walked and built Exherbo instead.
+
 ## After boot
 
 - **Desktop:** add one with cave, e.g. a WM + terminal from the `x11` repos
