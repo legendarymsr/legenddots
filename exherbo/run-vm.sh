@@ -119,7 +119,13 @@ fi
 [[ -f "$FW_VARS" ]] || die "OVMF_VARS not found next to $FW_CODE — set FW_VARS=/path/OVMF_VARS.fd"
 
 NVRAM="$VM_DIR/OVMF_VARS.fd"
-[[ -f "$NVRAM" ]] || { header "Copying UEFI NVRAM -> $NVRAM"; cp "$FW_VARS" "$NVRAM"; }
+# In install mode, always reset the NVRAM to factory boot order — OVMF persists
+# its BootOrder here, and a stale one makes it ignore the CD and fall through to
+# the (empty) disk / PXE. A fresh copy boots the CD; boot mode keeps its NVRAM.
+if [[ ! -f "$NVRAM" || "$MODE" == "install" ]]; then
+  header "Resetting UEFI NVRAM -> $NVRAM (fresh firmware boot order)"
+  cp "$FW_VARS" "$NVRAM"
+fi
 [[ -f "$DISK" ]]  || { header "Creating disk $DISK ($DISK_SIZE)"; qemu-img create -f qcow2 "$DISK" "$DISK_SIZE"; }
 
 # ── Install mode: get an ISO (download the default if missing) ────────────────
