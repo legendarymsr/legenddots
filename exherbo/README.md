@@ -33,15 +33,13 @@ instead of) a real install.
 
 ## Install it in a VM (KVM)
 
-Want a real, bootable install without touching your disk? `run-vm.sh` is one
-command — it finds your OVMF firmware, makes the disk + NVRAM, **auto-downloads
-the Gentoo minimal ISO** the first time, and boots. Run it once to install, then
-again to boot what you installed.
+Want a real, bootable install without touching your disk? `run-vm.sh` does the
+whole thing in one command — **installs qemu + OVMF firmware** if they're missing,
+adds you to the `kvm` group (and activates it for the session, no re-login),
+makes the disk + NVRAM, **auto-downloads the Gentoo minimal ISO** the first time,
+and boots.
 
 ```sh
-doas emerge -av app-emulation/qemu sys-firmware/edk2-bin
-doas usermod -aG kvm legend
-
 ./run-vm.sh
 ```
 
