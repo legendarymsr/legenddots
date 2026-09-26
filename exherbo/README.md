@@ -77,9 +77,12 @@ from real UUIDs, binds the pseudo-filesystems, then runs `exherbo-setup.sh` in a
 clean-environment (`env -i`) chroot.
 
 `exherbo-setup.sh` (in chroot) sets hostname/timezone/locale, runs **`cave
-sync`**, wires DHCP via `systemd-networkd`, **builds a kernel** (`sys-kernel/linux`
-+ `dracut`), installs **GRUB** (`--removable`, so a Mac's firmware finds it),
-sets up doas/sudo, and creates users.
+sync`**, wires DHCP via `systemd-networkd`, **builds a kernel from kernel.org**
+(Exherbo doesn't package one — only `linux-firmware` comes from cave), with the
+disk/fs drivers built *in* so it boots with no initramfs, installs
+**systemd-boot** (`bootctl` — Exherbo is systemd-first, so no grub/efibootmgr
+needed), sets up doas (from the third-party `somasis` repo) or sudo, and creates
+users.
 
 > **Editing files:** `vi` (vim) is in the stage already; `nano` isn't until you
 > `cave resolve -x app-editors/nano`, so use `vi` in the chroot.
@@ -197,8 +200,11 @@ walked and built Exherbo instead.
 - **MacBook Air wifi:** the BCM4360 needs the proprietary `wl`
   (`net-wireless/broadcom-sta`) out-of-tree driver — build it against your kernel
   and load `wl`. Ethernet / USB-tether work out of the box.
-- **Kernel:** the installer uses `defconfig`; for this Mac, `make menuconfig` in
-  `/usr/src/linux-*` to enable i915 + SIMPLEDRM before rebuilding.
+- **Kernel:** built from kernel.org with `defconfig` + the disk/fs drivers forced
+  in (virtio for the VM, AHCI/NVMe + vfat for the Mac) so it boots with no
+  initramfs. For this Mac, `make menuconfig` in `/usr/src/linux-*` to add i915 +
+  SIMPLEDRM before rebuilding, then re-copy `arch/x86/boot/bzImage` to
+  `/boot/vmlinuz-*`.
 
 ## Sources
 
