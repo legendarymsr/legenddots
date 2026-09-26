@@ -58,7 +58,15 @@ Name=en* eth* wl*
 DHCP=yes
 EOF
 systemctl enable systemd-networkd systemd-resolved 2>/dev/null || warn "enable networkd/resolved after boot"
-ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf 2>/dev/null || true
+# DNS for the REST of this chroot: systemd-resolved isn't running in here, so we
+# must NOT point resolv.conf at its /run stub now — doing that is what killed
+# every fetch after this step (linux-firmware, the kernel, doas: "Temporary
+# failure in name resolution"). Keep a real, working resolver instead; a prior
+# run may also have left a dead stub symlink, so heal it if lookups are broken.
+if ! getent hosts cdn.kernel.org >/dev/null 2>&1; then
+  rm -f /etc/resolv.conf
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+fi
 # NOTE — MacBook Air wifi: the BCM4360 needs the proprietary broadcom 'wl' driver
 # (net-wireless/broadcom-sta), an out-of-tree module. Ethernet / USB-tether work
 # out of the box; build broadcom-sta after the kernel and load 'wl' for wifi.
