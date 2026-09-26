@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Run Exherbo (or anything) in a UEFI KVM virtual machine.
-# First run creates the disk image + a writable copy of the UEFI NVRAM.
 #
-#   ./run-vm.sh path/to/live.iso   # INSTALL: boots the ISO — then inside the VM
-#                                  #          run  DISK=/dev/vda ./install.sh
-#   ./run-vm.sh                    # BOOT the already-installed system (no ISO)
+#   ./run-vm.sh              first run  -> INSTALL (auto-downloads the Gentoo
+#                            minimal ISO if missing, boots it). Inside the VM:
+#                                DISK=/dev/vda ./install.sh
+#                            after that -> BOOTS the installed system.
+#   ./run-vm.sh install      force install mode again (re-run the ISO).
+#   ./run-vm.sh /path.iso    install using a specific ISO.
 #
-# Overridable via env: VM_DIR DISK_SIZE MEM CPUS FW_CODE FW_VARS DISPLAY_TYPE
-#   MEM=8G CPUS=4 ./run-vm.sh live.iso
+# First run also creates the disk image + a writable copy of the UEFI NVRAM.
+# Override via env: VM_DIR DISK_SIZE MEM CPUS FW_CODE FW_VARS DISPLAY_TYPE
+#                   ISO_DEFAULT ISO_URL
 # =============================================================================
 set -euo pipefail
 
@@ -22,11 +25,27 @@ DISK="$VM_DIR/exherbo.qcow2"
 DISK_SIZE="${DISK_SIZE:-20G}"
 MEM="${MEM:-4G}"
 CPUS="${CPUS:-$(nproc)}"
-ISO="${1:-}"
+ISO_DEFAULT="${ISO_DEFAULT:-$HOME/live.iso}"
+# Gentoo minimal install ISO (UEFI-bootable). Dated autobuilds rotate off the
+# mirror eventually — if this 404s, bump the date or pass your own ISO / ISO_URL.
+ISO_URL="${ISO_URL:-https://distfiles.gentoo.org/releases/amd64/autobuilds/20260913T163055Z/install-amd64-minimal-20260913T163055Z.iso}"
 
 command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 not found — emerge app-emulation/qemu"
 command -v qemu-img          >/dev/null || die "qemu-img not found — emerge app-emulation/qemu"
 mkdir -p "$VM_DIR"
+
+# ── Decide mode: install vs boot ──────────────────────────────────────────────
+ARG="${1:-}"
+ISO=""
+if [[ "$ARG" == "install" ]]; then
+  MODE="install"; ISO="${2:-}"
+elif [[ -n "$ARG" ]]; then
+  MODE="install"; ISO="$ARG"
+elif [[ -f "$DISK" ]]; then
+  MODE="boot"
+else
+  MODE="install"           # no disk yet -> first-run install
+fi
 
 # ── Locate the OVMF UEFI firmware (from sys-firmware/edk2-bin) ─────────────────
 FW_CODE="${FW_CODE:-}"; FW_VARS="${FW_VARS:-}"
@@ -48,6 +67,20 @@ fi
 NVRAM="$VM_DIR/OVMF_VARS.fd"
 [[ -f "$NVRAM" ]] || { header "Copying UEFI NVRAM -> $NVRAM"; cp "$FW_VARS" "$NVRAM"; }
 [[ -f "$DISK" ]]  || { header "Creating disk $DISK ($DISK_SIZE)"; qemu-img create -f qcow2 "$DISK" "$DISK_SIZE"; }
+
+# ── Install mode: make sure we have an ISO (download the default if missing) ──
+if [[ "$MODE" == "install" ]]; then
+  [[ -n "$ISO" ]] || ISO="$ISO_DEFAULT"
+  if [[ ! -f "$ISO" ]]; then
+    if [[ "$ISO" == "$ISO_DEFAULT" ]]; then
+      command -v curl >/dev/null || die "curl not found — needed to fetch the ISO"
+      header "No ISO at $ISO — downloading Gentoo minimal"
+      curl -fL# -o "$ISO" "$ISO_URL" || { rm -f "$ISO"; die "ISO download failed ($ISO_URL) — grab one by hand and pass it"; }
+    else
+      die "ISO not found: $ISO"
+    fi
+  fi
+fi
 
 # ── KVM acceleration (falls back to slow emulation if no access) ──────────────
 ACCEL=()
@@ -84,8 +117,7 @@ ARGS=(
   "${DISP[@]}"
 )
 
-if [[ -n "$ISO" ]]; then
-  [[ -f "$ISO" ]] || die "ISO not found: $ISO"
+if [[ "$MODE" == "install" ]]; then
   ARGS+=(-cdrom "$ISO" -boot menu=on)
   header "Install mode — booting $ISO"
   echo -e "  ${GREEN}Inside the VM, run:${NC}  DISK=/dev/vda ./install.sh   (virtio disk = /dev/vda)"
