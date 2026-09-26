@@ -111,30 +111,54 @@ else
   KVER=""
 fi
 
-# ── Bootloader: systemd-boot (Exherbo is systemd-first — no grub needed) ───────
-# systemd-boot ships with systemd (bootctl): no build options, no efibootmgr, and
-# with the drivers built in above, no initramfs. Much simpler than grub here.
-header "Installing the bootloader (systemd-boot)"
-if bootctl install 2>/dev/null; then
-  ROOT_UUID="$(findmnt -no UUID / 2>/dev/null || true)"
-  [ -z "$ROOT_UUID" ] && ROOT_UUID="$(blkid -s UUID -o value "$(findmnt -no SOURCE / 2>/dev/null)" 2>/dev/null || true)"
-  mkdir -p /boot/loader/entries
+# ── Bootloader: systemd-boot, with a direct-EFISTUB fallback ──────────────────
+# Prefer systemd-boot (bootctl) — but Exherbo's systemd may not ship the sd-boot
+# EFI binary, in which case we boot the kernel *itself* as an EFI app (CONFIG_
+# EFI_STUB) with root= baked in. Either way the loader lands at the removable
+# path \EFI\BOOT\BOOTX64.EFI, which is what OVMF *and* a real Mac's firmware boot
+# with no NVRAM entry needed.
+header "Installing the bootloader"
+ROOT_UUID="$(findmnt -no UUID / 2>/dev/null || true)"
+[ -z "$ROOT_UUID" ] && ROOT_UUID="$(blkid -s UUID -o value "$(findmnt -no SOURCE / 2>/dev/null)" 2>/dev/null || true)"
+mkdir -p /boot/EFI/BOOT /boot/EFI/systemd /boot/loader/entries
+
+SDBOOT="$(find /usr -name 'systemd-bootx64.efi' 2>/dev/null | head -1)"
+if [ -n "$SDBOOT" ]; then
+  printf 'systemd-boot binary: %s\n' "$SDBOOT"
+  bootctl --esp-path=/boot install || warn "bootctl returned an error — falling back to a manual copy"
+  # Copy sd-boot to BOTH the systemd path and the removable fallback, so it boots
+  # even if bootctl couldn't write an NVRAM entry (common inside a chroot).
+  cp -f "$SDBOOT" /boot/EFI/systemd/systemd-bootx64.efi
+  cp -f "$SDBOOT" /boot/EFI/BOOT/BOOTX64.EFI
   cat > /boot/loader/loader.conf <<EOF
 default exherbo
 timeout 3
 editor  yes
 EOF
-  if [ -n "${KVER}" ] && [ -n "${ROOT_UUID}" ]; then
+  if [ -n "$KVER" ] && [ -n "$ROOT_UUID" ]; then
     cat > /boot/loader/entries/exherbo.conf <<EOF
 title   Exherbo
 linux   /vmlinuz-${KVER}
 options root=UUID=${ROOT_UUID} rw
 EOF
+    printf '%bsystemd-boot installed (+ removable \\EFI\\BOOT\\BOOTX64.EFI).%b\n' "$GRN" "$NC"
   else
-    warn "couldn't write the boot entry (KVER='${KVER}' ROOT_UUID='${ROOT_UUID}') — add /boot/loader/entries/exherbo.conf by hand"
+    warn "boot entry not written (KVER='$KVER' ROOT_UUID='$ROOT_UUID')"
   fi
+elif [ -n "$KVER" ] && [ -d "/usr/src/linux-${KVER}" ] && [ -n "$ROOT_UUID" ]; then
+  warn "no systemd-boot binary here — using a direct EFISTUB boot instead"
+  # The kernel is a valid EFI application. Bake the cmdline in (the removable
+  # path can't pass one) and drop the kernel straight at \EFI\BOOT\BOOTX64.EFI.
+  cd "/usr/src/linux-${KVER}"
+  ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=UUID=${ROOT_UUID} rw"
+  make olddefconfig
+  make -j"$(nproc)" bzImage
+  cp -f arch/x86/boot/bzImage /boot/EFI/BOOT/BOOTX64.EFI
+  cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
+  cd /
+  printf '%bEFISTUB kernel installed at \\EFI\\BOOT\\BOOTX64.EFI (root=UUID=%s).%b\n' "$GRN" "$ROOT_UUID" "$NC"
 else
-  warn "bootctl install failed — is /boot the mounted ESP? install a bootloader by hand"
+  warn "no bootloader installed (KVER='$KVER' ROOT_UUID='$ROOT_UUID') — set one up by hand"
 fi
 
 # ── Privilege escalation ──────────────────────────────────────────────────────
