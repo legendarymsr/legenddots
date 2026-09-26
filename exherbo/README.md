@@ -39,7 +39,7 @@ run, picks a working display, and boots.
 
 ```sh
 doas emerge -av app-emulation/qemu sys-firmware/edk2-bin   # once
-doas usermod -aG kvm "$USER"                               # once, then re-login
+doas usermod -aG kvm legend                                # once, then re-login
 
 ./run-vm.sh path/to/live.iso   # install: boot a Linux live ISO in the VM
 #   inside the VM:  DISK=/dev/vda ./install.sh   (virtio disk = /dev/vda)
