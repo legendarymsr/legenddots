@@ -103,11 +103,11 @@ fi
 KSRC="/usr/src/linux-${KVER}"
 if [ -d "$KSRC" ]; then
   cd "$KSRC"
-  make defconfig
-  # Build the disk/root/fs drivers straight IN so the box boots with NO initramfs,
-  # both in the KVM guest (virtio) and on the MacBook (AHCI/NVMe + the vfat ESP).
+  # defconfig + the KVM-guest fragment (virtio, paravirt, guest console).
+  make defconfig kvm_guest.config
+  # Plus the disk/root/fs drivers the fragment doesn't cover, so it also boots
+  # the MacBook (AHCI/NVMe + the vfat ESP) with NO initramfs.
   ./scripts/config \
-    -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE \
     -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
     -e EXT4_FS -e VFAT_FS -e FAT_FS \
     -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE

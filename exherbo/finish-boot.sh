@@ -76,9 +76,10 @@ if [ ! -d "linux-${KVER}" ]; then
 fi
 cd "linux-${KVER}"
 header "Building linux-${KVER} (the long part)"
-make defconfig
+# defconfig + the KVM-guest fragment (virtio, paravirt, guest console). Plus the
+# disk/fs drivers the fragment doesn't cover, so it also boots real hardware.
+make defconfig kvm_guest.config
 ./scripts/config \
-  -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE \
   -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
   -e EXT4_FS -e VFAT_FS -e FAT_FS \
   -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE
