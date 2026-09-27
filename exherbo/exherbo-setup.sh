@@ -84,12 +84,15 @@ $RESOLVE linux-firmware || warn "linux-firmware resolve failed (try: cave resolv
 # tools the kernel build wants; the gcc stage usually already has them
 $RESOLVE bc flex bison 2>/dev/null || true
 
-KVER="${KVER:-$(fetch https://www.kernel.org/finger_banner 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)}"
+# Pin a known-good LTS (6.12 is an LTS). Auto-detecting off kernel.org proved
+# unreliable — it grabbed bogus versions like 7.2.8 and 404'd. Override with
+# KVER=x.y.z if you want a different one; the vN.x path is derived from it.
 KVER="${KVER:-6.12.9}"
+KMAJ="${KVER%%.*}"
 cd /usr/src
 if [ ! -d "linux-${KVER}" ]; then
   header "Fetching linux-${KVER}"
-  if dl_file "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KVER}.tar.xz" "linux-${KVER}.tar.xz"; then
+  if dl_file "https://cdn.kernel.org/pub/linux/kernel/v${KMAJ}.x/linux-${KVER}.tar.xz" "linux-${KVER}.tar.xz"; then
     tar xf "linux-${KVER}.tar.xz" && rm -f "linux-${KVER}.tar.xz"
   else
     warn "kernel download failed (no curl/wget, or network) — build one by hand"
