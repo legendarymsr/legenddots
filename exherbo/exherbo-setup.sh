@@ -84,10 +84,12 @@ $RESOLVE linux-firmware || warn "linux-firmware resolve failed (try: cave resolv
 # tools the kernel build wants; the gcc stage usually already has them
 $RESOLVE bc flex bison 2>/dev/null || true
 
-# Pin a known-good LTS (6.12 is an LTS). Auto-detecting off kernel.org proved
-# unreliable — it grabbed bogus versions like 7.2.8 and 404'd. Override with
-# KVER=x.y.z if you want a different one; the vN.x path is derived from it.
-KVER="${KVER:-6.12.9}"
+# Latest stable from kernel.org's finger_banner (the "latest stable" line), with
+# a known-good fallback. The vN.x download path is derived from the major, so
+# this tracks whatever's current (7.x now) instead of a hardcoded series.
+# Override with KVER=x.y.z for a specific version.
+KVER="${KVER:-$(fetch https://www.kernel.org/finger_banner 2>/dev/null | awk '/latest stable version/{print $NF; exit}')}"
+KVER="${KVER:-7.2.8}"
 KMAJ="${KVER%%.*}"
 cd /usr/src
 if [ ! -d "linux-${KVER}" ]; then
