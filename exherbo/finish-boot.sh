@@ -8,6 +8,8 @@
 #   DISK=/dev/vda ./finish-boot.sh          # VM (virtio disk)
 #   DISK=/dev/sda ./finish-boot.sh          # real MacBook
 #   KVER=7.2.8   DISK=/dev/vda ./finish-boot.sh   # pin a kernel version
+#   SLIM=1       DISK=/dev/vda ./finish-boot.sh   # fast build: no modules, VM
+#                                                   essentials only (~10 min vs ~45)
 # =============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -75,17 +77,30 @@ if [ ! -d "linux-${KVER}" ]; then
   fi
 fi
 cd "linux-${KVER}"
-header "Building linux-${KVER} (the long part)"
-# defconfig + the KVM-guest fragment (virtio, paravirt, guest console). Plus the
-# disk/fs drivers the fragment doesn't cover, so it also boots real hardware.
+# defconfig + the KVM-guest fragment (virtio, paravirt, guest console).
 make defconfig kvm_guest.config
-./scripts/config \
-  -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
-  -e EXT4_FS -e VFAT_FS -e FAT_FS \
-  -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE
+if [ "${SLIM:-}" = "1" ]; then
+  header "Building linux-${KVER} — SLIM (no modules, VM essentials; fast)"
+  # Modules are the bulk of the build — drop them entirely and force IN just the
+  # drivers we actually need: disk, fs, and a simple framebuffer console so the
+  # QEMU window still shows output (no udev-loaded modules exist to bring it up).
+  ./scripts/config -d MODULES \
+    -e EXT4_FS -e VFAT_FS -e FAT_FS -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e NLS_ASCII \
+    -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE -e VIRTIO_BALLOON \
+    -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME -e USB_STORAGE \
+    -e SYSFB_SIMPLEFB -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
+    -e FRAMEBUFFER_CONSOLE -e VT -e VT_CONSOLE -e EFI -e EFI_STUB
+else
+  header "Building linux-${KVER} (full defconfig — the long part)"
+  # Disk/fs drivers the fragment doesn't cover, so it also boots real hardware.
+  ./scripts/config \
+    -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
+    -e EXT4_FS -e VFAT_FS -e FAT_FS \
+    -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE
+fi
 make olddefconfig
 make -j"$(nproc)"
-make modules_install
+make modules_install 2>/dev/null || true
 cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
 
 header "Installing the bootloader"
@@ -116,7 +131,7 @@ CHROOT
 chmod +x "$MNT/kernel-boot.sh"
 
 header "Entering chroot: kernel + bootloader only"
-if env -i HOME=/root TERM="${TERM:-linux}" KVER="${KVER:-}" \
+if env -i HOME=/root TERM="${TERM:-linux}" KVER="${KVER:-}" SLIM="${SLIM:-}" \
      "$(command -v chroot)" "$MNT" /bin/bash -lc '/kernel-boot.sh'; then
   header "Done"
   echo -e "${GRN}Kernel + bootloader installed. Reboot into it:${NC}"
