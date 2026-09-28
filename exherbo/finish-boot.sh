@@ -93,14 +93,16 @@ if [ "${SLIM:-}" = "1" ]; then
     -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE -e VIRTIO_BALLOON \
     -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME -e USB_STORAGE \
     -e SYSFB_SIMPLEFB -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
-    -e FRAMEBUFFER_CONSOLE -e VT -e VT_CONSOLE -e EFI -e EFI_STUB
+    -e FRAMEBUFFER_CONSOLE -e VT -e VT_CONSOLE -e EFI -e EFI_STUB \
+    -e PARTITION_ADVANCED -e EFI_PARTITION -e BLK_DEV -e BLOCK
 else
   header "Building linux-${KVER} (full defconfig — the long part)"
   # Disk/fs drivers the fragment doesn't cover, so it also boots real hardware.
   ./scripts/config \
     -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
     -e EXT4_FS -e VFAT_FS -e FAT_FS \
-    -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE
+    -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE \
+    -e EFI_PARTITION
 fi
 make olddefconfig
 make -j"$(nproc)"
