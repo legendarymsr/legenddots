@@ -213,6 +213,11 @@ walked and built Exherbo instead.
 - **MacBook Air wifi:** the BCM4360 needs the proprietary `wl`
   (`net-wireless/broadcom-sta`) out-of-tree driver — build it against your kernel
   and load `wl`. Ethernet / USB-tether work out of the box.
+- **Updating the kernel:** run `doas ./kernel-boot.sh` (or `doas env SLIM=1
+  ./kernel-boot.sh` for a fast VM build) on the booted system — it fetches the
+  current stable kernel, rebuilds it, and reinstalls the bootloader
+  (`root=PARTUUID=`), leaving the running kernel in place until you reboot. It's
+  the same script the installer uses, so install-time and update-time never drift.
 - **Kernel:** built from kernel.org with `defconfig` + the disk/fs drivers forced
   in (virtio for the VM, AHCI/NVMe + vfat for the Mac) so it boots with no
   initramfs. For this Mac, `make menuconfig` in `/usr/src/linux-*` to add i915 +
