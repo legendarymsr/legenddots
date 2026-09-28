@@ -183,15 +183,19 @@ fi
 # ── Privilege escalation ──────────────────────────────────────────────────────
 header "Privilege escalation (${PRIV_ESC})"
 if [ "$PRIV_ESC" = "doas" ]; then
-  # doas isn't in arbor — it lives in the third-party 'somasis' repo. Enable it,
-  # sync, then install (the same 'unavailable repo' dance as tombriden/fastfetch).
-  $RESOLVE repository/somasis 2>/dev/null || warn "couldn't add the somasis repo (doas lives there)"
-  cave sync somasis 2>/dev/null || cave sync 2>/dev/null || true
-  if $RESOLVE app-admin/doas; then
+  # doas isn't in arbor — it's in the third-party 'somasis' repo. Try that first;
+  # if the repo won't resolve (common), build the tiny doas port from source.
+  $RESOLVE repository/somasis 2>/dev/null && cave sync somasis 2>/dev/null || true
+  if ! { $RESOLVE app-admin/doas 2>/dev/null && command -v doas >/dev/null 2>&1; }; then
+    warn "somasis/doas unavailable — building doas from source (slicer69/doas)"
+    ( cd /usr/src && rm -rf doas-master doas.tgz \
+      && dl_file "https://codeload.github.com/slicer69/doas/tar.gz/refs/heads/master" doas.tgz \
+      && tar xf doas.tgz && cd doas-master && make && make install ) \
+      || warn "doas source build failed — you'll have no doas!"
+  fi
+  if command -v doas >/dev/null 2>&1; then
     echo "permit persist :wheel" > /etc/doas.conf && chmod 0400 /etc/doas.conf
-  else
-    warn "doas install failed (somasis repo) — falling back to sudo"
-    $RESOLVE sudo && { mkdir -p /etc/sudoers.d; echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel; }
+    printf '%bdoas configured (permit persist :wheel).%b\n' "$GRN" "$NC"
   fi
 else
   $RESOLVE sudo || warn "install sudo by hand"
@@ -199,17 +203,56 @@ else
   echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 fi
 
+# ── fastfetch (third-party 'tombriden' repo — non-fatal if unavailable) ───────
+header "Installing fastfetch"
+$RESOLVE repository/tombriden 2>/dev/null && cave sync tombriden 2>/dev/null || true
+$RESOLVE fastfetch 2>/dev/null || warn "fastfetch skipped (tombriden repo didn't resolve)"
+
 # ── Users & passwords ─────────────────────────────────────────────────────────
 header "Set the root password"
 passwd root
-printf '%bCreate a regular user? enter a name (blank to skip):%b ' "$YEL" "$NC"
-read -r USERNAME || USERNAME=""
+USERNAME="${USERNAME:-legend}"
+printf '%bRegular user name? (default: %s, '\''-'\'' to skip):%b ' "$YEL" "$USERNAME" "$NC"
+read -r ANS || ANS=""
+if [ "$ANS" = "-" ]; then USERNAME=""; else USERNAME="${ANS:-$USERNAME}"; fi
 if [ -n "$USERNAME" ]; then
   groupadd -f wheel 2>/dev/null || true
-  useradd -mG wheel -s /bin/bash "$USERNAME" || true
+  useradd -mG wheel -s /bin/bash "$USERNAME" 2>/dev/null || true
   printf 'set %s password:\n' "$USERNAME"; passwd "$USERNAME" || true
 fi
 
+# ── Optional: bspwm desktop (Xorg — a big source build) ───────────────────────
+if [ "${INSTALL_WM:-}" = "true" ]; then
+  header "Installing the bspwm desktop (Xorg + bspwm — long compile)"
+  $RESOLVE xorg-server xinit xf86-input-libinput bspwm sxhkd xterm \
+    || warn "some WM packages didn't resolve — finish by hand with cave"
+  if [ -n "$USERNAME" ] && [ -d "/home/$USERNAME" ]; then
+    UH="/home/$USERNAME"
+    mkdir -p "$UH/.config/bspwm" "$UH/.config/sxhkd"
+    cat > "$UH/.config/bspwm/bspwmrc" <<'BSPWM'
+#!/bin/sh
+bspc monitor -d 1 2 3 4 5
+bspc config border_width          2
+bspc config window_gap            8
+bspc config focus_follows_pointer true
+BSPWM
+    chmod +x "$UH/.config/bspwm/bspwmrc"
+    cat > "$UH/.config/sxhkd/sxhkdrc" <<'SXHKD'
+super + Return
+	xterm
+super + w
+	bspc node -c
+super + {1-5}
+	bspc desktop -f '^{1-5}'
+super + shift + q
+	bspc quit
+SXHKD
+    printf 'sxhkd &\nexec bspwm\n' > "$UH/.xinitrc"
+    chown -R "$USERNAME:$USERNAME" "$UH/.config" "$UH/.xinitrc" 2>/dev/null || true
+    printf '%bDesktop ready — log in as %s and run: startx  (super+Return = terminal)%b\n' "$GRN" "$USERNAME" "$NC"
+  fi
+fi
+
 header "chroot setup complete"
-printf '%bExit the chroot, then: swapoff, umount -R the target, reboot.%b\n' "$GRN" "$NC"
-printf 'After boot: add a desktop with cave (e.g. `cave resolve -x x11-wm/…`) and build broadcom-sta for wifi.\n'
+printf '%bExit the chroot, then: swapoff -a, umount -R the target, reboot.%b\n' "$GRN" "$NC"
+printf 'Wifi on the real MacBook: build net-wireless/broadcom-sta and load '\''wl'\''.\n'

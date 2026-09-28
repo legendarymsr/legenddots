@@ -60,6 +60,11 @@ if [[ -z "${PRIV_ESC:-}" ]]; then
   read -t 10 -r ANS || true; echo
   case "${ANS,,}" in sudo) PRIV_ESC="sudo" ;; *) PRIV_ESC="doas" ;; esac
 fi
+if [[ -z "${INSTALL_WM:-}" ]]; then
+  echo -e "${CYAN}Install the bspwm desktop (Xorg — a long source compile)? [yes/no] (10s, default: no)${NC}"
+  read -t 10 -r ANS || true; echo
+  case "${ANS,,}" in y|yes) INSTALL_WM="true" ;; *) INSTALL_WM="false" ;; esac
+fi
 HOSTNAME_="${HOSTNAME_:-exherbo}"
 TIMEZONE="${TIMEZONE:-America/New_York}"
 LOCALE="${LOCALE:-en_US.UTF-8}"
@@ -176,6 +181,7 @@ enter_chroot() {
   install -Dm755 "$SELF_DIR/exherbo-setup.sh" "$MNT/exherbo-setup.sh"
   if env -i HOME=/root TERM="${TERM:-linux}" \
        HOSTNAME_="$HOSTNAME_" TIMEZONE="$TIMEZONE" LOCALE="$LOCALE" PRIV_ESC="$PRIV_ESC" \
+       INSTALL_WM="${INSTALL_WM:-false}" \
        "$(command -v chroot)" "$MNT" /bin/bash -lc '/exherbo-setup.sh'; then
     header "Done"
     echo -e "${GREEN}Exherbo installed. Unmount and reboot:${NC}"

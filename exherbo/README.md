@@ -106,7 +106,8 @@ users.
 | `STAGE_FILE` | `exherbo-x86_64-pc-linux-gnu-gcc-current.tar.xz` | which stage to unpack; other arches/variants at [stages.exherbo.org](https://stages.exherbo.org/) (set `STAGE_BASE` too) |
 | `VERIFY` | `true` | check the stage against its published `.sha256` |
 | `DISK` | `/dev/sda` | disk to wipe (MacBook Air 6,2) |
-| `PRIV_ESC` | `doas` | `doas` or `sudo` for the installed system |
+| `PRIV_ESC` | `doas` | `doas` or `sudo`; `doas` comes from the `somasis` repo, falling back to a source build |
+| `INSTALL_WM` | `no` (prompt) | `true` also installs a bspwm desktop (Xorg — a long compile) + a minimal config |
 | `HOSTNAME_` | `exherbo` | hostname |
 | `TIMEZONE` | `America/New_York` | `/usr/share/zoneinfo/...` |
 | `LOCALE` | `en_US.UTF-8` | set via `eclectic locale` + `/etc/locale.conf` |
