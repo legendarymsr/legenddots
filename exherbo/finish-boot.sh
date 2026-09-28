@@ -34,6 +34,10 @@ MNT=/mnt/exherbo
 [[ -b "$DISK" ]]  || die "$DISK is not a block device"
 case "$DISK" in *[0-9]) P="${DISK}p" ;; *) P="${DISK}" ;; esac
 EFI="${P}1"; ROOT="${P}3"
+# The root spec baked into the boot cmdline. WITHOUT an initramfs the kernel can
+# NOT resolve a filesystem UUID= — only PARTUUID= (GPT) or a device node. Get the
+# GPT PARTUUID here in the live env, where blkid is reliable.
+ROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOT" 2>/dev/null || true)"
 
 # ── Mount the installed system + pseudo-filesystems (idempotent) ──────────────
 header "Mounting the installed system on ${ROOT}"
@@ -104,8 +108,12 @@ make modules_install 2>/dev/null || true
 cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
 
 header "Installing the bootloader"
-ROOT_UUID="$(findmnt -no UUID / 2>/dev/null || true)"
-[ -z "$ROOT_UUID" ] && ROOT_UUID="$(blkid -s UUID -o value "$(findmnt -no SOURCE / 2>/dev/null)" 2>/dev/null || true)"
+# No initramfs → the kernel resolves root= itself and only understands PARTUUID=
+# (GPT) or a device node, NOT a filesystem UUID=. Prefer PARTUUID, fall back to
+# the device node.
+ROOT_SPEC="${ROOT_PARTUUID:+PARTUUID=${ROOT_PARTUUID}}"
+[ -z "$ROOT_SPEC" ] && ROOT_SPEC="${ROOT_DEV:-/dev/vda3}"
+echo "root spec for the boot cmdline: root=${ROOT_SPEC}"
 mkdir -p /boot/EFI/BOOT /boot/EFI/systemd /boot/loader/entries
 SDBOOT="$(find /usr -name 'systemd-bootx64.efi' 2>/dev/null | head -1)"
 if [ -n "$SDBOOT" ]; then
@@ -113,25 +121,24 @@ if [ -n "$SDBOOT" ]; then
   cp -f "$SDBOOT" /boot/EFI/systemd/systemd-bootx64.efi
   cp -f "$SDBOOT" /boot/EFI/BOOT/BOOTX64.EFI
   printf 'default exherbo\ntimeout 3\neditor  yes\n' > /boot/loader/loader.conf
-  printf 'title   Exherbo\nlinux   /vmlinuz-%s\noptions root=UUID=%s rw\n' "$KVER" "$ROOT_UUID" \
+  printf 'title   Exherbo\nlinux   /vmlinuz-%s\noptions root=%s rw\n' "$KVER" "$ROOT_SPEC" \
     > /boot/loader/entries/exherbo.conf
   printf '%bsystemd-boot installed (+ removable \\EFI\\BOOT\\BOOTX64.EFI).%b\n' "$GRN" "$NC"
-elif [ -n "$ROOT_UUID" ]; then
+else
   warn "no systemd-boot binary — using a direct EFISTUB boot"
-  ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=UUID=${ROOT_UUID} rw"
+  ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=${ROOT_SPEC} rw"
   make olddefconfig
   make -j"$(nproc)" bzImage
   cp -f arch/x86/boot/bzImage /boot/EFI/BOOT/BOOTX64.EFI
   cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
-  printf '%bEFISTUB kernel installed at \\EFI\\BOOT\\BOOTX64.EFI (root=UUID=%s).%b\n' "$GRN" "$ROOT_UUID" "$NC"
-else
-  warn "ROOT_UUID empty — bootloader NOT installed"; exit 1
+  printf '%bEFISTUB kernel installed at \\EFI\\BOOT\\BOOTX64.EFI (root=%s).%b\n' "$GRN" "$ROOT_SPEC" "$NC"
 fi
 CHROOT
 chmod +x "$MNT/kernel-boot.sh"
 
 header "Entering chroot: kernel + bootloader only"
 if env -i HOME=/root TERM="${TERM:-linux}" KVER="${KVER:-}" SLIM="${SLIM:-}" \
+     ROOT_PARTUUID="${ROOT_PARTUUID:-}" ROOT_DEV="$ROOT" \
      "$(command -v chroot)" "$MNT" /bin/bash -lc '/kernel-boot.sh'; then
   header "Done"
   echo -e "${GRN}Kernel + bootloader installed. Reboot into it:${NC}"
