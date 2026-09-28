@@ -130,8 +130,14 @@ fi
 # path \EFI\BOOT\BOOTX64.EFI, which is what OVMF *and* a real Mac's firmware boot
 # with no NVRAM entry needed.
 header "Installing the bootloader"
-ROOT_UUID="$(findmnt -no UUID / 2>/dev/null || true)"
-[ -z "$ROOT_UUID" ] && ROOT_UUID="$(blkid -s UUID -o value "$(findmnt -no SOURCE / 2>/dev/null)" 2>/dev/null || true)"
+# No initramfs → the kernel resolves root= itself and only understands PARTUUID=
+# (GPT) or a device node, NOT a filesystem UUID=. Derive the GPT PARTUUID of the
+# device backing / and use that.
+ROOT_DEV="$(findmnt -no SOURCE / 2>/dev/null || true)"
+ROOT_PARTUUID="$(blkid -s PARTUUID -o value "$ROOT_DEV" 2>/dev/null || true)"
+ROOT_SPEC="${ROOT_PARTUUID:+PARTUUID=${ROOT_PARTUUID}}"
+[ -z "$ROOT_SPEC" ] && ROOT_SPEC="${ROOT_DEV:-/dev/vda3}"
+echo "root spec for the boot cmdline: root=${ROOT_SPEC}"
 mkdir -p /boot/EFI/BOOT /boot/EFI/systemd /boot/loader/entries
 
 SDBOOT="$(find /usr -name 'systemd-bootx64.efi' 2>/dev/null | head -1)"
@@ -147,30 +153,30 @@ default exherbo
 timeout 3
 editor  yes
 EOF
-  if [ -n "$KVER" ] && [ -n "$ROOT_UUID" ]; then
+  if [ -n "$KVER" ]; then
     cat > /boot/loader/entries/exherbo.conf <<EOF
 title   Exherbo
 linux   /vmlinuz-${KVER}
-options root=UUID=${ROOT_UUID} rw
+options root=${ROOT_SPEC} rw
 EOF
     printf '%bsystemd-boot installed (+ removable \\EFI\\BOOT\\BOOTX64.EFI).%b\n' "$GRN" "$NC"
   else
-    warn "boot entry not written (KVER='$KVER' ROOT_UUID='$ROOT_UUID')"
+    warn "boot entry not written (KVER empty)"
   fi
-elif [ -n "$KVER" ] && [ -d "/usr/src/linux-${KVER}" ] && [ -n "$ROOT_UUID" ]; then
+elif [ -n "$KVER" ] && [ -d "/usr/src/linux-${KVER}" ]; then
   warn "no systemd-boot binary here — using a direct EFISTUB boot instead"
   # The kernel is a valid EFI application. Bake the cmdline in (the removable
   # path can't pass one) and drop the kernel straight at \EFI\BOOT\BOOTX64.EFI.
   cd "/usr/src/linux-${KVER}"
-  ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=UUID=${ROOT_UUID} rw"
+  ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=${ROOT_SPEC} rw"
   make olddefconfig
   make -j"$(nproc)" bzImage
   cp -f arch/x86/boot/bzImage /boot/EFI/BOOT/BOOTX64.EFI
   cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
   cd /
-  printf '%bEFISTUB kernel installed at \\EFI\\BOOT\\BOOTX64.EFI (root=UUID=%s).%b\n' "$GRN" "$ROOT_UUID" "$NC"
+  printf '%bEFISTUB kernel installed at \\EFI\\BOOT\\BOOTX64.EFI (root=%s).%b\n' "$GRN" "$ROOT_SPEC" "$NC"
 else
-  warn "no bootloader installed (KVER='$KVER' ROOT_UUID='$ROOT_UUID') — set one up by hand"
+  warn "no bootloader installed (KVER='$KVER') — set one up by hand"
 fi
 
 # ── Privilege escalation ──────────────────────────────────────────────────────
