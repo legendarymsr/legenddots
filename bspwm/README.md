@@ -6,8 +6,9 @@
 > Haskell, no Rust.
 
 A deliberately small bspwm rice: the window manager (sxhkd for keys), a lean
-**polybar** (ram · battery · date), ultra-minimal **picom / rofi / dunst**,
-**dillo** for a browser, a **ly** login, and a **TTY-style lock**. Tokyo Night,
+**lemonbar** (ram · battery · date, a pure-shell C bar — no Haskell), minimal
+**picom / rofi / dunst**, **slock** for the screen lock, a **ly** login, and
+**surf** for a browser (the one heavy piece — it pulls WebKit). Tokyo Night,
 Super as the mod key.
 
 ## Install (Arch or KISS)
@@ -24,9 +25,9 @@ The script detects your distro:
   toolchain to bootstrap — then it wires `~/.xinitrc` so you launch with
   **`startx`** (enabling `ly` is left to you; KISS isn't systemd).
 
-Either way it symlinks the configs into `~/.config`, links the Dillo config
-(`../scripts/dillo/`) into `~/.dillo/`, installs the `ly` config + bspwm session,
-and sets `physlock` setuid.
+Either way it symlinks the configs into `~/.config`, installs the `ly` config +
+bspwm session, and sets `slock` setuid. (surf, like st, is configured at compile
+time — no config file.)
 
 ## What's here
 
@@ -34,8 +35,7 @@ and sets `physlock` setuid.
 |------|-----------|------|
 | `bspwmrc` | `~/.config/bspwm/bspwmrc` | the WM config — a shell script |
 | `sxhkdrc` | `~/.config/sxhkd/sxhkdrc` | keybinds |
-| `polybar/config.ini` | `~/.config/polybar/config.ini` | the bar — ram · battery · date |
-| `polybar/launch.sh` | `~/.config/polybar/launch.sh` | (re)start the bar |
+| `lemonbar/bar.sh` | `~/.config/lemonbar/bar.sh` | the bar — ram · battery · date (shell + lemonbar) |
 | `picom.conf` | `~/.config/picom/picom.conf` | vsync, nothing else |
 | `rofi/config.rasi` | `~/.config/rofi/config.rasi` | launcher (stock theme) |
 | `dunst/dunstrc` | `~/.config/dunst/dunstrc` | notifications |
@@ -48,31 +48,31 @@ and sets `physlock` setuid.
 |-----|--------|
 | `super-Return` | st |
 | `super-p` | rofi |
-| `super-w` | dillo |
+| `super-w` | surf |
 | `super-q` / `super-shift-q` | close / kill window |
 | `super-{h,j,k,l}` | focus in a direction |
 | `super-shift-{h,j,k,l}` | move window |
 | `super-{1..9}` | switch desktop |
 | `super-shift-{1..9}` | send window to desktop |
 | `super-t` / `super-shift-space` / `super-f` | tiled / floating / fullscreen |
-| `super-shift-x` | **lock** (physlock) |
+| `super-shift-x` | **lock** (slock) |
 | `super-alt-r` / `super-alt-q` | restart / quit bspwm |
 | `super-Escape` | reload sxhkd |
 
 Keys live in `sxhkdrc` — edit it and hit `super-Escape` to reload. No recompile.
 
-## Lock (TTY-style)
+## Lock
 
-`physlock` is a **console locker**, not a graphical lockscreen: `super-shift-x`
-drops to a bare console and locks every VT until you type your password.
-`install.sh` sets it setuid; prefer not to? Add a `doas` rule and change the
-bind to `doas physlock`.
+`slock` is a **graphical X screen locker**: `super-shift-x` blanks the screen and
+locks until you type your password. `install.sh` sets it setuid so it can
+authenticate.
 
 ## The bar
 
-polybar, one bar, three modules: **ram**, **battery**, **date**. Set the battery
-names for your hardware in `config.ini` (`ls /sys/class/power_supply`); on a
-desktop with no battery the module just shows nothing.
+`lemonbar/bar.sh` is a tiny shell loop piped into **lemonbar** (C) — three
+readouts: **ram**, **battery**, **date**, in Tokyo Night. On a machine with no
+battery that readout just drops off. The font line needs a lemonbar built with
+Xft (`lemonbar-xft`); on the plain core-font build, drop `-f "$FONT"`.
 
 ## Notes
 
