@@ -213,11 +213,14 @@ walked and built Exherbo instead.
 - **MacBook Air wifi:** the BCM4360 needs the proprietary `wl`
   (`net-wireless/broadcom-sta`) out-of-tree driver — build it against your kernel
   and load `wl`. Ethernet / USB-tether work out of the box.
-- **doas + a desktop after the fact:** `doas KEYMAP=se ./setup-desktop.sh` installs
-  doas (somasis repo, or a source build) and a bspwm desktop (Xorg + sxhkd + xterm
-  with a minimal config) on an already-running system — the same thing the
-  installer's `INSTALL_WM=yes` does at install time. `NO_DOAS=1` / `NO_WM=1` skip
-  either half.
+- **doas + the bspwm rice after the fact:** `doas ./setup-desktop.sh` installs doas
+  (somasis repo, or a source build) and the full Tokyo Night bspwm rice on an
+  already-running system — Xorg + bspwm/sxhkd/polybar/picom/dunst/rofi/dillo,
+  **st built from `suckless/st/config.h`**, the JetBrains Mono Nerd Font, and
+  physlock setuid — deploying the real configs from `bspwm/`. It's the Exherbo
+  counterpart of `bspwm/install.sh` (which covers Arch/KISS). `NO_DOAS=1` / `NO_WM=1`
+  skip either half; `KEYMAP=` overrides the `setxkbmap` line; `TARGET_USER=` picks
+  whose home gets the configs.
 - **Updating the kernel:** run `doas ./kernel-boot.sh` (or `doas env SLIM=1
   ./kernel-boot.sh` for a fast VM build) on the booted system — it fetches the
   current stable kernel, rebuilds it, and reinstalls the bootloader
