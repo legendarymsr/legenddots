@@ -90,7 +90,9 @@ if [ "${NO_WM:-}" != "1" ]; then
       mkdir -p "$(dirname "$SRC")"
       [ -d "$SRC/.git" ] || git clone "https://git.suckless.org/$t" "$SRC" 2>/dev/null \
         || { warn "$t: clone failed"; return 1; }
-      [ -f "$REPO/suckless/$t/config.h" ] && cp "$REPO/suckless/$t/config.h" "$SRC/config.h"
+      # Symlink your repo's config.h in (not a copy), so editing
+      # ../suckless/$t/config.h and rerunning rebuilds with the change.
+      [ -f "$REPO/suckless/$t/config.h" ] && ln -sfn "$REPO/suckless/$t/config.h" "$SRC/config.h"
       ( cd "$SRC" && make clean >/dev/null 2>&1 || true; make && make install ) \
         && printf '%b%s installed%b\n' "$GRN" "$t" "$NC" || { warn "$t: build failed"; return 1; }
     }
