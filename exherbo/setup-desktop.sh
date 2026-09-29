@@ -29,6 +29,23 @@ TARGET_USER="${TARGET_USER:-legend}"
 KEYMAP="${KEYMAP:-}"
 UH="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 
+# ── Enable the third-party repos this stuff lives in (NONE are in arbor) ───────
+# bspwm/sxhkd/rofi/picom/dunst/doas/fastfetch all live in unofficial repos that
+# must be added via the 'unavailable' meta-repos first. Best-effort: cave will
+# still name anything that can't be found.
+enable_repos() {
+  header "Enabling third-party repos (the WM stack isn't in arbor)"
+  cave sync 2>/dev/null || true
+  for r in unavailable unavailable-unofficial; do
+    cave resolve -x1 "repository/$r" 2>/dev/null || true
+  done
+  for r in x11 desktop hasufell somasis tombriden hardware; do
+    cave resolve -x1 "repository/$r" 2>/dev/null || warn "repo '$r' not enabled — its packages will be unavailable"
+  done
+  cave sync 2>/dev/null || true
+}
+[ "${NO_REPOS:-}" = "1" ] || enable_repos
+
 # ── doas ──────────────────────────────────────────────────────────────────────
 if [ "${NO_DOAS:-}" != "1" ]; then
   header "Installing doas"
