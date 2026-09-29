@@ -213,14 +213,16 @@ walked and built Exherbo instead.
 - **MacBook Air wifi:** the BCM4360 needs the proprietary `wl`
   (`net-wireless/broadcom-sta`) out-of-tree driver — build it against your kernel
   and load `wl`. Ethernet / USB-tether work out of the box.
-- **doas + the bspwm rice after the fact:** `doas ./setup-desktop.sh` installs doas
-  (somasis repo, or a source build) and the full Tokyo Night bspwm rice on an
-  already-running system — Xorg + bspwm/sxhkd/polybar/picom/dunst/rofi/dillo,
-  **st built from `suckless/st/config.h`**, the JetBrains Mono Nerd Font, and
-  physlock setuid — deploying the real configs from `bspwm/`. It's the Exherbo
-  counterpart of `bspwm/install.sh` (which covers Arch/KISS). `NO_DOAS=1` / `NO_WM=1`
-  skip either half; `KEYMAP=` overrides the `setxkbmap` line; `TARGET_USER=` picks
-  whose home gets the configs.
+- **doas + a suckless desktop after the fact:** `doas ./setup-desktop.sh` installs
+  doas (somasis repo, or a source build) and a **suckless desktop** on an
+  already-running system: **dwm** (WM + built-in bar), **dmenu** (launcher),
+  **st**, **slock**, and **surf** — each built from `git.suckless.org` with the
+  `config.h` in `../suckless/`, so no third-party package repos are needed for the
+  tools (only Xorg + the X libs come from cave). Writes a `~/.xinitrc` that feeds
+  dwm's bar a `ram · battery · date` status and `exec dwm`s. Keys (Super): Return
+  = st, d = dmenu, b = surf, Escape = slock. `NO_DOAS=1` / `NO_WM=1` skip either
+  half; `NO_SURF=1` skips surf's heavy WebKit build; `KEYMAP=` sets the layout;
+  `TARGET_USER=` picks whose home gets the session.
 - **Updating the kernel:** run `doas ./kernel-boot.sh` (or `doas env SLIM=1
   ./kernel-boot.sh` for a fast VM build) on the booted system — it fetches the
   current stable kernel, rebuilds it, and reinstalls the bootloader

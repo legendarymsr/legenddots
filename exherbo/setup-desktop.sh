@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Install doas + the legenddots bspwm rice on an ALREADY-INSTALLED Exherbo.
-# The Exherbo counterpart of bspwm/install.sh (which covers Arch/KISS): deploys
-# the real Tokyo Night configs, builds st from suckless/st/config.h, and pulls
-# the stack with cave. Run as root.
+# Install doas + a suckless desktop on an ALREADY-INSTALLED Exherbo: dwm (WM,
+# built-in bar), dmenu (launcher), st (terminal), slock (lock), surf (browser) —
+# all built from git.suckless.org with the config.h files in ../suckless/. No
+# third-party package repos needed for the tools themselves (they're source
+# builds); only Xorg + the X libraries come from cave. Run as root.
 #
 #   doas ./setup-desktop.sh
 #   TARGET_USER=legend KEYMAP=se ./setup-desktop.sh
 #
-# Env: TARGET_USER  whose ~ gets the configs (default: legend)
-#      KEYMAP       override the setxkbmap line in bspwmrc (default: keep repo's 'se')
+# Env: TARGET_USER  whose ~ gets the session (default: legend)
+#      KEYMAP       X keyboard layout in .xinitrc (default: se)
 #      NO_DOAS=1 / NO_WM=1   skip either half
+#      NO_SURF=1    skip surf (its WebKit dep is a huge build)
 # =============================================================================
 set -eu
 SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -65,72 +67,78 @@ if [ "${NO_DOAS:-}" != "1" ]; then
   fi
 fi
 
-# ── bspwm rice ────────────────────────────────────────────────────────────────
+# ── suckless desktop: dwm + dmenu + st + slock + surf (built from source) ─────
 if [ "${NO_WM:-}" != "1" ]; then
-  header "Installing Xorg + the bspwm rice (long compile)"
-  # Core: Xorg, input, bspwm/sxhkd, and st's build deps.
-  $RESOLVE xorg-server xinit xf86-input-libinput x11-libs/libX11 x11-libs/libXft \
-           dev-util/pkgconf dev-scm/git bspwm sxhkd \
-    || warn "core WM packages incomplete — check the cave output"
-  # Rice extras — several may live in third-party repos and not resolve; that's
-  # fine, bspwmrc backgrounds them so a missing one just doesn't launch.
-  $RESOLVE picom dunst rofi dillo physlock polybar \
-    || warn "some rice extras didn't resolve (bar/notifier/launcher/lock may be absent)"
+  header "Installing Xorg + the suckless build deps"
+  # Xorg + the X libraries the suckless tools compile against. The tools
+  # themselves are built from git.suckless.org below — no package repo needed.
+  $RESOLVE xorg-server xinit xf86-input-libinput \
+           x11-libs/libX11 x11-libs/libXft x11-libs/libXinerama x11-libs/libXext \
+           media-libs/fontconfig media-libs/freetype dev-util/pkgconf dev-scm/git \
+    || warn "some Xorg/X11 build deps didn't resolve — a suckless build may fail"
+  # surf needs WebKit (a big build). Skip it with NO_SURF=1.
+  if [ "${NO_SURF:-}" != "1" ]; then
+    $RESOLVE webkit gtk+ || warn "webkit/gtk didn't resolve — surf won't build (NO_SURF=1 to skip)"
+  fi
 
   if [ -z "$UH" ] || [ ! -d "$UH" ]; then
-    warn "no home dir for '$TARGET_USER' — set TARGET_USER= and re-run to drop configs"
+    warn "no home dir for '$TARGET_USER' — set TARGET_USER= and re-run"
   else
-    # ── st, built from your suckless config.h (Tokyo Night) ──
-    header "Building st from suckless/st/config.h"
-    SRC="$UH/.local/src/st"
-    mkdir -p "$(dirname "$SRC")"
-    [ -d "$SRC/.git" ] || git clone https://git.suckless.org/st "$SRC" 2>/dev/null \
-      || warn "st clone failed — build it by hand from suckless/st/config.h"
-    if [ -d "$SRC" ] && [ -f "$REPO/suckless/st/config.h" ]; then
-      cp "$REPO/suckless/st/config.h" "$SRC/config.h"
+    # Build one suckless tool from git.suckless.org with your repo's config.h.
+    build_sl() {
+      t="$1"; SRC="$UH/.local/src/$t"
+      mkdir -p "$(dirname "$SRC")"
+      [ -d "$SRC/.git" ] || git clone "https://git.suckless.org/$t" "$SRC" 2>/dev/null \
+        || { warn "$t: clone failed"; return 1; }
+      [ -f "$REPO/suckless/$t/config.h" ] && cp "$REPO/suckless/$t/config.h" "$SRC/config.h"
       ( cd "$SRC" && make clean >/dev/null 2>&1 || true; make && make install ) \
-        && printf '%bst installed (Tokyo Night).%b\n' "$GRN" "$NC" \
-        || warn "st build failed (needs libX11/libXft/pkgconf) — super+Return needs st"
-    fi
+        && printf '%b%s installed%b\n' "$GRN" "$t" "$NC" || { warn "$t: build failed"; return 1; }
+    }
 
-    # ── deploy the real configs ──
-    header "Deploying the rice configs to ${UH}"
-    mkdir -p "$UH/.config/bspwm" "$UH/.config/sxhkd" "$UH/.config/polybar" \
-             "$UH/.config/picom" "$UH/.config/rofi" "$UH/.config/dunst" "$UH/.dillo"
-    cp "$REPO/bspwm/bspwmrc"            "$UH/.config/bspwm/bspwmrc"    && chmod +x "$UH/.config/bspwm/bspwmrc"
-    cp "$REPO/bspwm/sxhkdrc"            "$UH/.config/sxhkd/sxhkdrc"
-    cp "$REPO/bspwm/polybar/config.ini" "$UH/.config/polybar/config.ini"
-    cp "$REPO/bspwm/polybar/launch.sh"  "$UH/.config/polybar/launch.sh" && chmod +x "$UH/.config/polybar/launch.sh"
-    cp "$REPO/bspwm/picom.conf"         "$UH/.config/picom/picom.conf"
-    cp "$REPO/bspwm/rofi/config.rasi"   "$UH/.config/rofi/config.rasi"   2>/dev/null || true
-    cp "$REPO/bspwm/dunst/dunstrc"      "$UH/.config/dunst/dunstrc"      2>/dev/null || true
-    cp "$REPO/scripts/dillo/dillorc"    "$UH/.dillo/dillorc"             2>/dev/null || true
-    cp "$REPO/scripts/dillo/cookiesrc"  "$UH/.dillo/cookiesrc"           2>/dev/null || true
-    # Optional keymap override (bspwmrc already ships 'setxkbmap se').
-    [ -n "$KEYMAP" ] && sed -i "s/^setxkbmap .*/setxkbmap $KEYMAP/" "$UH/.config/bspwm/bspwmrc"
-    printf 'exec bspwm\n' > "$UH/.xinitrc"
+    header "Building the suckless tools (dwm · dmenu · st · slock · surf)"
+    build_sl dwm
+    build_sl dmenu
+    build_sl st
+    build_sl slock
+    [ "${NO_SURF:-}" = "1" ] || build_sl surf
 
-    # ── JetBrains Mono Nerd Font (polybar's font — best effort) ──
+    # ── session: dwm + a status loop feeding dwm's built-in bar ──
+    header "Writing ~/.xinitrc (dwm + status bar)"
+    cat > "$UH/.xinitrc" <<XINIT
+#!/bin/sh
+setxkbmap ${KEYMAP:-se}
+# dwm's bar shows the root window name — feed it ram · battery · date.
+while :; do
+  ram=\$(free -m 2>/dev/null | awk '/Mem:/{printf "%d%%", (\$3/\$2)*100}')
+  bat=\$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
+  [ -n "\$bat" ] && bat=" · bat \${bat}%"
+  xsetroot -name "ram \${ram}\${bat} · \$(date '+%a %d %b %H:%M')"
+  sleep 3
+done &
+exec dwm
+XINIT
+
+    # ── JetBrains Mono Nerd Font (best effort) ──
     FD="$UH/.local/share/fonts"; mkdir -p "$FD"
     if command -v unzip >/dev/null 2>&1; then
       dl_file "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip" /tmp/jbm.zip 2>/dev/null \
         && unzip -oq /tmp/jbm.zip -d "$FD" 2>/dev/null \
         && { command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null 2>&1 || true; } \
         && printf '%bJetBrainsMono Nerd Font installed.%b\n' "$GRN" "$NC" \
-        || warn "nerd font fetch failed — polybar falls back to a default font"
+        || warn "nerd font fetch failed — dwm/st fall back to a default font"
     else
-      warn "unzip missing — skipping the nerd font (polybar uses a default font)"
+      warn "unzip missing — skipping the nerd font"
     fi
 
-    chown -R "$TARGET_USER:$TARGET_USER" "$UH/.config" "$UH/.xinitrc" "$UH/.dillo" "$UH/.local" 2>/dev/null || true
+    chown -R "$TARGET_USER:$TARGET_USER" "$UH/.xinitrc" "$UH/.local" 2>/dev/null || true
   fi
 
-  # physlock must be setuid root to lock every VT.
-  for p in /usr/bin/physlock /usr/local/bin/physlock; do
-    [ -x "$p" ] && chmod u+s "$p" 2>/dev/null && printf 'physlock setuid: %s\n' "$p" || true
+  # slock must be setuid root to lock the screen and authenticate.
+  for p in /usr/bin/slock /usr/local/bin/slock; do
+    [ -x "$p" ] && chmod u+s "$p" 2>/dev/null && printf 'slock setuid: %s\n' "$p" || true
   done
 fi
 
 header "setup-desktop complete"
-printf 'As %s: %bstartx%b   (super+Return = st · super+p = rofi · super+w = dillo · super+shift+x = lock)\n' \
+printf 'As %s: %bstartx%b   (Mod+Return = st · Mod+d = dmenu · Mod+b = surf · Mod+Escape = slock · Mod+shift+q = kill — keys in suckless/dwm/config.h)\n' \
   "$TARGET_USER" "$GRN" "$NC"
