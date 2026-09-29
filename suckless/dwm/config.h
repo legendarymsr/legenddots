@@ -41,7 +41,7 @@ static const char *termcmd[] = { "st", NULL };
 static const Key keys[] = {
  { MODKEY, XK_d, spawn, {.v = dmenucmd } },
  { MODKEY, XK_Return, spawn, {.v = termcmd } },
- { MODKEY, XK_b, spawn, SHCMD("icecat") },
+ { MODKEY, XK_b, spawn, SHCMD("surf") },
  { MODKEY, XK_e, spawn, SHCMD("emacs") },
  { MODKEY, XK_Escape, spawn, SHCMD("slock") },
  { MODKEY|ShiftMask, XK_b, togglebar, {0} },
