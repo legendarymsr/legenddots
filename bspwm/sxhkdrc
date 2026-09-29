@@ -7,11 +7,11 @@ super + Return
 super + p
 	rofi -show drun
 super + w
-	dillo
+	surf
 
-# lock (TTY-style, locks every VT)
+# lock the X screen
 super + shift + x
-	physlock
+	slock
 
 # reload sxhkd · restart bspwm · quit bspwm
 super + Escape

@@ -32,14 +32,11 @@ deploy_configs() {
     info "Linking configs..."
     link "$REPO_DIR/bspwmrc"            "$HOME/.config/bspwm/bspwmrc"
     link "$REPO_DIR/sxhkdrc"            "$HOME/.config/sxhkd/sxhkdrc"
-    link "$REPO_DIR/polybar/config.ini" "$HOME/.config/polybar/config.ini"
-    link "$REPO_DIR/polybar/launch.sh"  "$HOME/.config/polybar/launch.sh"
+    link "$REPO_DIR/lemonbar/bar.sh"    "$HOME/.config/lemonbar/bar.sh"
     link "$REPO_DIR/picom.conf"         "$HOME/.config/picom/picom.conf"
     link "$REPO_DIR/rofi/config.rasi"   "$HOME/.config/rofi/config.rasi"
     link "$REPO_DIR/dunst/dunstrc"      "$HOME/.config/dunst/dunstrc"
-    # Dillo reads its config ONLY from ~/.dillo/ (no XDG). Link the repo's copy.
-    link "$REPO_DIR/../scripts/dillo/dillorc"   "$HOME/.dillo/dillorc"
-    link "$REPO_DIR/../scripts/dillo/cookiesrc" "$HOME/.dillo/cookiesrc"
+    # surf is configured at compile time (like st) — no config file to link.
 
     info "Installing the ly config and the bspwm session..."
     [[ -e /etc/ly/config.ini && ! -L /etc/ly/config.ini ]] && $SUDO cp -n /etc/ly/config.ini /etc/ly/config.ini.bak || true
@@ -66,19 +63,19 @@ build_st() {
 }
 
 finish() {
-    if [[ -x /usr/bin/physlock ]]; then
-        $SUDO chmod u+s /usr/bin/physlock && success "physlock setuid" || warn "couldn't setuid physlock"
+    if [[ -x /usr/bin/slock ]]; then
+        $SUDO chmod u+s /usr/bin/slock && success "slock setuid" || warn "couldn't setuid slock"
     else
-        warn "physlock not installed — the super+shift+x lock won't work until it is"
+        warn "slock not installed — the super+shift+x lock won't work until it is"
     fi
 }
 
 # ── Arch ──────────────────────────────────────────────────────────────────────
 install_arch() {
     local PKGS=(
-        bspwm sxhkd polybar
-        picom rofi dunst dillo
-        ly physlock
+        bspwm sxhkd lemonbar                 # lemonbar is AUR on Arch (lemonbar-git)
+        picom rofi dunst surf
+        ly slock
         xorg-server xorg-xinit
         git make gcc pkgconf libx11 libxft   # to build st from your config.h
         ttf-jetbrains-mono-nerd
@@ -101,7 +98,7 @@ install_kiss() {
     info "Building packages (kiss)... (names can vary by repo revision)"
     for pkg in xorg-server xinit xsetroot \
                libx11 libxext libxft libxinerama libxrandr \
-               bspwm sxhkd polybar picom rofi dunst physlock dillo \
+               bspwm sxhkd lemonbar picom rofi dunst slock surf \
                git pkgconf ttf-dejavu ly; do
         if kiss build "$pkg" && kiss install "$pkg"; then success "$pkg"
         else warn "$pkg not in KISS_PATH — build it by hand later"; fi
@@ -130,4 +127,4 @@ else
     die "no supported package manager found (need pacman for Arch or kiss for KISS)"
 fi
 
-echo "Keys: super+Return = st · super+p = rofi · super+w = dillo · super+shift+x = lock · super+{h,j,k,l} = focus · super+alt+q = quit"
+echo "Keys: super+Return = st · super+p = rofi · super+w = surf · super+shift+x = lock (slock) · super+{h,j,k,l} = focus · super+alt+q = quit"
