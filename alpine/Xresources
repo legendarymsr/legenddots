@@ -1,0 +1,32 @@
+! ~/.Xresources — Tokyo Night for xterm (runtime config; no config.h, no rebuild).
+! Loaded by ~/.xinitrc via `xrdb -merge`. This is st's config.h, moved to a
+! runtime dotfile so it fits a slow RISC-V board.
+
+xterm*faceName:    JetBrainsMono Nerd Font
+xterm*faceSize:    11
+xterm*termName:    xterm-256color
+xterm*saveLines:   8192
+xterm*scrollBar:   false
+xterm*metaSendsEscape: true
+xterm*selectToClipboard: true
+
+! Tokyo Night palette
+xterm*background:  #1a1b26
+xterm*foreground:  #c0caf5
+xterm*cursorColor: #c0caf5
+xterm*color0:  #15161e
+xterm*color1:  #f7768e
+xterm*color2:  #9ece6a
+xterm*color3:  #e0af68
+xterm*color4:  #7aa2f7
+xterm*color5:  #bb9af7
+xterm*color6:  #7dcfff
+xterm*color7:  #a9b1d6
+xterm*color8:  #414868
+xterm*color9:  #f7768e
+xterm*color10: #9ece6a
+xterm*color11: #e0af68
+xterm*color12: #7aa2f7
+xterm*color13: #bb9af7
+xterm*color14: #7dcfff
+xterm*color15: #c0caf5
