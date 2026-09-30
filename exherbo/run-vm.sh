@@ -190,7 +190,7 @@ if [[ "$MODE" == "repair" ]]; then
     die "couldn't read a kernel from the disk (your host kernel has no nbd module). Either:
     • install libguestfs for a no-root, no-nbd repair:  doas emerge app-emulation/libguestfs
     • or rebuild via the CD (works with what you have):  ./run-vm.sh install
-        then in the live CD:  SLIM=1 DISK=/dev/vda ./exherbo/finish-boot.sh"
+        then in the live CD:  DISK=/dev/vda ./exherbo/finish-boot.sh"
   fi
   echo "  root=PARTUUID=$REPAIR_ROOT"
 fi
