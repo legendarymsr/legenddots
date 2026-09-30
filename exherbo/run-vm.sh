@@ -138,40 +138,60 @@ fi
 #    and best-effort restore \EFI\BOOT\BOOTX64.EFI so normal boot may work again.
 REPAIR_KERNEL="$VM_DIR/repair-kernel"; REPAIR_ROOT=""
 if [[ "$MODE" == "repair" ]]; then
-  command -v qemu-nbd >/dev/null 2>&1 || die "qemu-nbd not found (it ships with qemu)"
-  command -v doas    >/dev/null 2>&1 || die "need doas for qemu-nbd + mount"
   header "Repair — pulling a kernel out of $DISK to boot it directly"
-  echo -e "  ${CYAN}doas will ask for YOUR login password (user ${USER_NAME}) — once.${NC}"
-  # Everything root-side runs under ONE doas call, so a mistype can't stack into
-  # a lockout. Status goes to stderr; the root PARTUUID is the only stdout line.
-  REPAIR_ROOT="$(doas env DISK="$DISK" VM_DIR="$VM_DIR" REPAIR_KERNEL="$REPAIR_KERNEL" USER_NAME="$USER_NAME" bash -c '
-    set -u
-    NBD=/dev/nbd0; MP="$VM_DIR/.esp"
-    modprobe nbd max_part=8 2>/dev/null || true
-    qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
-    qemu-nbd --connect="$NBD" -f qcow2 "$DISK" 1>&2 || { echo "  qemu-nbd connect failed" >&2; exit 0; }
-    sleep 1; partprobe "$NBD" 2>/dev/null || true; sleep 1
-    mkdir -p "$MP"
-    if mount "${NBD}p1" "$MP" 2>/dev/null; then
-      K="$(ls -1t "$MP"/vmlinuz-* 2>/dev/null | head -1)"
-      [ -z "$K" ] && [ -f "$MP/EFI/BOOT/BOOTX64.EFI" ] && K="$MP/EFI/BOOT/BOOTX64.EFI"
-      if [ -n "$K" ]; then
-        cp "$K" "$REPAIR_KERNEL" && chown "$USER_NAME" "$REPAIR_KERNEL"
-        echo "  kernel: $(basename "$K")" >&2
-        cp "$K" "$MP/EFI/BOOT/BOOTX64.EFI.new" 2>/dev/null \
-          && mv -f "$MP/EFI/BOOT/BOOTX64.EFI.new" "$MP/EFI/BOOT/BOOTX64.EFI" 2>/dev/null \
-          && echo "  restored BOOTX64.EFI" >&2
+
+  # ── Method 1: libguestfs — reads the disk image with NO root and NO nbd
+  #    module (it spins up its own tiny appliance). The clean path; install with
+  #    `doas emerge app-emulation/libguestfs` (Gentoo) / `libguestfs` elsewhere.
+  if command -v guestfish >/dev/null 2>&1; then
+    echo "  using libguestfs (no password, no nbd needed)"
+    rm -f "$VM_DIR"/vmlinuz-* 2>/dev/null || true
+    guestfish --ro -a "$DISK" run : mount /dev/sda1 / : glob copy-out '/vmlinuz-*' "$VM_DIR" >/dev/null 2>&1 || true
+    K="$(ls -1t "$VM_DIR"/vmlinuz-* 2>/dev/null | head -1)"
+    [[ -n "$K" ]] && mv -f "$K" "$REPAIR_KERNEL"
+    REPAIR_ROOT="$(guestfish --ro -a "$DISK" run : part-get-gpt-guid /dev/sda 3 2>/dev/null | tr 'A-Z' 'a-z' | tr -cd '0-9a-f-')"
+    [[ -f "$REPAIR_KERNEL" && -n "$REPAIR_ROOT" ]] && echo "  kernel: $(basename "$REPAIR_KERNEL")"
+  fi
+
+  # ── Method 2: qemu-nbd — needs the host `nbd` kernel MODULE + one doas
+  #    password. Only tried if libguestfs didn't already do it.
+  if [[ ! -f "$REPAIR_KERNEL" || -z "$REPAIR_ROOT" ]] \
+     && command -v qemu-nbd >/dev/null 2>&1 && command -v doas >/dev/null 2>&1; then
+    echo -e "  ${CYAN}qemu-nbd path — doas asks for YOUR login password (user ${USER_NAME}) once.${NC}"
+    REPAIR_ROOT="$(doas env DISK="$DISK" VM_DIR="$VM_DIR" REPAIR_KERNEL="$REPAIR_KERNEL" USER_NAME="$USER_NAME" bash -c '
+      set -u
+      NBD=/dev/nbd0; MP="$VM_DIR/.esp"
+      modprobe nbd max_part=8 2>/dev/null || { echo "  no nbd module in this host kernel" >&2; exit 0; }
+      qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
+      qemu-nbd --connect="$NBD" -f qcow2 "$DISK" 1>&2 || { echo "  qemu-nbd connect failed" >&2; exit 0; }
+      sleep 1; partprobe "$NBD" 2>/dev/null || true; sleep 1
+      mkdir -p "$MP"
+      if mount "${NBD}p1" "$MP" 2>/dev/null; then
+        K="$(ls -1t "$MP"/vmlinuz-* 2>/dev/null | head -1)"
+        [ -z "$K" ] && [ -f "$MP/EFI/BOOT/BOOTX64.EFI" ] && K="$MP/EFI/BOOT/BOOTX64.EFI"
+        if [ -n "$K" ]; then
+          cp "$K" "$REPAIR_KERNEL" && chown "$USER_NAME" "$REPAIR_KERNEL"
+          echo "  kernel: $(basename "$K")" >&2
+          cp "$K" "$MP/EFI/BOOT/BOOTX64.EFI.new" 2>/dev/null \
+            && mv -f "$MP/EFI/BOOT/BOOTX64.EFI.new" "$MP/EFI/BOOT/BOOTX64.EFI" 2>/dev/null \
+            && echo "  restored BOOTX64.EFI" >&2
+        fi
+        umount "$MP" 2>/dev/null || true
+      else
+        echo "  could not mount the ESP (${NBD}p1)" >&2
       fi
-      umount "$MP" 2>/dev/null || true
-    else
-      echo "  could not mount the ESP (${NBD}p1)" >&2
-    fi
-    blkid -s PARTUUID -o value "${NBD}p3" 2>/dev/null
-    qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
-    rmdir "$MP" 2>/dev/null || true
-  ')"
-  [[ -f "$REPAIR_KERNEL" ]] || die "no kernel on the ESP (or doas/qemu-nbd failed) — rebuild via the CD:  ./run-vm.sh install  then  SLIM=1 DISK=/dev/vda ./exherbo/finish-boot.sh"
-  [[ -n "$REPAIR_ROOT" ]]   || die "couldn't read the root PARTUUID"
+      blkid -s PARTUUID -o value "${NBD}p3" 2>/dev/null
+      qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
+      rmdir "$MP" 2>/dev/null || true
+    ')"
+  fi
+
+  if [[ ! -f "$REPAIR_KERNEL" || -z "$REPAIR_ROOT" ]]; then
+    die "couldn't read a kernel from the disk (your host kernel has no nbd module). Either:
+    • install libguestfs for a no-root, no-nbd repair:  doas emerge app-emulation/libguestfs
+    • or rebuild via the CD (works with what you have):  ./run-vm.sh install
+        then in the live CD:  SLIM=1 DISK=/dev/vda ./exherbo/finish-boot.sh"
+  fi
   echo "  root=PARTUUID=$REPAIR_ROOT"
 fi
 
