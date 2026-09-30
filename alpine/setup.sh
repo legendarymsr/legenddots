@@ -25,7 +25,7 @@ warn() { printf '%b!! %s%b\n' "$YEL" "$*" "$NC"; }
 TARGET_USER="${TARGET_USER:-legend}"
 KEYMAP="${KEYMAP:-us}"
 
-# ── enable the community repo (bspwm, sxhkd, vis, dmenu live there) ───────────
+# ── enable the community repo (bspwm, sxhkd, vis, bemenu live there) ───────────
 if ! grep -qE '^[^#].*/community$' /etc/apk/repositories 2>/dev/null; then
   say "enabling the community repository"
   sed -i -E 's|^#(\s*https?://.*/community)$|\1|' /etc/apk/repositories || true
@@ -37,7 +37,7 @@ say "installing Xorg + bspwm + xterm + vis + lynx (binary packages)"
 apk add \
   xorg-server xinit xf86-input-libinput xf86-video-fbdev \
   xrdb setxkbmap xsetroot \
-  bspwm sxhkd dmenu xterm \
+  bspwm sxhkd bemenu xterm \
   vis lynx \
   || warn "core install had issues — check the apk output above"
 # fonts are best-effort (name varies); xterm falls back to a default otherwise
@@ -76,13 +76,13 @@ bspc config focus_follows_pointer true
 BSPWM
 chmod +x "$UH/.config/bspwm/bspwmrc"
 
-# sxhkdrc — xterm terminal, dmenu launcher (themed by flags, not a rebuild),
-# lynx + vis in a terminal.
+# sxhkdrc — xterm terminal, bemenu launcher (themed by flags at runtime, no
+# config.h rebuild), lynx + vis in a terminal.
 cat > "$UH/.config/sxhkd/sxhkdrc" <<'SXHKD'
 super + Return
 	xterm
 super + p
-	dmenu_run -nb '#1a1b26' -nf '#c0caf5' -sb '#7aa2f7' -sf '#1a1b26'
+	bemenu-run -nb '#1a1b26' -nf '#c0caf5' -hb '#7aa2f7' -hf '#1a1b26' -fn 'JetBrainsMono Nerd Font 11'
 super + w
 	xterm -e lynx
 super + e
@@ -134,4 +134,4 @@ chown -R "$TARGET_USER:$TARGET_USER" \
 
 say "done"
 printf '%bLog in as %s, then: startx%b\n' "$GRN" "$TARGET_USER" "$NC"
-printf 'Keys: super+Return xterm · super+p dmenu · super+w lynx · super+e vis · super+{h,j,k,l} focus · super+shift+Esc quit\n'
+printf 'Keys: super+Return xterm · super+p bemenu · super+w lynx · super+e vis · super+{h,j,k,l} focus · super+shift+Esc quit\n'
