@@ -10,7 +10,7 @@
 #   tmux.conf                    -> ~/.config/tmux/tmux.conf          (tmux 3.1+)
 #   suckless/screen/screenrc     -> ~/.screenrc                        (GNU Screen)
 #   suckless/vis/visrc.lua       -> ~/.config/vis/visrc.lua            (vis: Lua, no VimL)
-#   suckless/vis/themes/*.lua    -> ~/.config/vis/themes/tokyonight.lua (Tokyo Night)
+#   suckless/vis/themes/*.lua    -> $PREFIX/share/vis/themes/tokyonight.lua (Tokyo Night)
 #   suckless/vi/exrc             -> ~/.exrc                             (POSIX vi baseline)
 #   termux/colors.properties     -> ~/.termux/colors.properties         (Tokyo Night terminal)
 set -u
@@ -61,7 +61,9 @@ link "$REPO/init.lua"                           "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"                           "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"            "$HOME/.screenrc"
 link "$REPO/suckless/vis/visrc.lua"              "$HOME/.config/vis/visrc.lua"
-link "$REPO/suckless/vis/themes/tokyonight.lua"  "$HOME/.config/vis/themes/tokyonight.lua"
+# vis only searches its INSTALL theme dir ($PREFIX/share/vis/themes), never
+# ~/.config/vis/themes — so the theme has to go there for `set theme` to find it.
+link "$REPO/suckless/vis/themes/tokyonight.lua"  "$PREFIX/share/vis/themes/tokyonight.lua"
 link "$REPO/suckless/vi/exrc"                    "$HOME/.exrc"
 link "$REPO/termux/colors.properties"            "$HOME/.termux/colors.properties"
 
