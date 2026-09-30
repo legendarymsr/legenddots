@@ -11,6 +11,7 @@
 #   suckless/vis/visrc.lua       -> ~/.config/vis/visrc.lua            (vis: Lua, no VimL)
 #   suckless/vis/themes/*.lua    -> ~/.config/vis/themes/tokyonight.lua (Tokyo Night)
 #   suckless/vi/exrc             -> ~/.exrc                             (POSIX vi baseline)
+#   termux/colors.properties     -> ~/.termux/colors.properties         (Tokyo Night terminal)
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -49,6 +50,7 @@ link "$REPO/suckless/screen/screenrc"            "$HOME/.screenrc"
 link "$REPO/suckless/vis/visrc.lua"              "$HOME/.config/vis/visrc.lua"
 link "$REPO/suckless/vis/themes/tokyonight.lua"  "$HOME/.config/vis/themes/tokyonight.lua"
 link "$REPO/suckless/vi/exrc"                    "$HOME/.exrc"
+link "$REPO/termux/colors.properties"            "$HOME/.termux/colors.properties"
 
 # 4. cleanup of earlier versions of this script:
 #  a) it used to link ~/.vimrc to the (now removed) vim config — drop that dangling link
@@ -69,6 +71,12 @@ for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
   fi
 done
 
+# 5. apply the Termux terminal colours right away (no-op off Termux)
+if command -v termux-reload-settings >/dev/null 2>&1; then
+  termux-reload-settings && say "reloaded Termux settings — Tokyo Night terminal applied"
+fi
+
 echo
 say "Done. Packages: pkg install neovim tmux screen vis git"
 say "vis uses ~/.config/vis/visrc.lua (Tokyo Night); ~/.exrc is the vi baseline."
+say "Termux terminal is themed via ~/.termux/colors.properties (Tokyo Night)."

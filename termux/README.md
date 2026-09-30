@@ -157,6 +157,7 @@ bash ~/legenddots/termux/dotfiles.sh
 | `suckless/vis/visrc.lua` | `~/.config/vis/visrc.lua` — vis config (Lua, no VimL) |
 | `suckless/vis/themes/tokyonight.lua` | `~/.config/vis/themes/tokyonight.lua` — Tokyo Night |
 | `suckless/vi/exrc` | `~/.exrc` — POSIX vi baseline (nvi / traditional vi) |
+| `termux/colors.properties` | `~/.termux/colors.properties` — Tokyo Night terminal (auto `termux-reload-settings`) |
 
 Re-run it any time to update — it does the `git pull` for you, and because the
 links are stable it's idempotent.
