@@ -50,6 +50,7 @@ in
     # Runtime dotfiles for the two non-config.h tools.
     home.file.".screenrc" = lib.mkIf cfg.screen.enable { source = ./screen/screenrc; };
     home.file.".config/vis/visrc.lua" = lib.mkIf cfg.vis.enable { source = ./vis/visrc.lua; };
+    home.file.".config/vis/themes/tokyonight.lua" = lib.mkIf cfg.vis.enable { source = ./vis/themes/tokyonight.lua; };
     home.file.".exrc" = lib.mkIf cfg.vis.enable { source = ./vi/exrc; };
   };
 }
