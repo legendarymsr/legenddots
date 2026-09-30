@@ -45,6 +45,17 @@ link() {
 }
 
 # 3. the phone dotfiles
+
+# make our .zshrc authoritative: remove any existing zsh rc (a real file, or a
+# foreign symlink from another setup) so nothing shadows it — link recreates it.
+for z in "$HOME/.zshrc" "$HOME/.zshrc.pre-oh-my-zsh"; do
+  { [ -e "$z" ] || [ -L "$z" ]; } || continue
+  case "$(readlink "$z" 2>/dev/null)" in
+    */legenddots/.zshrc) ;;                        # already ours — keep
+    *) rm -f "$z" && say "removed existing zsh config: $z" ;;
+  esac
+done
+
 link "$REPO/.zshrc"                              "$HOME/.zshrc"
 link "$REPO/init.lua"                           "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"                           "$HOME/.config/tmux/tmux.conf"
@@ -78,8 +89,18 @@ if command -v termux-reload-settings >/dev/null 2>&1; then
   termux-reload-settings && say "reloaded Termux settings — Tokyo Night terminal applied"
 fi
 
+# 6. make zsh the default login shell (Termux only — don't touch a desktop shell)
+if { [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux ]; } \
+   && command -v zsh >/dev/null 2>&1 && command -v chsh >/dev/null 2>&1; then
+  case "${SHELL:-}" in
+    */zsh) say "zsh is already the default shell" ;;
+    *) chsh -s zsh && say "default shell -> zsh (restart Termux to apply)" \
+         || warn "chsh -s zsh failed — run 'chsh -s zsh' yourself" ;;
+  esac
+fi
+
 echo
 say "Done. Packages: pkg install zsh neovim tmux screen vis git"
-say "zsh: make it default with  chsh -s zsh  (restart Termux after)."
+say "zsh set as default (restart Termux to take effect); ~/.zshrc is yours."
 say "vis uses ~/.config/vis/visrc.lua (Tokyo Night); ~/.exrc is the vi baseline."
 say "Termux terminal is themed via ~/.termux/colors.properties (Tokyo Night)."
