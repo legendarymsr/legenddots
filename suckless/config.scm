@@ -42,6 +42,6 @@
   (list st-legend slock-legend dmenu-legend dwm-legend dwl-legend))
 
 ;; screen is a stock Guix package (not rebuilt); its ~/.screenrc is placed by
-;; home-configuration.scm, which also places a minimal ~/.vimrc (vim not installed
-;; here). Returned value: a manifest, so `guix shell -m` works directly.
+;; home-configuration.scm, which also places visrc.lua + a POSIX ~/.exrc (no editor
+;; installed here). Returned value: a manifest, so `guix shell -m` works directly.
 (packages->manifest (append %suckless-packages (list screen)))

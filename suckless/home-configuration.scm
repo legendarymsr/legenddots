@@ -39,8 +39,9 @@
   (list st-legend slock-legend dmenu-legend dwm-legend dwl-legend))
 
 ;; screen is a stock Guix package (not rebuilt); its ~/.screenrc is placed below.
-;; vim is config-only — a minimal ~/.vimrc is placed too, but vim itself isn't
-;; installed here (add it yourself).
+;; vis is config-only — visrc.lua + a POSIX ~/.exrc are placed too, but no editor
+;; is installed here (add vis or nvi yourself). vim was dropped: Vimscript is a
+;; bespoke config DSL, exactly what this collection avoids.
 (home-environment
   (packages (append %suckless-packages (list screen)))
   (services
@@ -48,4 +49,5 @@
     (simple-service 'legend-suckless-dotfiles
                     home-files-service-type
                     (list `(".screenrc" ,(local-file "screen/screenrc"))
-                          `(".vimrc"    ,(local-file "vim/vimrc")))))))
+                          `(".config/vis/visrc.lua" ,(local-file "vis/visrc.lua"))
+                          `(".exrc"     ,(local-file "vi/exrc")))))))
