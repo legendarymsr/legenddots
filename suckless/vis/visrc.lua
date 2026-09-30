@@ -8,9 +8,8 @@
 require('vis')
 
 vis.events.subscribe(vis.events.INIT, function()
-	-- A dark 16-colour theme out of the box. To match st/dwm exactly, drop a
-	-- Tokyo Night theme in ~/.config/vis/themes/ and `set theme tokyonight`.
-	vis:command('set theme dark-16')
+	-- Tokyo Night, matching st/dwm (themes/tokyonight.lua → ~/.config/vis/themes/).
+	vis:command('set theme tokyonight')
 end)
 
 vis.events.subscribe(vis.events.WIN_OPEN, function(win)

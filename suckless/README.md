@@ -31,10 +31,11 @@ Unlike everything above, these are **runtime dotfiles**, not compile-time `confi
 | **swaylock** | Wayland screen locker (dwl's `Mod+Esc`) | `swaylock/config` | `~/.config/swaylock/config` |
 
 ```sh
-ln -sfn "$PWD/screen/screenrc" ~/.screenrc
-ln -sfn "$PWD/vis/visrc.lua"   ~/.config/vis/visrc.lua
-ln -sfn "$PWD/vi/exrc"         ~/.exrc
-ln -sfn "$PWD/foot/foot.ini"   ~/.config/foot/foot.ini
+ln -sfn "$PWD/screen/screenrc"           ~/.screenrc
+ln -sfn "$PWD/vis/visrc.lua"             ~/.config/vis/visrc.lua
+ln -sfn "$PWD/vis/themes/tokyonight.lua" ~/.config/vis/themes/tokyonight.lua
+ln -sfn "$PWD/vi/exrc"                   ~/.exrc
+ln -sfn "$PWD/foot/foot.ini"             ~/.config/foot/foot.ini
 ln -sfn "$PWD/wmenu/menu"      ~/.local/bin/menu          # dwl runs `menu` on Mod+d
 ln -sfn "$PWD/swaylock/config" ~/.config/swaylock/config  # dwl locks with Mod+Esc
 ```
@@ -78,7 +79,8 @@ language: a one-program DSL you must learn to configure one program. So vim's ou
   **structural regular expressions** (sam) underneath, configured in **Lua** — a
   general-purpose language, not a DSL — and *legacy-free*, so unlike Neovim it
   carries no Vimscript at all. `visrc.lua` is the whole config: line numbers,
-  autoindent, 4-space expandtab, a dark theme; edit and restart, no rebuild.
+  autoindent, 4-space expandtab, and the **Tokyo Night** theme
+  (`vis/themes/tokyonight.lua`, matching st); edit and restart, no rebuild.
   Install `app-editors/vis` (Gentoo) / `vis` (Arch / nixpkgs / Guix).
 - **vi** (`vi/exrc`) — the portable baseline. A `~/.exrc` of nothing but POSIX
   `set`s (`autoindent`, `shiftwidth`/`tabstop=4`, `showmatch`, `number`) that

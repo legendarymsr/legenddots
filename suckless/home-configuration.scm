@@ -50,4 +50,5 @@
                     home-files-service-type
                     (list `(".screenrc" ,(local-file "screen/screenrc"))
                           `(".config/vis/visrc.lua" ,(local-file "vis/visrc.lua"))
+                          `(".config/vis/themes/tokyonight.lua" ,(local-file "vis/themes/tokyonight.lua"))
                           `(".exrc"     ,(local-file "vi/exrc")))))))
