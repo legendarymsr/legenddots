@@ -12,6 +12,10 @@
 #   ./run-vm.sh            first run -> INSTALL (inside: DISK=/dev/vda ./install.sh)
 #                          after     -> BOOT the installed system
 #   ./run-vm.sh install    force install mode again
+#   ./run-vm.sh repair     BOOT WON'T WORK? direct-boot the disk's kernel via
+#                          -kernel (bypasses a broken/missing ESP bootloader),
+#                          and best-effort restore \EFI\BOOT\BOOTX64.EFI. One
+#                          command, no live CD. Needs qemu-nbd + doas.
 #   ./run-vm.sh /path.iso  install with a specific ISO
 #
 # Tunables (env): VM_DIR DISK_SIZE MEM CPUS FW_CODE FW_VARS DISPLAY_TYPE
@@ -102,9 +106,10 @@ ensure_kvm_access "$@"
 command -v qemu-img >/dev/null 2>&1 || die "qemu-img not found — app-emulation/qemu didn't install right"
 mkdir -p "$VM_DIR"
 
-# ── Mode: install vs boot ─────────────────────────────────────────────────────
+# ── Mode: install vs boot vs repair ───────────────────────────────────────────
 ARG="${1:-}"; ISO=""
 if [[ "$ARG" == "install" ]]; then MODE="install"; ISO="${2:-}"
+elif [[ "$ARG" == "repair" ]];  then MODE="repair"
 elif [[ -n "$ARG" ]];       then MODE="install"; ISO="$ARG"
 elif [[ -f "$DISK" ]];      then MODE="boot"
 else                             MODE="install"
@@ -127,6 +132,43 @@ if [[ ! -f "$NVRAM" || "$MODE" == "install" ]]; then
   cp "$FW_VARS" "$NVRAM"
 fi
 [[ -f "$DISK" ]]  || { header "Creating disk $DISK ($DISK_SIZE)"; qemu-img create -f qcow2 "$DISK" "$DISK_SIZE"; }
+
+# ── Repair mode: boot the disk directly via -kernel, bypassing a broken ESP
+#    bootloader. Pull a kernel + the root PARTUUID out of the disk with qemu-nbd,
+#    and best-effort restore \EFI\BOOT\BOOTX64.EFI so normal boot may work again.
+REPAIR_KERNEL="$VM_DIR/repair-kernel"; REPAIR_ROOT=""
+if [[ "$MODE" == "repair" ]]; then
+  command -v qemu-nbd >/dev/null 2>&1 || die "qemu-nbd not found (it ships with qemu)"
+  command -v doas    >/dev/null 2>&1 || die "need doas for qemu-nbd + mount"
+  header "Repair — pulling a kernel out of $DISK to boot it directly"
+  NBD=/dev/nbd0; ESPMP="$VM_DIR/.esp"
+  doas modprobe nbd max_part=8 2>/dev/null || true
+  doas qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
+  doas qemu-nbd --connect="$NBD" -f qcow2 "$DISK" || die "qemu-nbd connect failed"
+  sleep 1; doas partprobe "$NBD" 2>/dev/null || true; sleep 1
+  mkdir -p "$ESPMP"
+  if doas mount "${NBD}p1" "$ESPMP" 2>/dev/null; then
+    K="$(doas sh -c "ls -1t '$ESPMP'/vmlinuz-* 2>/dev/null | head -1")"
+    [[ -z "$K" && -f "$ESPMP/EFI/BOOT/BOOTX64.EFI" ]] && K="$ESPMP/EFI/BOOT/BOOTX64.EFI"
+    if [[ -n "$K" ]]; then
+      doas cp "$K" "$REPAIR_KERNEL" && doas chown "$USER_NAME" "$REPAIR_KERNEL"
+      echo "  kernel: $(basename "$K")"
+      # best-effort: refresh the removable loader from the same image (atomic)
+      doas cp "$K" "$ESPMP/EFI/BOOT/BOOTX64.EFI.new" 2>/dev/null \
+        && doas mv -f "$ESPMP/EFI/BOOT/BOOTX64.EFI.new" "$ESPMP/EFI/BOOT/BOOTX64.EFI" 2>/dev/null \
+        && echo "  restored \\EFI\\BOOT\\BOOTX64.EFI"
+    fi
+    doas umount "$ESPMP" 2>/dev/null || true
+  else
+    warn "couldn't mount the ESP (${NBD}p1)"
+  fi
+  REPAIR_ROOT="$(doas blkid -s PARTUUID -o value "${NBD}p3" 2>/dev/null)"
+  doas qemu-nbd --disconnect "$NBD" >/dev/null 2>&1 || true
+  rmdir "$ESPMP" 2>/dev/null || true
+  [[ -f "$REPAIR_KERNEL" ]] || die "no kernel on the ESP — rebuild via the CD:  ./run-vm.sh install  then  SLIM=1 DISK=/dev/vda ./exherbo/finish-boot.sh"
+  [[ -n "$REPAIR_ROOT" ]]   || die "couldn't read the root PARTUUID from ${NBD}p3"
+  echo "  root=PARTUUID=$REPAIR_ROOT"
+fi
 
 # ── Install mode: get an ISO (download the default if missing) ────────────────
 if [[ "$MODE" == "install" ]]; then
@@ -172,6 +214,9 @@ if [[ "$MODE" == "install" ]]; then
   ARGS+=(-cdrom "$ISO" -boot menu=on)
   header "Install mode — booting $ISO"
   echo -e "  ${GREEN}Inside the VM, run:${NC}  DISK=/dev/vda ./install.sh"
+elif [[ "$MODE" == "repair" ]]; then
+  ARGS+=(-kernel "$REPAIR_KERNEL" -append "root=PARTUUID=$REPAIR_ROOT rw")
+  header "Repair mode — direct-booting the installed system (bypassing the ESP loader)"
 else
   header "Boot mode — starting the installed system on $DISK"
 fi
