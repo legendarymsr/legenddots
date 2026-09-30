@@ -12,7 +12,7 @@ local lexers = vis.lexers
 -- syntax
 lexers.STYLE_DEFAULT       = ''
 lexers.STYLE_NOTHING       = ''
-lexers.STYLE_COMMENT       = 'fore:black,bold'   -- brightblack = dim grey
+lexers.STYLE_COMMENT       = 'fore:white,italics'  -- readable; italic sets it apart
 lexers.STYLE_KEYWORD       = 'fore:magenta'      -- purple
 lexers.STYLE_FUNCTION      = 'fore:blue'
 lexers.STYLE_DEFINITION    = 'fore:blue'
@@ -35,7 +35,7 @@ lexers.STYLE_ERROR         = 'fore:red,italics'
 lexers.STYLE_WHITESPACE    = ''
 
 -- editor UI
-lexers.STYLE_LINENUMBER        = 'fore:black,bold'
+lexers.STYLE_LINENUMBER        = 'fore:blue'
 lexers.STYLE_LINENUMBER_CURSOR = 'fore:white'
 lexers.STYLE_CURSOR            = 'reverse'
 lexers.STYLE_CURSOR_PRIMARY    = 'reverse'
