@@ -24,20 +24,21 @@ in
 
     # Not suckless, but shipped alongside for the minimalist collection, configured
     # via runtime dotfiles rather than a compile-time config.h. screen is installed
-    # and configured; vim is config-only (we link a minimal ~/.vimrc, install no
-    # editor). Both come along when `enable = true`; turn either off individually below.
+    # and configured; vis is config-only (we link visrc.lua + a POSIX ~/.exrc,
+    # install no editor). Both come along when `enable = true`; turn either off below.
     screen.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Install GNU Screen and link suckless/screen/screenrc to ~/.screenrc.";
     };
 
-    # vim is config-only: we link a very minimal ~/.vimrc but don't install vim
-    # (it's in every distro's main repo; add it yourself).
-    vim.enable = lib.mkOption {
+    # vis is config-only: we link visrc.lua + a POSIX ~/.exrc but don't install an
+    # editor (vis/nvi are in every distro's repo; add one yourself). vim was
+    # dropped — Vimscript is a bespoke config DSL, the thing this collection avoids.
+    vis.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Link suckless/vim/vimrc to ~/.vimrc (config only — vim not installed).";
+      description = "Link suckless/vis/visrc.lua to ~/.config/vis/ and suckless/vi/exrc to ~/.exrc (config only).";
     };
   };
 
@@ -48,6 +49,7 @@ in
 
     # Runtime dotfiles for the two non-config.h tools.
     home.file.".screenrc" = lib.mkIf cfg.screen.enable { source = ./screen/screenrc; };
-    home.file.".vimrc" = lib.mkIf cfg.vim.enable { source = ./vim/vimrc; };
+    home.file.".config/vis/visrc.lua" = lib.mkIf cfg.vis.enable { source = ./vis/visrc.lua; };
+    home.file.".exrc" = lib.mkIf cfg.vis.enable { source = ./vi/exrc; };
   };
 }

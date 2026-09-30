@@ -17,21 +17,23 @@ dotfiles — edit one, then rebuild that program. All themed **Tokyo Night**,
 
 ### Also here — not suckless, but same spirit
 
-Minimal **screen** and **vim** configs, kept for the minimalist collection. Unlike
-everything above, these are **runtime dotfiles**, not compile-time `config.h` — so
-you *symlink* them, no rebuild.
+Minimal **screen**, **vis** and **vi** configs, kept for the minimalist collection.
+Unlike everything above, these are **runtime dotfiles**, not compile-time `config.h`
+— so you *symlink* them, no rebuild.
 
 | Tool | What | file | symlink to |
 |------|------|------|-----------|
 | **screen** | terminal multiplexer (GNU) | `screen/screenrc` | `~/.screenrc` |
-| **vim** | very minimal vim config | `vim/vimrc` | `~/.vimrc` |
+| **vis** | modal editor (vi + sam), Lua config | `vis/visrc.lua` | `~/.config/vis/visrc.lua` |
+| **vi** | POSIX ex/vi baseline (nvi, traditional vi) | `vi/exrc` | `~/.exrc` |
 | **foot** | Wayland terminal (dwl's `termcmd`) | `foot/foot.ini` | `~/.config/foot/foot.ini` |
 | **wmenu** | Wayland launcher (dwl's `menucmd`) | `wmenu/menu` | `~/.local/bin/menu` |
 | **swaylock** | Wayland screen locker (dwl's `Mod+Esc`) | `swaylock/config` | `~/.config/swaylock/config` |
 
 ```sh
 ln -sfn "$PWD/screen/screenrc" ~/.screenrc
-ln -sfn "$PWD/vim/vimrc"       ~/.vimrc
+ln -sfn "$PWD/vis/visrc.lua"   ~/.config/vis/visrc.lua
+ln -sfn "$PWD/vi/exrc"         ~/.exrc
 ln -sfn "$PWD/foot/foot.ini"   ~/.config/foot/foot.ini
 ln -sfn "$PWD/wmenu/menu"      ~/.local/bin/menu          # dwl runs `menu` on Mod+d
 ln -sfn "$PWD/swaylock/config" ~/.config/swaylock/config  # dwl locks with Mod+Esc
@@ -64,29 +66,37 @@ Tokyo Night background (`color=1a1b26`); the password ring stays swaylock's
 default. Install `gui-apps/swaylock` (Gentoo) / `swaylock` (Arch/nixpkgs).
 
 **screen** is a real program (package `app-misc/screen` on Gentoo, `screen` on
-Arch / nixpkgs / Guix). **vim is config-only** — we ship a tiny `~/.vimrc`; install
-vim yourself (it's a vi, and it's in every main repo, Termux included). The vimrc is
-deliberately bare: `syntax on` and `tabstop`/`shiftwidth=4` — nothing else.
+Arch / nixpkgs / Guix). The editors are **config-only** — install one yourself
+(both are in every main repo, Termux included).
 
-**Optional C/C++ LSP** (`vim/c-lsp.vim`) — kept out of the base vimrc so that stays
-minimal. It's the dead-simplest LSP path for real Vim (Vim has no built-in client):
-the pure-Vim9 [`yegappan/lsp`](https://github.com/yegappan/lsp) plugin driving
-`clangd` — no node, no python, no plugin manager. Install:
+**Why not vim?** vim's config language is **Vimscript** — a bespoke DSL used for
+nothing but vim. That's the same objection this whole collection has to Nix's
+language: a one-program DSL you must learn to configure one program. So vim's out
+(and with it its `.vimrc` and the old `c-lsp.vim`), replaced by:
 
-```sh
-git clone https://github.com/yegappan/lsp ~/.vim/pack/lsp/start/lsp   # Vim native packages
-echo 'source ~/legenddots/suckless/vim/c-lsp.vim' >> ~/.vimrc          # opt in
-```
+- **vis** (`vis/visrc.lua`) — the real editor. Modal (vi keys) with Plan 9
+  **structural regular expressions** (sam) underneath, configured in **Lua** — a
+  general-purpose language, not a DSL — and *legacy-free*, so unlike Neovim it
+  carries no Vimscript at all. `visrc.lua` is the whole config: line numbers,
+  autoindent, 4-space expandtab, a dark theme; edit and restart, no rebuild.
+  Install `app-editors/vis` (Gentoo) / `vis` (Arch / nixpkgs / Guix).
+- **vi** (`vi/exrc`) — the portable baseline. A `~/.exrc` of nothing but POSIX
+  `set`s (`autoindent`, `shiftwidth`/`tabstop=4`, `showmatch`, `number`) that
+  *every* real vi honours — nvi, traditional vi, busybox vi. No config language at
+  all, for servers and recovery shells where vis isn't around.
 
-Then `clangd` starts on `.c`/`.cpp` buffers; keys: `gd` def, `gr` refs, `K` hover,
-`grn` rename, `gra` code action. (Needs Vim 9 and `clangd` on `PATH`.)
+**Optional C/C++ LSP** — the vis-native replacement for the old `c-lsp.vim`:
+[`vis-lspc`](https://gitlab.com/muhq/vis-lspc) driving `clangd`, no node/python/
+plugin-manager. Clone it into `~/.config/vis/` and uncomment the `require('vis-lspc')`
+lines at the bottom of `visrc.lua`.
 
 **Declaratively you don't symlink by hand:**
 
 - **home-manager** (`legend.suckless.enable = true`) installs `screen`, links
-  `~/.screenrc`, and links `~/.vimrc` (config only, vim not installed). Turn either off
-  with `legend.suckless.screen.enable = false` / `legend.suckless.vim.enable = false`.
-- **Guix Home** (`home-configuration.scm`) installs `screen` and places both dotfiles
+  `~/.screenrc`, and links `~/.config/vis/visrc.lua` + `~/.exrc` (config only, no
+  editor installed). Turn either off with `legend.suckless.screen.enable = false` /
+  `legend.suckless.vis.enable = false`.
+- **Guix Home** (`home-configuration.scm`) installs `screen` and places the dotfiles
   via `home-files-service-type`. The `config.scm` manifest also carries `screen`.
 
 The manual `ln -sfn` above is only for non-declarative setups.
