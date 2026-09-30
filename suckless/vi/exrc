@@ -1,0 +1,8 @@
+" ~/.exrc — POSIX ex/vi baseline. No config language at all, just `set`s that
+" every real vi honours: nvi, traditional vi, busybox vi. The lowest-common-
+" denominator editor config for servers / recovery shells where vis isn't around.
+set autoindent
+set shiftwidth=4
+set tabstop=4
+set showmatch
+set number
