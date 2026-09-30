@@ -186,7 +186,8 @@ PS1+="${CYAN}%~${RESET}"                 # Cyan path (~ for home)
 PS1+="${BLUE}]${RESET}"                 # End blue bracket
 
 # End of prompt line, new line for command input (grey >)
-PS1+="\n${GREY}> ${RESET}"
+# zsh: use $'\n' for a real newline — a plain "\n" prints literally, unlike bash.
+PS1+=$'\n'"${GREY}> ${RESET}"
 
 # --- RPROMPT (Right Prompt - Removed for simplicity) ---
 
