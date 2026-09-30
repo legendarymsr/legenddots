@@ -143,7 +143,7 @@ lines, and it **skips any target missing from the clone so you never get a
 dangling link**:
 
 ```sh
-pkg install neovim tmux screen vis git
+pkg install zsh neovim tmux screen vis git
 bash ~/legenddots/termux/dotfiles.sh
 ```
 
@@ -151,6 +151,7 @@ bash ~/legenddots/termux/dotfiles.sh
 
 | repo file | → linked to |
 |-----------|-------------|
+| `.zshrc` | `~/.zshrc` — zsh config (make it default: `chsh -s zsh`) |
 | `init.lua` | `~/.config/nvim/init.lua` — same as desktop (Mason/LSP self-skips on Termux) |
 | `tmux.conf` | `~/.config/tmux/tmux.conf` — tmux 3.1+ reads it there |
 | `suckless/screen/screenrc` | `~/.screenrc` — home dir, not `~/.config` |
