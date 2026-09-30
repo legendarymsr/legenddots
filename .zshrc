@@ -224,18 +224,15 @@ update_termux_packages() {
 
 # --- END CUSTOM ZSH BAR PROMPT ---
 export PATH="$HOME/.cargo/bin:$PATH"
-# Legend's Mommy Hook — praise on success, a gentle nudge on failure.
-# Runs `mommy` (cargo install mommy) ONLY if it's installed. Two reasons:
-#   1. otherwise it spams "command not found" on every prompt, and
-#   2. with AUTO_CD on, a bare `mommy` that isn't a command makes zsh cd into a
-#      ~/mommy directory if one exists — so the hook was trapping you in it.
-# Capture $? FIRST: every command below (even `command -v`) overwrites it.
+# Prompt feedback on the previous command — subtle, no saccharine. A green check
+# on success, a red cross + exit code on failure (colours follow the terminal's
+# Tokyo Night palette). Capture $? FIRST — it's clobbered by anything below.
 precmd() {
     local exit_code=$?
-    if command -v mommy >/dev/null 2>&1; then
-        ( exit "$exit_code" ); mommy   # let mommy read the real exit status
-    elif [ "$exit_code" -ne 0 ]; then
-        echo -e "\e[38;5;203mOh no, did my puppy make a mistake? Mommy knows you can do better~\e[0m"
+    if [ "$exit_code" -eq 0 ]; then
+        print -P "%F{green}✓%f"
+    else
+        print -P "%F{red}✗ $exit_code%f"
     fi
 }
 if [[ -d /data/data/com.termux ]]; then
