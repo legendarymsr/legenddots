@@ -70,6 +70,13 @@ fi
 # ── suckless desktop: dwm + dmenu + st + slock + surf (built from source) ─────
 if [ "${NO_WM:-}" != "1" ]; then
   header "Installing Xorg + the suckless build deps"
+  # Exherbo's minimal stage ships the global 'X' option OFF, so libX11/cairo/gtk
+  # refuse to build ("-X -> X", aborting the resolve). Enable X for everything
+  # (idempotent) before pulling anything X-related.
+  if ! grep -qxF '*/* X' /etc/paludis/options.conf 2>/dev/null; then
+    echo '*/* X' >> /etc/paludis/options.conf
+    printf '%benabled the global X option in /etc/paludis/options.conf%b\n' "$GRN" "$NC"
+  fi
   # Xorg + the X libraries the suckless tools compile against. The tools
   # themselves are built from git.suckless.org below — no package repo needed.
   $RESOLVE xorg-server xinit xf86-input-libinput \
