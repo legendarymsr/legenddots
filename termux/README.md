@@ -151,7 +151,7 @@ bash ~/legenddots/termux/dotfiles.sh
 
 | repo file | → linked to |
 |-----------|-------------|
-| `.zshrc` | `~/.zshrc` — zsh config (make it default: `chsh -s zsh`) |
+| `.zshrc` | `~/.zshrc` — zsh config (script removes any existing one, links this, sets zsh default) |
 | `init.lua` | `~/.config/nvim/init.lua` — same as desktop (Mason/LSP self-skips on Termux) |
 | `tmux.conf` | `~/.config/tmux/tmux.conf` — tmux 3.1+ reads it there |
 | `suckless/screen/screenrc` | `~/.screenrc` — home dir, not `~/.config` |
