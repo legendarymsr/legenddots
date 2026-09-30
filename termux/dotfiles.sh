@@ -5,6 +5,7 @@
 #   bash ~/legenddots/termux/dotfiles.sh
 #
 # Links the editor/multiplexer configs that make sense on the phone:
+#   .zshrc                       -> ~/.zshrc                          (zsh config)
 #   init.lua                     -> ~/.config/nvim/init.lua           (Neovim)
 #   tmux.conf                    -> ~/.config/tmux/tmux.conf          (tmux 3.1+)
 #   suckless/screen/screenrc     -> ~/.screenrc                        (GNU Screen)
@@ -44,6 +45,7 @@ link() {
 }
 
 # 3. the phone dotfiles
+link "$REPO/.zshrc"                              "$HOME/.zshrc"
 link "$REPO/init.lua"                           "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"                           "$HOME/.config/tmux/tmux.conf"
 link "$REPO/suckless/screen/screenrc"            "$HOME/.screenrc"
@@ -77,6 +79,7 @@ if command -v termux-reload-settings >/dev/null 2>&1; then
 fi
 
 echo
-say "Done. Packages: pkg install neovim tmux screen vis git"
+say "Done. Packages: pkg install zsh neovim tmux screen vis git"
+say "zsh: make it default with  chsh -s zsh  (restart Termux after)."
 say "vis uses ~/.config/vis/visrc.lua (Tokyo Night); ~/.exrc is the vi baseline."
 say "Termux terminal is themed via ~/.termux/colors.properties (Tokyo Night)."
