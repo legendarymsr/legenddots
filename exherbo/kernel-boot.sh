@@ -73,7 +73,8 @@ else
     -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
     -e EXT4_FS -e VFAT_FS -e FAT_FS \
     -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE \
-    -e EFI_PARTITION
+    -e EFI_PARTITION \
+    -e DRM_VIRTIO_GPU -e DRM_KMS_HELPER
 fi
 make olddefconfig
 make -j"$(nproc)"
