@@ -55,7 +55,7 @@ creates your user, and drops the runtime dotfiles:
 |-------|---------|------------------|
 | **bspwm** + **sxhkd** | `bspwm sxhkd` | `~/.config/bspwm/bspwmrc`, `~/.config/sxhkd/sxhkdrc` |
 | **xterm** | `xterm` | `~/.Xresources` (Tokyo Night — st's `config.h` as a dotfile) |
-| **dmenu** | `dmenu` | themed by launch flags in `sxhkdrc` (no rebuild) |
+| **bemenu** | `bemenu` | dmenu-alike, themed by launch flags at runtime (no config.h) |
 | **vis** | `vis` | `~/.config/vis/visrc.lua` + Tokyo Night theme (reused from `suckless/`) |
 | **lynx** | `lynx` | — |
 | **vi** (busybox) | (base) | `$EXINIT` in `~/.profile` |
@@ -67,7 +67,7 @@ Then log in as your user and:
 startx
 ```
 
-**Keys** (Super = mod): `Return` xterm · `p` dmenu · `w` lynx · `e` vis · `q`/`shift+q`
+**Keys** (Super = mod): `Return` xterm · `p` bemenu · `w` lynx · `e` vis · `q`/`shift+q`
 close/kill · `{1-5}` desktops · `{h,j,k,l}` focus · `t`/`f` tiled/fullscreen · `shift+r`
 reload bspwm · `shift+Escape` quit · `Escape` reload sxhkd.
 
