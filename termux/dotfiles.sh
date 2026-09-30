@@ -5,10 +5,12 @@
 #   bash ~/legenddots/termux/dotfiles.sh
 #
 # Links the editor/multiplexer configs that make sense on the phone:
-#   init.lua                 -> ~/.config/nvim/init.lua   (Neovim)
-#   tmux.conf                -> ~/.config/tmux/tmux.conf   (tmux 3.1+ reads it there)
-#   suckless/screen/screenrc -> ~/.screenrc                (GNU Screen)
-#   suckless/vim/vimrc       -> ~/.vimrc                   (minimal vim config)
+#   init.lua                     -> ~/.config/nvim/init.lua           (Neovim)
+#   tmux.conf                    -> ~/.config/tmux/tmux.conf          (tmux 3.1+)
+#   suckless/screen/screenrc     -> ~/.screenrc                        (GNU Screen)
+#   suckless/vis/visrc.lua       -> ~/.config/vis/visrc.lua            (vis: Lua, no VimL)
+#   suckless/vis/themes/*.lua    -> ~/.config/vis/themes/tokyonight.lua (Tokyo Night)
+#   suckless/vi/exrc             -> ~/.exrc                             (POSIX vi baseline)
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,17 +43,19 @@ link() {
 }
 
 # 3. the phone dotfiles
-link "$REPO/init.lua"                  "$HOME/.config/nvim/init.lua"
-link "$REPO/tmux.conf"                 "$HOME/.config/tmux/tmux.conf"
-link "$REPO/suckless/screen/screenrc"  "$HOME/.screenrc"
-link "$REPO/suckless/vim/vimrc"        "$HOME/.vimrc"
+link "$REPO/init.lua"                           "$HOME/.config/nvim/init.lua"
+link "$REPO/tmux.conf"                           "$HOME/.config/tmux/tmux.conf"
+link "$REPO/suckless/screen/screenrc"            "$HOME/.screenrc"
+link "$REPO/suckless/vis/visrc.lua"              "$HOME/.config/vis/visrc.lua"
+link "$REPO/suckless/vis/themes/tokyonight.lua"  "$HOME/.config/vis/themes/tokyonight.lua"
+link "$REPO/suckless/vi/exrc"                    "$HOME/.exrc"
 
 # 4. cleanup of earlier versions of this script:
-#  a) it used to link ~/.exrc to the (now removed) vi config — drop that dangling link
-if [ -L "$HOME/.exrc" ]; then
-  case "$(readlink "$HOME/.exrc")" in
-    */legenddots/suckless/vi/exrc)
-      rm -f "$HOME/.exrc" && say "removed the stale ~/.exrc symlink (vi dropped; vim now)" ;;
+#  a) it used to link ~/.vimrc to the (now removed) vim config — drop that dangling link
+if [ -L "$HOME/.vimrc" ]; then
+  case "$(readlink "$HOME/.vimrc")" in
+    */legenddots/suckless/vim/vimrc)
+      rm -f "$HOME/.vimrc" && say "removed the stale ~/.vimrc symlink (vim dropped; vis now)" ;;
   esac
 fi
 #  b) it used to append a busybox-vi EXINIT line to the shell rc — strip it back out.
@@ -66,5 +70,5 @@ for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
 done
 
 echo
-say "Done. Packages: pkg install neovim tmux screen vim git"
-say "vim uses the minimal ~/.vimrc (linked)."
+say "Done. Packages: pkg install neovim tmux screen vis git"
+say "vis uses ~/.config/vis/visrc.lua (Tokyo Night); ~/.exrc is the vi baseline."

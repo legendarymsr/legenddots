@@ -143,7 +143,7 @@ lines, and it **skips any target missing from the clone so you never get a
 dangling link**:
 
 ```sh
-pkg install neovim tmux screen git
+pkg install neovim tmux screen vis git
 bash ~/legenddots/termux/dotfiles.sh
 ```
 
@@ -154,7 +154,9 @@ bash ~/legenddots/termux/dotfiles.sh
 | `init.lua` | `~/.config/nvim/init.lua` — same as desktop (Mason/LSP self-skips on Termux) |
 | `tmux.conf` | `~/.config/tmux/tmux.conf` — tmux 3.1+ reads it there |
 | `suckless/screen/screenrc` | `~/.screenrc` — home dir, not `~/.config` |
-| `suckless/vim/vimrc` | `~/.vimrc` — minimal vim config (see "vi on the phone" below) |
+| `suckless/vis/visrc.lua` | `~/.config/vis/visrc.lua` — vis config (Lua, no VimL) |
+| `suckless/vis/themes/tokyonight.lua` | `~/.config/vis/themes/tokyonight.lua` — Tokyo Night |
+| `suckless/vi/exrc` | `~/.exrc` — POSIX vi baseline (nvi / traditional vi) |
 
 Re-run it any time to update — it does the `git pull` for you, and because the
 links are stable it's idempotent.
@@ -174,18 +176,21 @@ links are stable it's idempotent.
 To land straight in tmux under pocketwl, run `tmux` in the `Alt+Return` terminal,
 or set `POCKETWL_TERMINAL='foot -e tmux' bash start` so every terminal opens into it.
 
-### vi on the phone
+### Editors on the phone
 
-**vim** — it's a vi, it's in Termux's main repo, and `dotfiles.sh` links a very minimal
-`~/.vimrc` (`suckless/vim/vimrc`) for it:
+**vis** — modal (vi keys) + Plan 9 structural regex, configured in **Lua** (no
+Vimscript). It's in Termux's main repo, and `dotfiles.sh` links `~/.config/vis/visrc.lua`
+plus the Tokyo Night theme:
 
 ```sh
-pkg install vim
+pkg install vis
 ```
 
-That's a working, minimal vi today. (`nvim` reads `init.lua` and busybox's `vi` reads no
-config file, so vim is the one that actually uses a config here.) To type `vi` instead of
-`vim`: `ln -sfn "$PREFIX/bin/vim" "$PREFIX/bin/vi"`.
+**vi baseline** — `dotfiles.sh` also links `~/.exrc` (`suckless/vi/exrc`), the POSIX
+`set`s that `nvi` / traditional vi honour when vis isn't around (Termux's `vi` is busybox,
+which uses `$EXINIT` rather than `~/.exrc`, so `vis` is the real editor here). `nvim` reads
+`init.lua`. **vim was dropped** — Vimscript is a config DSL (see `suckless/README.md`). To
+type `vi` for vis: `ln -sfn "$PREFIX/bin/vis" "$PREFIX/bin/vi"`.
 
 ---
 
