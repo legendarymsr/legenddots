@@ -52,6 +52,16 @@ if [ ! -d "linux-${KVER}" ]; then
 fi
 cd "linux-${KVER}"
 
+# Atomic install: copy to a temp then rename, so an interrupted or failed write
+# (e.g. a full disk) never leaves a truncated kernel/loader — the previous one
+# survives instead of bricking the boot.
+atomic_cp() { cp -f "$1" "$2.tmp" && { sync 2>/dev/null || true; mv -f "$2.tmp" "$2"; }; }
+
+# Free space + drop stale objects: a previous (especially full) build can fill a
+# small VM disk, which is what corrupts the loader mid-write. Start compact.
+header "Cleaning the build tree (frees space from any previous build)"
+make clean >/dev/null 2>&1 || true
+
 # ── Configure ─────────────────────────────────────────────────────────────────
 # defconfig + the KVM-guest fragment (virtio, paravirt, guest console).
 make defconfig kvm_guest.config
@@ -79,7 +89,7 @@ fi
 make olddefconfig
 make -j"$(nproc)"
 make modules_install 2>/dev/null || true
-cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
+atomic_cp arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
 
 # ── Bootloader (no initramfs → root= must be PARTUUID= or a device, NOT fs UUID) ─
 header "Installing the bootloader"
@@ -89,7 +99,7 @@ SDBOOT="$(find /usr -name 'systemd-bootx64.efi' 2>/dev/null | head -1)"
 if [ -n "$SDBOOT" ]; then
   bootctl --esp-path=/boot install || warn "bootctl error — using manual copy"
   cp -f "$SDBOOT" /boot/EFI/systemd/systemd-bootx64.efi
-  cp -f "$SDBOOT" /boot/EFI/BOOT/BOOTX64.EFI
+  atomic_cp "$SDBOOT" /boot/EFI/BOOT/BOOTX64.EFI
   printf 'default exherbo\ntimeout 3\neditor  yes\n' > /boot/loader/loader.conf
   printf 'title   Exherbo\nlinux   /vmlinuz-%s\noptions root=%s rw\n' "$KVER" "$ROOT_SPEC" \
     > /boot/loader/entries/exherbo.conf
@@ -99,8 +109,8 @@ else
   ./scripts/config -e EFI_STUB -e CMDLINE_BOOL --set-str CMDLINE "root=${ROOT_SPEC} rw"
   make olddefconfig
   make -j"$(nproc)" bzImage
-  cp -f arch/x86/boot/bzImage /boot/EFI/BOOT/BOOTX64.EFI
-  cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
+  atomic_cp arch/x86/boot/bzImage /boot/EFI/BOOT/BOOTX64.EFI
+  atomic_cp arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
   printf '%bEFISTUB linux-%s installed at \\EFI\\BOOT\\BOOTX64.EFI (root=%s).%b\n' "$GRN" "$KVER" "$ROOT_SPEC" "$NC"
 fi
 
