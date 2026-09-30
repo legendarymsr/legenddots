@@ -8,8 +8,9 @@
 #   DISK=/dev/vda ./finish-boot.sh          # VM (virtio disk)
 #   DISK=/dev/sda ./finish-boot.sh          # real MacBook
 #   KVER=7.2.8   DISK=/dev/vda ./finish-boot.sh   # pin a kernel version
-#   SLIM=1       DISK=/dev/vda ./finish-boot.sh   # fast build: no modules, VM
-#                                                   essentials only (~10 min vs ~45)
+#
+# The kernel is always a lean, no-modules build (virtio + AHCI/NVMe + ext4/vfat +
+# a framebuffer console, EFISTUB) — fast and fits a small VM disk.
 # =============================================================================
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -59,7 +60,7 @@ is_mounted "$MNT/run"  || { mount --rbind /run  "$MNT/run"  && mount --make-rsla
 install -Dm755 "$SELF_DIR/kernel-boot.sh" "$MNT/kernel-boot.sh"
 
 header "Entering chroot: kernel + bootloader only"
-if env -i HOME=/root TERM="${TERM:-linux}" KVER="${KVER:-}" SLIM="${SLIM:-}" \
+if env -i HOME=/root TERM="${TERM:-linux}" KVER="${KVER:-}" \
      ROOT_PARTUUID="${ROOT_PARTUUID:-}" ROOT_DEV="$ROOT" \
      "$(command -v chroot)" "$MNT" /bin/bash -lc '/kernel-boot.sh'; then
   header "Done"

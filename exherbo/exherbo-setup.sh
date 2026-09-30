@@ -105,17 +105,23 @@ if [ -d "$KSRC" ]; then
   cd "$KSRC"
   # defconfig + the KVM-guest fragment (virtio, paravirt, guest console).
   make defconfig kvm_guest.config
-  # Plus the disk/root/fs drivers the fragment doesn't cover, so it also boots
-  # the MacBook (AHCI/NVMe + the vfat ESP) with NO initramfs.
-  ./scripts/config \
-    -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME \
-    -e EXT4_FS -e VFAT_FS -e FAT_FS \
-    -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e USB_STORAGE \
-    -e EFI_PARTITION \
-    -e DRM_VIRTIO_GPU -e DRM_KMS_HELPER
+  # Lean, no-modules build: modules are the bulk of the compile and a disk-filler,
+  # so drop them and force IN just what's needed to boot with no initramfs —
+  # virtio (VM) + AHCI/NVMe/USB (real disks), ext4/vfat, a framebuffer console,
+  # PS/2 + evdev input, EFISTUB.
+  ./scripts/config -d MODULES \
+    -e EXT4_FS -e VFAT_FS -e FAT_FS -e NLS_CODEPAGE_437 -e NLS_ISO8859_1 -e NLS_ASCII \
+    -e VIRTIO -e VIRTIO_PCI -e VIRTIO_BLK -e VIRTIO_NET -e VIRTIO_CONSOLE -e VIRTIO_BALLOON \
+    -e SATA_AHCI -e ATA -e ATA_PIIX -e BLK_DEV_NVME -e USB_STORAGE \
+    -e SYSFB_SIMPLEFB -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
+    -e DRM_VIRTIO_GPU -e DRM_KMS_HELPER \
+    -e INPUT_EVDEV -e SERIO_I8042 -e INPUT_KEYBOARD -e KEYBOARD_ATKBD \
+    -e INPUT_MOUSE -e MOUSE_PS2 -e INPUT_MOUSEDEV \
+    -e FRAMEBUFFER_CONSOLE -e VT -e VT_CONSOLE -e EFI -e EFI_STUB \
+    -e PARTITION_ADVANCED -e EFI_PARTITION -e BLK_DEV -e BLOCK
   make olddefconfig
   make -j"$(nproc)"
-  make modules_install
+  make modules_install 2>/dev/null || true
   # Put the kernel on the ESP (/boot) ourselves — don't rely on installkernel.
   cp -f arch/x86/boot/bzImage "/boot/vmlinuz-${KVER}"
   cp -f System.map "/boot/System.map-${KVER}" 2>/dev/null || true
