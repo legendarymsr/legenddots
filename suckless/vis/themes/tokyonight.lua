@@ -1,43 +1,61 @@
 -- ~/.config/vis/themes/tokyonight.lua — legenddots
--- Tokyo Night for vis, matching st/dwm (bg #1a1b26, fg #c0caf5, blue #7aa2f7).
--- Selected from visrc.lua with `set theme tokyonight`. Truecolor terminals (st).
+--
+-- Tokyo Night, done in the 16 ANSI color NAMES rather than hex. vis renders
+-- these through the terminal's own palette — and our terminal IS Tokyo Night
+-- (termux/colors.properties, suckless/st/config.h) — so `blue` = #7aa2f7,
+-- `green` = #9ece6a, `magenta` = #bb9af7, etc. This works on every vis build
+-- (including name-only ones that ignore `fore:#rrggbb`), and stays in lockstep
+-- with the terminal theme. STYLE_DEFAULT='' keeps the terminal's bg/fg.
 
 local lexers = vis.lexers
 
 -- syntax
-lexers.STYLE_DEFAULT      = 'back:#1a1b26,fore:#c0caf5'
-lexers.STYLE_NOTHING      = 'back:#1a1b26'
-lexers.STYLE_COMMENT      = 'fore:#565f89,italics'
-lexers.STYLE_KEYWORD      = 'fore:#bb9af7'
-lexers.STYLE_FUNCTION     = 'fore:#7aa2f7'
-lexers.STYLE_DEFINITION   = 'fore:#7aa2f7'
-lexers.STYLE_CLASS        = 'fore:#2ac3de'
-lexers.STYLE_TYPE         = 'fore:#2ac3de'
-lexers.STYLE_STRING       = 'fore:#9ece6a'
-lexers.STYLE_NUMBER       = 'fore:#ff9e64'
-lexers.STYLE_CONSTANT     = 'fore:#ff9e64'
-lexers.STYLE_OPERATOR     = 'fore:#89ddff'
-lexers.STYLE_PREPROCESSOR = 'fore:#7dcfff'
-lexers.STYLE_LABEL        = 'fore:#bb9af7'
-lexers.STYLE_REGEX        = 'fore:#b4f9f8'
-lexers.STYLE_TAG          = 'fore:#f7768e'
-lexers.STYLE_ATTRIBUTE    = 'fore:#7aa2f7'
-lexers.STYLE_VARIABLE     = 'fore:#c0caf5'
-lexers.STYLE_IDENTIFIER   = 'fore:#c0caf5'
-lexers.STYLE_EMBEDDED     = 'back:#1f2335'
-lexers.STYLE_ERROR        = 'fore:#f7768e,italics'
-lexers.STYLE_WHITESPACE   = 'fore:#414868'
+lexers.STYLE_DEFAULT       = ''
+lexers.STYLE_NOTHING       = ''
+lexers.STYLE_COMMENT       = 'fore:black,bold'   -- brightblack = dim grey
+lexers.STYLE_KEYWORD       = 'fore:magenta'      -- purple
+lexers.STYLE_FUNCTION      = 'fore:blue'
+lexers.STYLE_DEFINITION    = 'fore:blue'
+lexers.STYLE_CLASS         = 'fore:cyan'
+lexers.STYLE_TYPE          = 'fore:cyan'
+lexers.STYLE_STRING        = 'fore:green'
+lexers.STYLE_NUMBER        = 'fore:yellow'
+lexers.STYLE_CONSTANT      = 'fore:yellow'
+lexers.STYLE_OPERATOR      = 'fore:cyan'
+lexers.STYLE_PREPROCESSOR  = 'fore:cyan'
+lexers.STYLE_LABEL         = 'fore:magenta'
+lexers.STYLE_REGEX         = 'fore:green'
+lexers.STYLE_TAG           = 'fore:red'
+lexers.STYLE_ATTRIBUTE     = 'fore:blue'
+lexers.STYLE_VARIABLE      = ''
+lexers.STYLE_IDENTIFIER    = ''
+lexers.STYLE_HEADING       = 'fore:magenta,bold'
+lexers.STYLE_EMBEDDED      = 'fore:cyan'
+lexers.STYLE_ERROR         = 'fore:red,italics'
+lexers.STYLE_WHITESPACE    = ''
 
 -- editor UI
-lexers.STYLE_LINENUMBER        = 'fore:#3b4261,back:#1a1b26'
-lexers.STYLE_LINENUMBER_CURSOR = 'fore:#737aa2,back:#1a1b26'
-lexers.STYLE_CURSOR            = 'fore:#1a1b26,back:#c0caf5'
-lexers.STYLE_CURSOR_PRIMARY    = 'fore:#1a1b26,back:#c0caf5'
-lexers.STYLE_CURSOR_LINE       = 'back:#292e42'
-lexers.STYLE_COLOR_COLUMN      = 'back:#292e42'
-lexers.STYLE_SELECTION         = 'back:#283457'
-lexers.STYLE_STATUS            = 'fore:#545c7e,back:#16161e'
-lexers.STYLE_STATUS_FOCUSED    = 'fore:#c0caf5,back:#16161e'
-lexers.STYLE_SEPARATOR         = 'fore:#c0caf5'
-lexers.STYLE_INFO              = 'fore:#c0caf5,back:#1a1b26'
-lexers.STYLE_EOF               = 'fore:#414868'
+lexers.STYLE_LINENUMBER        = 'fore:black,bold'
+lexers.STYLE_LINENUMBER_CURSOR = 'fore:white'
+lexers.STYLE_CURSOR            = 'reverse'
+lexers.STYLE_CURSOR_PRIMARY    = 'reverse'
+lexers.STYLE_CURSOR_LINE       = ''
+lexers.STYLE_COLOR_COLUMN      = 'back:black'
+lexers.STYLE_SELECTION         = 'back:black,bold'
+lexers.STYLE_STATUS            = 'fore:white,back:black'
+lexers.STYLE_STATUS_FOCUSED    = 'fore:white,back:black,bold'
+lexers.STYLE_SEPARATOR         = ''
+lexers.STYLE_INFO              = 'bold'
+lexers.STYLE_EOF               = ''
+
+-- Diff
+lexers.STYLE_ADDITION = 'fore:green'
+lexers.STYLE_DELETION = 'fore:red'
+lexers.STYLE_CHANGE   = 'fore:yellow'
+
+-- Markdown / prose
+lexers.STYLE_BOLD      = 'bold'
+lexers.STYLE_ITALIC    = 'italics'
+lexers.STYLE_LINK      = 'fore:blue'
+lexers.STYLE_LIST      = 'fore:magenta'
+lexers.STYLE_CODE      = 'fore:cyan'
