@@ -8,8 +8,13 @@
 require('vis')
 
 vis.events.subscribe(vis.events.INIT, function()
-	-- Tokyo Night, matching st/dwm (themes/tokyonight.lua → ~/.config/vis/themes/).
-	vis:command('set theme tokyonight')
+	-- Tokyo Night, matching st/dwm. `set theme` searches a fixed set of dirs and
+	-- on some builds (notably Termux) misses ~/.config/vis/themes, so load the
+	-- theme file directly by path; only fall back to the name if that fails.
+	local cfg = os.getenv('XDG_CONFIG_HOME') or ((os.getenv('HOME') or '') .. '/.config')
+	if not pcall(dofile, cfg .. '/vis/themes/tokyonight.lua') then
+		vis:command('set theme tokyonight')
+	end
 end)
 
 vis.events.subscribe(vis.events.WIN_OPEN, function(win)
