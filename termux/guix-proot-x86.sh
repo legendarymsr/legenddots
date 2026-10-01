@@ -149,13 +149,22 @@ if [ ! -x "$ROOTFS/bin/bash" ]; then
   say "Downloading Debian amd64 rootfs: $URL"
   wget -O "$TB" "$URL" || { warn "rootfs download failed ($URL)"; exit 1; }
   say "Extracting rootfs…"
-  # --link2symlink: Android FS often disallows hardlinks; convert them.
-  proot --link2symlink -0 tar -xpf "$TB" -C "$ROOTFS" --exclude=dev 2>/dev/null \
-    || tar -xpf "$TB" -C "$ROOTFS" --exclude=dev \
-    || { warn "extract failed"; exit 1; }
+  # --link2symlink: Android FS can't do hardlinks, convert them to symlinks.
+  # --no-same-owner: we aren't real root. Errors shown (not hidden) so failures
+  # are visible; the REAL success check is /bin/sh existing afterwards.
+  if ! proot --link2symlink tar -C "$ROOTFS" --no-same-owner --delay-directory-restore -xf "$TB"; then
+    warn "proot+tar had issues, trying plain tar…"
+    tar -C "$ROOTFS" --no-same-owner -xf "$TB" || true
+  fi
+  if [ ! -x "$ROOTFS/bin/sh" ]; then
+    warn "extraction produced no rootfs (no /bin/sh) — see errors above."
+    warn "clean up and retry:  bash ~/legenddots/termux/guix-proot-x86.sh reset"
+    exit 1
+  fi
   rm -f "$TB"
+  mkdir -p "$ROOTFS/etc" "$ROOTFS/tmp" "$ROOTFS/root"; chmod 1777 "$ROOTFS/tmp" 2>/dev/null || true
+  rm -f "$ROOTFS/etc/resolv.conf"    # may be a dangling symlink in the image
   printf 'nameserver 1.1.1.1\nnameserver 9.9.9.9\n' > "$ROOTFS/etc/resolv.conf"
-  mkdir -p "$ROOTFS/tmp" "$ROOTFS/root"; chmod 1777 "$ROOTFS/tmp"
 fi
 
 say "Installing GNU Guix inside the x86_64 rootfs (emulated — be patient)…"
