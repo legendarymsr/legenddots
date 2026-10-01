@@ -137,6 +137,15 @@ esac
 wake
 ensure_termux_deps || exit 1
 
+# Self-heal: an earlier failed/incomplete extraction can leave /bin/bash present
+# but the rootfs unable to actually execute under qemu (missing loader, etc.).
+# The guard below only re-extracts when /bin/bash is absent, so detect a dead
+# rootfs here and wipe it for a clean rebuild.
+if [ -x "$ROOTFS/bin/bash" ] && ! pr 'true' >/dev/null 2>&1; then
+  warn "existing rootfs can't run under qemu (incomplete earlier extraction) — rebuilding it…"
+  chmod -R u+w "$ROOTFS" 2>/dev/null || true; rm -rf "$ROOTFS"
+fi
+
 if [ ! -x "$ROOTFS/bin/bash" ]; then
   mkdir -p "$ROOTFS"
   URL="$X86_ROOTFS_URL"
@@ -170,6 +179,17 @@ if [ ! -x "$ROOTFS/bin/bash" ]; then
   rm -f "$ROOTFS/etc/resolv.conf"    # may be a dangling symlink in the image
   printf 'nameserver 1.1.1.1\nnameserver 9.9.9.9\n' > "$ROOTFS/etc/resolv.conf"
 fi
+
+# Sanity: can the rootfs actually execute under QEMU? Fail loudly here instead of
+# cascading execve errors through the whole Guix install.
+if ! pr 'true' >/dev/null 2>&1; then
+  warn "The x86_64 rootfs can't execute under QEMU emulation (qemu/proot layer, not Guix)."
+  warn "  qemu binary: ${QEMU:-<unset>}"
+  warn "  Try a clean rebuild:  bash ~/legenddots/termux/guix-proot-x86.sh reset"
+  warn "  and confirm qemu works: command -v qemu-x86_64"
+  exit 1
+fi
+say "x86_64 rootfs executes under emulation ✓"
 
 say "Installing GNU Guix inside the x86_64 rootfs (emulated — be patient)…"
 pr '
