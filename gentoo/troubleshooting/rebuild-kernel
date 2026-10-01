@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # rebuild-kernel — rebuild the kernel from the PROVEN, bootable config.
 # -----------------------------------------------------------------------------

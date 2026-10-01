@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendxd — a hex viewer, in C.
  *
  * "Reject Electron. Return to C."

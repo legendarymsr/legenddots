@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendtodo — a plain-text todo list, in C.
  *
  * "Reject Electron. Return to C."

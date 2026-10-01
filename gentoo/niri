@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # Launch niri on Gentoo/OpenRC (no systemd/dinit).
 set -euo pipefail
 

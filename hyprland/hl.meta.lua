@@ -1,4 +1,3 @@
--- SPDX-License-Identifier: GPL-3.0-or-later
 ---@meta
 -- Type stub for Hyprland's Lua config API (the `hl` global). NOT executed — it
 -- only teaches lua_ls the shape of the runtime-injected `hl`, so editing

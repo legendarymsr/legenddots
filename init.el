@@ -1,4 +1,3 @@
-;; SPDX-License-Identifier: GPL-3.0-or-later
 ;; -*- mode: elisp; lexical-binding: t -*-
 ;; LegendOS Bunker: Red Team Edition v5.0 — GPL-3.0
 ;;

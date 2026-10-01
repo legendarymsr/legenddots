@@ -1,4 +1,3 @@
-;; SPDX-License-Identifier: GPL-3.0-or-later
 (use-modules (gnu home)
              (gnu home services)
              (gnu home services shells)

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendtimer — a terminal countdown timer, in C.
  *
  * "Reject Electron. Return to C."

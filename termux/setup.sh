@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # pocketwl — install native Termux dependencies and build the compositor.
 # Run inside Termux (not proot):  bash ~/legenddots/termux/setup.sh
 set -u

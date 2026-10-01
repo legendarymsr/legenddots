@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # KISS in-chroot setup — runs INSIDE the kiss-chroot from install.sh.
 # Configures the system, sets up the kiss-community repos, then builds a

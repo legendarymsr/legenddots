@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendbar — a sparkline generator, in C.
  *
  * "Reject Electron. Return to C."

@@ -1,5 +1,4 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-3.0-or-later
 # ~/.config/bspwm/bspwmrc — legenddots (minimal)
 # bspwm does nothing on its own; this script configures it and starts the bits
 # around it. sxhkd owns the keybinds (see sxhkdrc). No recompiling, ever.

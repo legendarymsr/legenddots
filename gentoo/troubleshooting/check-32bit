@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # check-32bit — report any 32-bit (multilib) remnants on the system. READ-ONLY;
 # changes nothing. Run as your normal user:
 #   bash ~/legenddots/gentoo/troubleshooting/check-32bit

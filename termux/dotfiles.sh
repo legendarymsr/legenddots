@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # termux/dotfiles.sh — pull the repo and symlink the phone dotfiles in one shot,
 # so nothing gets missed by hand-copying individual `ln` lines.
 #

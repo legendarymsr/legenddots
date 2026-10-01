@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # Collect audio diagnostics. Read-only — changes nothing.
 # Run as yourself: bash ~/legenddots/gentoo/troubleshooting/audio-debug
 

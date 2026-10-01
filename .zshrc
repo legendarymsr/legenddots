@@ -1,5 +1,4 @@
 #!/data/data/com.termux/files/usr/bin/env zsh
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # ZSH Configuration File (.zshrc)
 # Based on:- https://github.com/zdharma-continuum/zinit-configs/tree/master/vladdoster

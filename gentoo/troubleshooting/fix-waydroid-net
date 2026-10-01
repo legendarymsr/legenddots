@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # fix-waydroid-net — one command to get Waydroid's internet working.
 # By default it does a CLEAN restart (container, and best-effort your session),

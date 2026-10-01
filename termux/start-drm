@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # Run pocketwl on the wlroots DRM backend — TRUE Wayland, no Termux:X11.
 # REQUIRES ROOT.
 #

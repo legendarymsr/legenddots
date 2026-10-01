@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 # Dillo — minimal, Tokyo Night, JetBrainsMono. Symlink to ~/.dillo/dillorc.
 # Dillo reads its config ONLY from ~/.dillo/ (then /etc/dillo) — every version,
 # including the revived Dillo 3.1/3.2/3.3. There is NO ~/.config/dillo/ (XDG)

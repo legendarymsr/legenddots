@@ -1,5 +1,4 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 
 # ==========================================================================
 # LEGENDDOTS: MINIMALIST RECOVERY PROTOCOL v22.2

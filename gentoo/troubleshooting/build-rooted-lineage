@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # waygentoodroid — build a rooted, GApps-free LineageOS image on Waydroid
 # -----------------------------------------------------------------------------

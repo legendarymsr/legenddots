@@ -1,5 +1,4 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 
 # ==========================================================================
 # LEGENDDOTS: ENDEAVOUR-OS RECOVERY PROTOCOL v22.2
