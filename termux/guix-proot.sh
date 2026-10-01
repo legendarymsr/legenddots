@@ -113,12 +113,32 @@ exec guix $(printf '%q ' "$@")" ;;
 exec bash -i" ;;
   doctor)
     echo ":: proot-distro: $(command -v proot-distro || echo MISSING)"
+    echo ":: daemon substitute-urls (configured): $SUBS"
     in_proot '
       echo ":: guix: $(command -v guix 2>/dev/null || echo MISSING)  $(guix --version 2>/dev/null | head -1)"
       pgrep -x guix-daemon >/dev/null && echo ":: daemon: running" || echo ":: daemon: NOT running — see /var/log/guix-daemon.log"
       echo ":: JIT off? GUILE_JIT_THRESHOLD=${GUILE_JIT_THRESHOLD:-unset} (want -1)"
-      echo ":: authorized substitute servers:"
-      grep -o "[a-z.]*\.guix\.gnu\.org" /etc/guix/acl 2>/dev/null | sort -u | sed "s/^/     /" || echo "     (none — run setup)"
+      # The ACL stores raw public keys, not hostnames — count the keys instead.
+      n=$(grep -o "public-key" /etc/guix/acl 2>/dev/null | wc -l | tr -d " ")
+      echo ":: authorized substitute keys: ${n:-0}  (ci + Bordeaux = 2–3; if 0, run: guix-proot.sh authorize)"
+    '
+    echo ":: confirm a package has a prebuilt binary with:  guix-proot.sh weather PKG"
+    exit $? ;;
+  authorize)
+    # (Re)authorize both substitute farms — so Guix downloads binaries instead of
+    # compiling. Safe to run anytime; idempotent.
+    in_proot '
+      for key in ci.guix.gnu.org bordeaux.guix.gnu.org; do
+        for d in /var/guix/profiles/per-user/root/current-guix/share/guix \
+                 /root/.config/guix/current/share/guix /usr/share/guix; do
+          if [ -f "$d/$key.pub" ]; then
+            guix archive --authorize < "$d/$key.pub" 2>/dev/null && echo ":: authorized $key"
+            break
+          fi
+        done
+      done
+      n=$(grep -o "public-key" /etc/guix/acl 2>/dev/null | wc -l | tr -d " ")
+      echo ":: authorized substitute keys now: ${n:-0}"
     '
     exit $? ;;
   reset)
@@ -126,7 +146,7 @@ exec bash -i" ;;
     proot-distro remove "$DISTRO" 2>/dev/null || proot-distro reset "$DISTRO" 2>/dev/null || true
     echo ":: done — now re-run:  bash ~/legenddots/termux/guix-proot.sh"; exit 0 ;;
   setup|"") : ;;   # fall through to the setup below
-  *) warn "usage: guix-proot.sh [setup|guix ...|pull|weather PKG|login|daemon|doctor|reset]"; exit 1 ;;
+  *) warn "usage: guix-proot.sh [setup|guix ...|pull|weather PKG|authorize|login|daemon|doctor|reset]"; exit 1 ;;
 esac
 
 # ── setup ─────────────────────────────────────────────────────────────────────
