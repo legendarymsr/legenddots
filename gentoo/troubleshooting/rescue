@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # rescue — finish an interrupted update + rebuild the kernel, IN PLACE.
 # -----------------------------------------------------------------------------

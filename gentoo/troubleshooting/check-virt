@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # check-virt — diagnose why QEMU/KVM and/or Waydroid don't work on this Gentoo
 # box, and print the exact fix for each problem. Read-only: it changes nothing.

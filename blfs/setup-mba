@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # LFS 12.4 + BLFS Desktop Setup — MacBook Air 6,2 / Niri + Wayland
 #

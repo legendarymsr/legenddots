@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # fix-virt — make QEMU/KVM + Waydroid work, automatically. Applies the runtime
 # fixes (kvm/libvirt groups, kvm_intel, libvirtd, binderfs, waydroid-container)

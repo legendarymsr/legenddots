@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # install-apks — side-load a working Magisk app + Termux into the Waydroid Android.
 # -----------------------------------------------------------------------------

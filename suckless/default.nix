@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Shared package set: the legenddots suckless tools, each rebuilt against our
 # own config.h. Imported by both flake.nix and home.nix.
 #

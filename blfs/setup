@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # LFS 12.4 + BLFS Desktop Setup — KVM/QEMU (x86_64, 2 vCPU, 4 GB RAM) / Niri + Wayland
 #

@@ -1,3 +1,4 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;; Guix Home — install the legenddots suckless tools into your user profile,
 ;; each rebuilt against our own config.h.
 ;;

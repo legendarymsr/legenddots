@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendpick — pick random items, in C.
  *
  * "Reject Electron. Return to C."

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Chroot back into an in-progress gentoo/install.sh run -- after a crash,
 # a freeze, or just a deliberate reboot. The script doesn't know or care

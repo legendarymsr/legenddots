@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Finish an ALREADY-installed Exherbo: build ONLY the kernel + bootloader and
 # skip everything else (system config, cave sync, networking, doas). For when

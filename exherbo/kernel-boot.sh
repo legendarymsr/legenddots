@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Build/refresh the kernel + bootloader for THIS Exherbo system. Runs as root,
 # both ways:

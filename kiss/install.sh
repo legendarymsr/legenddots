@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # KISS Linux Install Script — kiss-community fork, UEFI x86_64
 # Mirrors the flow of gentoo/install.sh: partition -> extract rootfs ->

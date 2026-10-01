@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # legend's Exherbo-in-a-VM launcher. One command, does everything:
 #   - installs qemu + OVMF firmware if missing (app-emulation/qemu,

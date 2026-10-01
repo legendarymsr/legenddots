@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # fix-wifi — Broadcom wl recovery + connect, GENTLE by default.
 # Run: doas bash ~/legenddots/gentoo/troubleshooting/fix-wifi
 #

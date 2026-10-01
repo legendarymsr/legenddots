@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Home-manager module for the legenddots suckless tools.
 #
 # Flake users get this as `homeManagerModules.default`. Non-flake users can

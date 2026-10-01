@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Minimal bspwm setup. Works on:
 #   - Arch  (pacman; ly enabled via systemd)
 #   - KISS  (kiss; started with startx)
