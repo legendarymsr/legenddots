@@ -59,10 +59,10 @@ pdx() { DISTRO_ARCH=x86_64 PROOT_DISTRO_X64_EMULATOR="$EMU" proot-distro login "
 pd()  { pdx bash -lc "$PROOT_PREP
 $1"; }
 
-# Check via a REAL file: /bin is an absolute symlink to /usr/bin in the rootfs,
-# which resolves to the host's path and breaks `[ -x .../bin/bash ]`. /etc isn't
-# symlinked.
-installed() { [ -e "$ROOTFS_DIR/etc/os-release" ]; }
+# Installed = the proot-distro rootfs dir exists and is non-empty. (Don't test
+# files under /bin — it's an absolute symlink to /usr/bin that resolves against
+# the HOST and gives false negatives.)
+installed() { [ -d "$ROOTFS_DIR" ] && [ -n "$(ls -A "$ROOTFS_DIR" 2>/dev/null)" ]; }
 
 # ── subcommands ──────────────────────────────────────────────────────────────
 case "${1:-setup}" in
@@ -97,7 +97,9 @@ exec $(printf '%q ' "$@")"
     rc=$?; unwake; exit $rc ;;
   doctor)
     echo ":: qemu: $(command -v qemu-x86_64 || echo MISSING)   emulator=$EMU"
-    echo ":: rootfs: $(installed && echo "$ROOTFS_DIR" || echo 'NOT installed')"
+    echo ":: rootfs dir: $ROOTFS_DIR"
+    echo ":: rootfs: $(installed && echo installed || echo 'NOT installed (empty/missing dir above)')"
+    echo ":: proot-distro sees: $(proot-distro list 2>/dev/null | grep -i "$ALIAS" | tr -s ' ' || echo '(not listed)')"
     echo ":: daemon substitute-urls (configured): $SUBS"
     installed && pd '
       echo ":: arch: $(uname -m)  (want x86_64)"
