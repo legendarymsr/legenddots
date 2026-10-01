@@ -1,4 +1,3 @@
--- SPDX-License-Identifier: GPL-3.0-or-later
 -- ~/.config/vis/visrc.lua — legenddots
 --
 -- vis: modal editing (vi keys) + Plan 9 structural regular expressions (sam),

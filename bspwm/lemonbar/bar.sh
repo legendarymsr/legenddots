@@ -1,5 +1,4 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-3.0-or-later
 # ~/.config/lemonbar/bar.sh — legenddots Tokyo Night bar: ram · battery · date
 # Pure shell + lemonbar (C). No Haskell, no polybar. bspwmrc launches this.
 #

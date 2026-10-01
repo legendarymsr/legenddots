@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Exherbo in-chroot setup — runs INSIDE the chroot from install.sh.
 # Syncs the cave/paludis repos, configures the system, then builds a kernel +

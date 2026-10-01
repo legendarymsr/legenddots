@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 # pocketwl — build against Termux's native wlroots.
 #
 # wlroots' own <wlr/types/wlr_xdg_shell.h> does #include "xdg-shell-protocol.h",

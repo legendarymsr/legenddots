@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 fn main() {
        // Trans Pride RGB Colors
        let b = "\x1b[38;2;91;206;250m";  // Blue

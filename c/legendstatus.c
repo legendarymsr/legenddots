@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendstatus — a pocket status line for dwm / dwl, in C.
  *
  * "Reject Electron. Return to C."

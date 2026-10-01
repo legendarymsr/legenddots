@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendpass — a secure password generator (with optional GnuPG store), in C.
  *
  * "Reject Electron. Return to C."

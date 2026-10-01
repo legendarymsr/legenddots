@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Genuine GNU IceCat inside pocketwl — via a proot distro + GNU Guix.
 #

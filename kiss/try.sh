@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Try KISS Linux WITHOUT installing it. Unpacks the kiss-community rootfs into a
 # directory and uses its OWN kiss-chroot to drop you in — no partitioning, no

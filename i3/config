@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 set $mod Mod4
 
 font pango:JetBrainsMono Nerd Font 11

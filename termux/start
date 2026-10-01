@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # pocketwl — start Termux:X11 and run the compositor nested inside it.
 # Unrooted Android has no DRM/KMS, so wlroots uses its X11 backend: because
 # DISPLAY points at the Termux:X11 server, pocketwl renders into an X11 window.

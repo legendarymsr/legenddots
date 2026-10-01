@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # GNU/Linux-libre From Scratch — KVM/QEMU (x86_64, 2 vCPU, 4+ GB RAM)
 # A fully FSDG-compliant free system: Linux-libre kernel, GNU Shepherd init,

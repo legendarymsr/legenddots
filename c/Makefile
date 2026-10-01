@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 # c/ — the manifesto's tools, in C.
 #
 #   "Reject Electron. Return to C."

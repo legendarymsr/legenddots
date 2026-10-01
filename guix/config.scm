@@ -1,4 +1,3 @@
-;; SPDX-License-Identifier: GPL-3.0-or-later
 (use-modules (gnu)
              (gnu services desktop)
              (gnu services networking)

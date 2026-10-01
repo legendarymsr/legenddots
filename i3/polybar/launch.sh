@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 killall -q polybar
 while pgrep -u $UID -x polybar >/dev/null; do sleep 0.1; done

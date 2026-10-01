@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
 // pocketwl — a pocket-sized Wayland compositor for Android/Termux.
 //
 // A minimal wlroots stacking compositor (derived from wlroots' reference

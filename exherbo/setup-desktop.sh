@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Install doas + a suckless desktop on an ALREADY-INSTALLED Exherbo: dwm (WM,
 # built-in bar), dmenu (launcher), st (terminal), slock (lock), surf (browser) —

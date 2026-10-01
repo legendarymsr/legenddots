@@ -1,4 +1,3 @@
--- SPDX-License-Identifier: GPL-3.0-or-later
 -- ~/.config/vis/themes/tokyonight.lua — legenddots
 --
 -- Tokyo Night, done in the 16 ANSI color NAMES rather than hex. vis renders

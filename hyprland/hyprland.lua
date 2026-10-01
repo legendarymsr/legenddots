@@ -1,4 +1,3 @@
--- SPDX-License-Identifier: GPL-3.0-or-later
 -- Hyprland config in Lua (the hl.* API) — Hyprland's config format in current
 -- versions (hyprlang/.conf is gone). Tokyo Night. Docs: https://wiki.hypr.land/
 --

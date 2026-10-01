@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 # Dillo cookie policy. Symlink next to dillorc (~/.dillo/ or ~/.config/dillo/).
 # Rules are matched top-down; DEFAULT is the fallback.
 #   DENY           reject all cookies (most private)

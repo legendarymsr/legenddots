@@ -1,5 +1,4 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-3.0-or-later
 exec wmenu-run -i \
 	-f 'JetBrainsMono Nerd Font 11' \
 	-N '#1a1b26' -n '#c0caf5' \
