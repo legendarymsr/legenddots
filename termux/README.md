@@ -304,13 +304,18 @@ bash ~/legenddots/termux/guix-proot-x86.sh guix install icecat
 bash ~/legenddots/termux/guix-proot-x86.sh run -- icecat
 ```
 
-It installs `qemu-user-x86-64`, downloads a clean Debian amd64 rootfs (from
-linuxcontainers — not Ubuntu; `X86_ROOTFS_URL` to override), and runs the same
-JIT-off Guix flow. Other
-commands: `login`, `pull`, `authorize`, `daemon`, `doctor`, `reset`. The native
-`guix-proot.sh` stays the fast default; reach for this only when a package has no
-aarch64 binary. (Untested here — qemu-user + proot + Guix is three fragile layers;
-`doctor` reports where it stands.)
+It installs `proot-distro` + `qemu-user-x86-64` and uses **proot-distro's built-in
+foreign-arch support** (`DISTRO_ARCH=x86_64`) to install an x86_64 Debian under the
+alias `debian-x86`, then runs the same JIT-off Guix flow. Using proot-distro (not a
+hand-rolled `proot -q`) is what makes it actually run — it extracts the rootfs and
+wires the emulator in correctly. Other commands: `login`, `pull`, `authorize`,
+`daemon`, `doctor`, `reset`. The native `guix-proot.sh` stays the fast default;
+reach for this only when a package has no aarch64 binary.
+
+If QEMU misbehaves, retry with the **Blink** emulator:
+`PROOT_DISTRO_X64_EMULATOR=BLINK bash …/guix-proot-x86.sh reset` then run setup
+again. (Three emulated layers — qemu/blink + proot + Guix — so `doctor` reports
+where it stands.)
 
 Prefer substitutes over `guix pull` where you can — the installer's Guix already
 has a package set; you only need to pull to *update* it. `guix weather PKG` first
