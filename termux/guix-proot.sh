@@ -88,8 +88,10 @@ exec guix $(printf '%q ' "$@")" ;;
     # parallelism (override GUIX_CORES / GUIX_MAX_JOBS) + a wakelock, and remind
     # about the phantom-process killer, which is the usual real cause.
     phantom_note; wake
-    say "guix pull with low parallelism (cores=${GUIX_CORES:-1}, jobs=${GUIX_MAX_JOBS:-1}) to cap RAM…"
-    in_proot "guix pull --cores=${GUIX_CORES:-1} --max-jobs=${GUIX_MAX_JOBS:-1} && guix describe"
+    say "guix pull with low parallelism + low-memory Guile (cores=${GUIX_CORES:-1}, jobs=${GUIX_MAX_JOBS:-1})…"
+    # GUILE_JIT_THRESHOLD=-1 disables the JIT (less RAM); GC_MARKERS=1 uses a
+    # single GC thread (less peak). Both shave the memory spike that OOM-kills it.
+    in_proot "GUILE_JIT_THRESHOLD=-1 GC_MARKERS=1 guix pull --cores=${GUIX_CORES:-1} --max-jobs=${GUIX_MAX_JOBS:-1} && guix describe"
     rc=$?; unwake; exit $rc ;;
   daemon) in_proot 'pgrep -x guix-daemon >/dev/null && echo "guix-daemon running" || echo "failed to start — see /var/log/guix-daemon.log"'; exit $? ;;
   login)  wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
