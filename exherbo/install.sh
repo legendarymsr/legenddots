@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Exherbo Linux Install Script — cave / paludis, exheres-0, UEFI x86_64
 # Mirrors the flow of gentoo/install.sh and kiss/install.sh: partition ->

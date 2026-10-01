@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # edit — open whichever editor you've picked as your default (neovim or emacs).
 # This is what $EDITOR / $VISUAL point at, so git, doas -e, etc. all honour the
 # choice. Switch the default any time with `use-nvim` / `use-emacs` (zsh funcs

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* fetch — the manifesto spite binary, in C.
  *
  * "Freedom is not granted — it is taken and defended."

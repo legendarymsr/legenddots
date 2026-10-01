@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # editor — show or switch your default editor (neovim <-> emacs), OS-wide aware.
 #
 #   editor            show the current default

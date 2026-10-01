@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Firefox ESR inside pocketwl — via a Debian proot. The reliable browser path.
 #

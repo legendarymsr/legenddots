@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Gentoo Install Script — MacBook Air 6,2 (THE FINAL PERFECTION)
 # =============================================================================

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Pre-reboot sanity check after a kernel rebuild. Read-only — changes nothing.
 # Run it BEFORE rebooting into a freshly built kernel:
 #   bash ~/legenddots/gentoo/troubleshooting/verify-boot

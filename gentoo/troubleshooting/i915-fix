@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Fix i915 KMS for niri: remove nomodeset from rEFInd boot config.
 set -euo pipefail
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 {
   description = "legenddots suckless tools (st, slock, dmenu, dwm, dwl, surf) built with custom Tokyo Night config.h";
 

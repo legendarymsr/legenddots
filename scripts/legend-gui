@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """LegendChrome — a lean, AMNESIC PyQt6 browser.
 
 By design it remembers nothing: off-the-record profile (no history, no on-disk

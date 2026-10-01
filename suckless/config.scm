@@ -1,3 +1,4 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;; Guix — the legenddots suckless tools, each rebuilt against our own config.h.
 ;;
 ;; Use it as a manifest (installs the tools into a profile / shell):

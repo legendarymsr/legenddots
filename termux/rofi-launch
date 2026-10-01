@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Alt+D launcher for pocketwl using rofi.
 #
 # Termux's rofi is built with Wayland support, so with WAYLAND_DISPLAY set it

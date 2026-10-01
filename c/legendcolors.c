@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* legendcolors — a terminal color palette tester, in C.
  *
  * "Reject Electron. Return to C."

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # =============================================================================
 # Try Exherbo WITHOUT installing it. Unpacks a stage into a directory on your
 # existing Linux box (Gentoo, whatever) and chroots in so you can play with

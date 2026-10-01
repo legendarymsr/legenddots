@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # pocketwl fallback app launcher — for when Termux has no Wayland GUI launcher
 # (fuzzel/wofi/tofi/bemenu). Uses tools Termux always has: foot + fzf.
 #
