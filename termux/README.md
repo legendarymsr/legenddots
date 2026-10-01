@@ -232,18 +232,25 @@ Two Android things, not Guix bugs:
 
 1. **Phantom-process killer (the usual cause).** Android 12+ silently kills apps
    that spawn many child processes — and proot + guix-daemon + a compile spawn a
-   *lot*. Termux just vanishes mid-build. Disable it over **adb** (from a PC or
-   wireless adb; survives reboot):
-   ```sh
-   adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
-   adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
-   adb shell settings put global settings_enable_monitor_phantom_procs false
-   ```
-   Then reboot. This is the single biggest fix.
-2. **Out-of-memory.** `guix pull` spikes RAM (Guile compiling the whole of Guix).
-   `guix-proot.sh pull` already runs it with `--cores=1 --max-jobs=1` to cap the
-   peak; lower a *build* too with `GUIX_CORES=1 GUIX_MAX_JOBS=1 guix-proot.sh guix install PKG`.
-   The script also grabs `termux-wake-lock` so Android won't suspend it.
+   *lot*. Termux just vanishes mid-build.
+   - **GrapheneOS:** just flip **Settings → Apps → Termux → "Disable child process
+     restrictions"** (no adb needed). ← you're here.
+   - **Stock Android:** disable it over **adb** (from a PC or wireless adb; survives
+     reboot), then reboot:
+     ```sh
+     adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
+     adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
+     adb shell settings put global settings_enable_monitor_phantom_procs false
+     ```
+   This is the single biggest fix.
+2. **Out-of-memory** (the likely cause once the killer is off). `guix pull` spikes
+   RAM — Guile compiles the whole of Guix. `guix-proot.sh pull` now runs it with
+   `--cores=1 --max-jobs=1` **and** `GUILE_JIT_THRESHOLD=-1 GC_MARKERS=1` (no JIT,
+   single GC thread) to shave the peak. Throttle a *build* the same way with
+   `GUIX_CORES=1 GUIX_MAX_JOBS=1 guix-proot.sh guix install PKG`. The script also
+   holds `termux-wake-lock`. If a pull still OOMs, close other apps first — or skip
+   pulling and lean on substitutes (`guix weather PKG`); you only need to pull to
+   *update* Guix, not to install from the set you already have.
 
 Prefer substitutes over `guix pull` where you can — the installer's Guix already
 has a package set; you only need to pull to *update* it. `guix weather PKG` first
