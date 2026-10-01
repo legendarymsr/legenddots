@@ -77,6 +77,7 @@ ensure_termux_deps() {
   pkg install -y proot qemu-user-x86-64 wget tar xz-utils >/dev/null 2>&1 \
     || pkg install -y proot qemu-user-x86-64 wget tar xz-utils \
     || { warn "could not install proot / qemu-user-x86-64"; return 1; }
+  mkdir -p "$PREFIX/tmp"            # proot stores temp files here (fixes can't-chmod proot-tmp)
   find_qemu || { warn "qemu-x86_64 not found after install"; return 1; }
 }
 
@@ -149,13 +150,14 @@ if [ ! -x "$ROOTFS/bin/bash" ]; then
   say "Downloading Debian amd64 rootfs: $URL"
   wget -O "$TB" "$URL" || { warn "rootfs download failed ($URL)"; exit 1; }
   say "Extracting rootfs…"
-  # --link2symlink: Android FS can't do hardlinks, convert them to symlinks.
-  # --no-same-owner: we aren't real root. Errors shown (not hidden) so failures
-  # are visible; the REAL success check is /bin/sh existing afterwards.
-  if ! proot --link2symlink tar -C "$ROOTFS" --no-same-owner --delay-directory-restore -xf "$TB"; then
-    warn "proot+tar had issues, trying plain tar…"
-    tar -C "$ROOTFS" --no-same-owner -xf "$TB" || true
-  fi
+  # Decompress with xz EXPLICITLY and pipe into tar — don't trust tar's xz
+  # auto-detect. proot --link2symlink converts hardlinks (Android FS can't do
+  # them); the --warning/--delay flags are what proot-distro itself uses on these
+  # linuxcontainers tarballs. Errors are shown; the REAL gate is /bin/sh existing.
+  xz -dc "$TB" | proot --link2symlink tar -C "$ROOTFS" \
+      --warning=no-unknown-keyword --delay-directory-restore -xf - \
+    || { warn "proot+tar path failed, trying plain tar…"; \
+         xz -dc "$TB" | tar -C "$ROOTFS" --no-same-owner -xf - || true; }
   if [ ! -x "$ROOTFS/bin/sh" ]; then
     warn "extraction produced no rootfs (no /bin/sh) — see errors above."
     warn "clean up and retry:  bash ~/legenddots/termux/guix-proot-x86.sh reset"
