@@ -71,6 +71,10 @@ DAEMON_START="
 PROOT_PREP="
   export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:\$PATH
   export GUIX_LOCPATH=/root/.guix-profile/lib/locale
+  # Disable Guile's JIT: under proot its generated code / executable mmaps crash
+  # (SIGILL/SIGSEGV), which is what takes Termux down on heavy ops like guix pull.
+  # Costs a little speed, buys stability. Applies to the daemon too (same env).
+  export GUILE_JIT_THRESHOLD=-1
   . /root/.guix-profile/etc/profile 2>/dev/null || true
   $DAEMON_START
 "
@@ -84,14 +88,15 @@ case "${1:-setup}" in
   guix)   shift; wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
 exec guix $(printf '%q ' "$@")" ;;
   pull)
-    # guix pull is the big RAM spike that kills Termux. Run it with minimal
-    # parallelism (override GUIX_CORES / GUIX_MAX_JOBS) + a wakelock, and remind
-    # about the phantom-process killer, which is the usual real cause.
+    # The crasher is the Guile JIT under proot (handled globally in PROOT_PREP),
+    # not memory — so don't cripple parallelism. Optionally cap it on low-RAM
+    # devices via GUIX_CORES / GUIX_MAX_JOBS.
     phantom_note; wake
-    say "guix pull with low parallelism + low-memory Guile (cores=${GUIX_CORES:-1}, jobs=${GUIX_MAX_JOBS:-1})…"
-    # GUILE_JIT_THRESHOLD=-1 disables the JIT (less RAM); GC_MARKERS=1 uses a
-    # single GC thread (less peak). Both shave the memory spike that OOM-kills it.
-    in_proot "GUILE_JIT_THRESHOLD=-1 GC_MARKERS=1 guix pull --cores=${GUIX_CORES:-1} --max-jobs=${GUIX_MAX_JOBS:-1} && guix describe"
+    pargs=""
+    [ -n "${GUIX_CORES:-}" ]    && pargs="$pargs --cores=${GUIX_CORES}"
+    [ -n "${GUIX_MAX_JOBS:-}" ] && pargs="$pargs --max-jobs=${GUIX_MAX_JOBS}"
+    say "guix pull (Guile JIT off for proot stability)…"
+    in_proot "guix pull${pargs} && guix describe"
     rc=$?; unwake; exit $rc ;;
   daemon) in_proot 'pgrep -x guix-daemon >/dev/null && echo "guix-daemon running" || echo "failed to start — see /var/log/guix-daemon.log"'; exit $? ;;
   login)  wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
