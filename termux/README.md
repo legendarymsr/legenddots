@@ -212,11 +212,19 @@ bash ~/legenddots/termux/guix-proot.sh login      # a shell inside it
 bash ~/legenddots/termux/guix-proot.sh daemon     # (re)start the daemon
 ```
 
-Base distro via `GUIX_DISTRO` (default `debian`). Same honest caveats as below:
-Guix-in-proot is **fragile** (the daemon only gets proot's fake root/namespaces),
-and aarch64 **substitutes are patchy**, so a package with no prebuilt binary
-builds from source — check `guix weather PKG` first. If setup wedges, finish by
-hand in `guix-proot.sh login`.
+Base distro via `GUIX_DISTRO` (default `debian`). It's tuned for Termux:
+
+- **Bordeaux substitutes** — it authorizes *both* `ci.guix.gnu.org` and
+  `bordeaux.guix.gnu.org` and points the daemon at both. Bordeaux builds far more
+  aarch64, so most installs download a binary instead of compiling for hours.
+  (A package it still lacks builds from source — check `guix weather PKG` first.)
+- **`PROOT_NO_SECCOMP=1`** — proot's seccomp emulation trips Guix daemon syscalls;
+  disabling it is slower but much more reliable.
+- **Locales** — sets `GUIX_LOCPATH` and installs `glibc-locales` so UTF-8 works
+  and Guix stops spamming locale warnings.
+
+Still honest: Guix-in-proot is **fragile** (the daemon only gets proot's fake
+root/namespaces). If setup wedges, finish by hand in `guix-proot.sh login`.
 
 ## Genuine GNU IceCat via Guix (`icecat.sh`)
 

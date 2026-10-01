@@ -52,45 +52,26 @@ if [[ "${1:-}" == "launch" ]]; then
 fi
 
 # ── setup ─────────────────────────────────────────────────────────────────────
-say "Installing proot-distro..."
-pkg install -y proot-distro || { warn "could not install proot-distro"; exit 1; }
+# The Guix host (proot-distro + Guix + daemon + Bordeaux substitutes + locales +
+# PROOT_NO_SECCOMP) is handled by guix-proot.sh so IceCat gets all those fixes.
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ -n "${TRISQUEL_ROOTFS_URL:-}" ]]; then
-  say "TRISQUEL_ROOTFS_URL set — see README to register it as a proot-distro plugin,"
-  say "then re-run with ICECAT_DISTRO=trisquel. Proceeding with '$DISTRO' for now."
+  say "TRISQUEL_ROOTFS_URL set — register it as a proot-distro plugin (see README),"
+  say "then re-run with ICECAT_DISTRO=trisquel. Using '$DISTRO' for now."
 fi
 
-say "Installing the '$DISTRO' proot (the Guix host)..."
-proot-distro install "$DISTRO" 2>/dev/null || say "  ($DISTRO already installed)"
+say "Setting up the Guix host via guix-proot.sh (base: $DISTRO)..."
+GUIX_DISTRO="$DISTRO" bash "$SELF_DIR/guix-proot.sh" \
+  || warn "guix-proot setup hit errors — see termux/README.md (proot/Guix friction)."
 
-say "Preparing the proot + installing GNU Guix (this is the fragile step)..."
-proot-distro login "$DISTRO" --shared-tmp -- bash -lc '
-  set -e
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -y
-  # Guix installer deps + a few libs IceCat/GTK expect from the host.
-  apt-get install -y wget xz-utils gpg guile-3.0-libs libgtk-3-0 \
-    fonts-dejavu ca-certificates locales || true
+# IceCat/GTK want a few host libs for the Wayland launch later.
+proot-distro login "$DISTRO" --shared-tmp -- bash -lc \
+  'export DEBIAN_FRONTEND=noninteractive; apt-get install -y libgtk-3-0 fonts-dejavu >/dev/null 2>&1 || true' || true
 
-  if ! command -v guix >/dev/null 2>&1; then
-    echo ":: fetching the GNU Guix install script..."
-    cd /root
-    wget -q https://guix.gnu.org/install.sh -O guix-install.sh
-    # Non-interactive; the installer sets up /gnu/store and guix-daemon.
-    yes "" | bash guix-install.sh || \
-      echo "!! Guix installer reported errors (expected in proot) — see README to finish by hand."
-  fi
-
-  # Start the daemon (proot has no init); background it.
-  if command -v guix-daemon >/dev/null 2>&1; then
-    guix-daemon --build-users-group=guixbuild --disable-chroot >/var/log/guix-daemon.log 2>&1 &
-    sleep 3
-  fi
-
-  echo ":: guix pull + installing genuine GNU IceCat (may build from source)..."
-  guix pull || echo "!! guix pull failed — see README"
-  guix install icecat || echo "!! guix install icecat failed — see README (substitutes/daemon)"
-' || warn "proot setup hit errors — see the notes above and libre/… no, termux/README.md"
+say "Installing genuine GNU IceCat (downloads a binary if Bordeaux has it; else builds)..."
+GUIX_DISTRO="$DISTRO" bash "$SELF_DIR/guix-proot.sh" guix install icecat \
+  || warn "guix install icecat failed — check 'bash guix-proot.sh guix weather icecat', see README."
 
 cat <<EOF
 
@@ -99,7 +80,8 @@ cat <<EOF
      2. from a terminal INSIDE pocketwl:
           bash ~/legenddots/termux/icecat.sh launch
 
-If Guix or the icecat install failed above, that's the known proot/Guix
-friction — see the "Genuine IceCat via Guix" section of termux/README.md for the
-manual daemon/substitute steps. IceCat from Guix is genuine FSDG-libre software.
+Tip: 'bash ~/legenddots/termux/guix-proot.sh guix weather icecat' shows whether a
+prebuilt aarch64 binary exists (Bordeaux) before you commit to a source build.
+If Guix friction bit, see the "Genuine IceCat via Guix" section of termux/README.md.
+IceCat from Guix is genuine FSDG-libre software.
 EOF

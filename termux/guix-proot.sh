@@ -28,18 +28,34 @@ DISTRO="${GUIX_DISTRO:-debian}"
 say()  { echo ":: $*"; }
 warn() { echo "!! $*" >&2; }
 
-# PATH inside the proot where guix lands (pre- and post-`guix pull`), plus the
-# command that starts the daemon if it isn't already up. Shared by every mode.
-PROOT_PREP='
-  export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:$PATH
-  . /root/.guix-profile/etc/profile 2>/dev/null || true
+# proot's seccomp emulation trips a lot of Guix/daemon syscalls on Termux —
+# disabling it is slower but MUCH more reliable. Set for every proot we spawn.
+export PROOT_NO_SECCOMP=1
+
+# Substitute (prebuilt-binary) servers, best aarch64 coverage first. Bordeaux
+# builds far more aarch64 than ci.guix.gnu.org, so this is the difference between
+# "downloads a binary" and "compiles IceCat for six hours". Authorized in setup.
+SUBS="https://bordeaux.guix.gnu.org https://ci.guix.gnu.org"
+
+# The daemon line, reused everywhere: no chroot (proot), both substitute farms,
+# all cores; fall back to no build-users if the group isn't set up.
+DAEMON_START="
   if command -v guix-daemon >/dev/null 2>&1 && ! pgrep -x guix-daemon >/dev/null 2>&1; then
-    ( guix-daemon --build-users-group=guixbuild --disable-chroot \
-        >/var/log/guix-daemon.log 2>&1 || \
-      guix-daemon --disable-chroot >/var/log/guix-daemon.log 2>&1 ) &
+    ( guix-daemon --disable-chroot --cores=0 --substitute-urls='$SUBS' --build-users-group=guixbuild \
+        >/var/log/guix-daemon.log 2>&1 \
+      || guix-daemon --disable-chroot --cores=0 --substitute-urls='$SUBS' \
+        >/var/log/guix-daemon.log 2>&1 ) &
     sleep 3
-  fi
-'
+  fi"
+
+# PATH where guix lands (pre- and post-`guix pull`), a locale path so Guix stops
+# spamming locale warnings, and the daemon ensure. Shared by every mode.
+PROOT_PREP="
+  export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:\$PATH
+  export GUIX_LOCPATH=/root/.guix-profile/lib/locale
+  . /root/.guix-profile/etc/profile 2>/dev/null || true
+  $DAEMON_START
+"
 
 # run a command string inside the proot (daemon ensured, guix on PATH)
 in_proot() { proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
@@ -83,16 +99,26 @@ proot-distro login "$DISTRO" --shared-tmp -- bash -lc '
   else
     echo ":: Guix already present."
   fi
+' || warn "proot/Guix base setup hit errors — see termux/README.md for the manual steps."
 
-  export PATH=/var/guix/profiles/per-user/root/current-guix/bin:$PATH
-  # Start the daemon (proot has no init).
-  if command -v guix-daemon >/dev/null 2>&1 && ! pgrep -x guix-daemon >/dev/null 2>&1; then
-    ( guix-daemon --build-users-group=guixbuild --disable-chroot >/var/log/guix-daemon.log 2>&1 \
-      || guix-daemon --disable-chroot >/var/log/guix-daemon.log 2>&1 ) &
-    sleep 3
-  fi
-  command -v guix >/dev/null 2>&1 && guix --version || echo "!! guix not on PATH yet — see README"
-' || warn "proot/Guix setup hit errors — see termux/README.md for the manual steps."
+say "Authorizing substitute servers (Bordeaux = good aarch64 binaries) + locales..."
+# Second pass uses PROOT_PREP, so the daemon is up with BOTH substitute farms and
+# guix is on PATH. Authorizing both keys is what lets Guix actually USE those
+# prebuilt binaries instead of compiling everything.
+in_proot '
+  for key in ci.guix.gnu.org bordeaux.guix.gnu.org; do
+    for d in /var/guix/profiles/per-user/root/current-guix/share/guix \
+             /root/.config/guix/current/share/guix /usr/share/guix; do
+      if [ -f "$d/$key.pub" ]; then
+        guix archive --authorize < "$d/$key.pub" 2>/dev/null && echo "   authorized $key"
+        break
+      fi
+    done
+  done
+  # UTF-8 locales (has substitutes, quick) so Guix stops warning + text renders.
+  guix install glibc-locales 2>/dev/null && echo "   installed glibc-locales" || true
+  guix --version 2>/dev/null || echo "!! guix not on PATH yet — see README"
+' || warn "key/locale step hit errors — see termux/README.md."
 
 cat <<EOF
 
