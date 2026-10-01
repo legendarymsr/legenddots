@@ -208,9 +208,15 @@ proot needs. It's the same Guix that `icecat.sh` uses — set it up once, then
 bash ~/legenddots/termux/guix-proot.sh            # set up the proot + Guix
 bash ~/legenddots/termux/guix-proot.sh pull       # update Guix
 bash ~/legenddots/termux/guix-proot.sh guix install hello
+bash ~/legenddots/termux/guix-proot.sh weather hello   # prebuilt binary available?
 bash ~/legenddots/termux/guix-proot.sh login      # a shell inside it
 bash ~/legenddots/termux/guix-proot.sh daemon     # (re)start the daemon
+bash ~/legenddots/termux/guix-proot.sh doctor     # check the whole setup
 ```
+
+Start with **`doctor`** if anything's off — it reports guix version, whether the
+daemon is up, that the JIT is disabled, and which substitute servers are
+authorized.
 
 Base distro via `GUIX_DISTRO` (default `debian`). It's tuned for Termux:
 
@@ -220,6 +226,11 @@ Base distro via `GUIX_DISTRO` (default `debian`). It's tuned for Termux:
   (A package it still lacks builds from source — check `guix weather PKG` first.)
 - **`PROOT_NO_SECCOMP=1`** — proot's seccomp emulation trips Guix daemon syscalls;
   disabling it is slower but much more reliable.
+- **No JIT** — `GUILE_JIT_THRESHOLD=-1` for every op (client + daemon); Guile's
+  JIT crashes under proot, which is the usual "`guix pull` kills Termux".
+- **Daemon tuned for proot** — `--disable-chroot --disable-deduplication` (store
+  hardlink dedup misbehaves on proot's VFS), and it *waits for the daemon socket*
+  before running, so the first command doesn't race a half-started daemon.
 - **Locales** — sets `GUIX_LOCPATH` and installs `glibc-locales` so UTF-8 works
   and Guix stops spamming locale warnings.
 

@@ -10,8 +10,10 @@
 #   bash ~/legenddots/termux/guix-proot.sh            # set up the proot + Guix
 #   bash ~/legenddots/termux/guix-proot.sh guix ...   # run a guix command
 #   bash ~/legenddots/termux/guix-proot.sh pull       # guix pull (update Guix)
+#   bash ~/legenddots/termux/guix-proot.sh weather P  # is there a prebuilt binary?
 #   bash ~/legenddots/termux/guix-proot.sh login      # interactive shell in it
 #   bash ~/legenddots/termux/guix-proot.sh daemon     # just (re)start the daemon
+#   bash ~/legenddots/termux/guix-proot.sh doctor     # check the setup end-to-end
 #
 # Env: GUIX_DISTRO  base proot distro (default: debian)
 #
@@ -55,15 +57,21 @@ export PROOT_NO_SECCOMP=1
 # "downloads a binary" and "compiles IceCat for six hours". Authorized in setup.
 SUBS="https://bordeaux.guix.gnu.org https://ci.guix.gnu.org"
 
-# The daemon line, reused everywhere: no chroot (proot), both substitute farms,
-# all cores; fall back to no build-users if the group isn't set up.
+# The daemon line, reused everywhere. For proot reliability:
+#   --disable-chroot          proot can't give real chroot
+#   --disable-deduplication   store dedup hardlinks misbehave on proot's VFS
+#   --substitute-urls         both farms (Bordeaux first = best aarch64)
+# Falls back to no build-users group if it isn't set up; then WAITS for the
+# daemon socket instead of a blind sleep, so the first guix call doesn't race it.
+GUIX_SOCK="/var/guix/daemon-socket/socket"
 DAEMON_START="
+  mkdir -p /dev/shm 2>/dev/null; chmod 1777 /dev/shm 2>/dev/null || true
   if command -v guix-daemon >/dev/null 2>&1 && ! pgrep -x guix-daemon >/dev/null 2>&1; then
-    ( guix-daemon --disable-chroot --cores=0 --substitute-urls='$SUBS' --build-users-group=guixbuild \
+    ( guix-daemon --disable-chroot --disable-deduplication --cores=0 --substitute-urls='$SUBS' --build-users-group=guixbuild \
         >/var/log/guix-daemon.log 2>&1 \
-      || guix-daemon --disable-chroot --cores=0 --substitute-urls='$SUBS' \
+      || guix-daemon --disable-chroot --disable-deduplication --cores=0 --substitute-urls='$SUBS' \
         >/var/log/guix-daemon.log 2>&1 ) &
-    sleep 3
+    for _ in \$(seq 1 30); do [ -S '$GUIX_SOCK' ] && break; sleep 1; done
   fi"
 
 # PATH where guix lands (pre- and post-`guix pull`), a locale path so Guix stops
@@ -98,11 +106,22 @@ exec guix $(printf '%q ' "$@")" ;;
     say "guix pull (Guile JIT off for proot stability)…"
     in_proot "guix pull${pargs} && guix describe"
     rc=$?; unwake; exit $rc ;;
+  weather) shift; wake; in_proot "guix weather $(printf '%q ' "$@")"; rc=$?; unwake; exit $rc ;;
   daemon) in_proot 'pgrep -x guix-daemon >/dev/null && echo "guix-daemon running" || echo "failed to start — see /var/log/guix-daemon.log"'; exit $? ;;
   login)  wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
 exec bash -i" ;;
+  doctor)
+    echo ":: proot-distro: $(command -v proot-distro || echo MISSING)"
+    in_proot '
+      echo ":: guix: $(command -v guix 2>/dev/null || echo MISSING)  $(guix --version 2>/dev/null | head -1)"
+      pgrep -x guix-daemon >/dev/null && echo ":: daemon: running" || echo ":: daemon: NOT running — see /var/log/guix-daemon.log"
+      echo ":: JIT off? GUILE_JIT_THRESHOLD=${GUILE_JIT_THRESHOLD:-unset} (want -1)"
+      echo ":: authorized substitute servers:"
+      grep -o "[a-z.]*\.guix\.gnu\.org" /etc/guix/acl 2>/dev/null | sort -u | sed "s/^/     /" || echo "     (none — run setup)"
+    '
+    exit $? ;;
   setup|"") : ;;   # fall through to the setup below
-  *) warn "usage: guix-proot.sh [setup|guix ...|pull|login|daemon]"; exit 1 ;;
+  *) warn "usage: guix-proot.sh [setup|guix ...|pull|weather PKG|login|daemon|doctor]"; exit 1 ;;
 esac
 
 # ── setup ─────────────────────────────────────────────────────────────────────
