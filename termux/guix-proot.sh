@@ -28,6 +28,24 @@ DISTRO="${GUIX_DISTRO:-debian}"
 say()  { echo ":: $*"; }
 warn() { echo "!! $*" >&2; }
 
+# Hold a CPU wakelock during long builds so Android doesn't suspend/kill Termux.
+wake()   { command -v termux-wake-lock   >/dev/null 2>&1 && termux-wake-lock   2>/dev/null || true; }
+unwake() { command -v termux-wake-unlock >/dev/null 2>&1 && termux-wake-unlock 2>/dev/null || true; }
+
+# The #1 cause of "guix pull crashes Termux": Android 12+ kills any app with lots
+# of child processes (the "phantom process killer"), and proot + guix spawn many.
+# This can only be disabled from a computer (or wireless adb) — print how, once.
+phantom_note() {
+  cat >&2 <<'EOF'
+!! If Termux dies mid-build (not an error, just gone), it's Android's phantom-
+!! process killer. Disable it over adb (survives reboot) — from a PC or wireless adb:
+!!   adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
+!!   adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
+!!   adb shell settings put global settings_enable_monitor_phantom_procs false
+!! Then reboot. (Also run `termux-wake-lock` — this script does it for you.)
+EOF
+}
+
 # proot's seccomp emulation trips a lot of Guix/daemon syscalls on Termux —
 # disabling it is slower but MUCH more reliable. Set for every proot we spawn.
 export PROOT_NO_SECCOMP=1
@@ -63,17 +81,25 @@ $1"; }
 
 # ── subcommands that assume setup is already done ────────────────────────────
 case "${1:-setup}" in
-  guix)   shift; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
+  guix)   shift; wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
 exec guix $(printf '%q ' "$@")" ;;
-  pull)   in_proot 'guix pull && guix describe'; exit $? ;;
+  pull)
+    # guix pull is the big RAM spike that kills Termux. Run it with minimal
+    # parallelism (override GUIX_CORES / GUIX_MAX_JOBS) + a wakelock, and remind
+    # about the phantom-process killer, which is the usual real cause.
+    phantom_note; wake
+    say "guix pull with low parallelism (cores=${GUIX_CORES:-1}, jobs=${GUIX_MAX_JOBS:-1}) to cap RAM…"
+    in_proot "guix pull --cores=${GUIX_CORES:-1} --max-jobs=${GUIX_MAX_JOBS:-1} && guix describe"
+    rc=$?; unwake; exit $rc ;;
   daemon) in_proot 'pgrep -x guix-daemon >/dev/null && echo "guix-daemon running" || echo "failed to start — see /var/log/guix-daemon.log"'; exit $? ;;
-  login)  exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
+  login)  wake; exec proot-distro login "$DISTRO" --shared-tmp -- bash -lc "$PROOT_PREP
 exec bash -i" ;;
   setup|"") : ;;   # fall through to the setup below
   *) warn "usage: guix-proot.sh [setup|guix ...|pull|login|daemon]"; exit 1 ;;
 esac
 
 # ── setup ─────────────────────────────────────────────────────────────────────
+phantom_note; wake   # long build ahead — hold a wakelock, warn about the killer
 say "Installing proot-distro..."
 pkg install -y proot-distro || { warn "could not install proot-distro"; exit 1; }
 
@@ -134,3 +160,5 @@ If a step failed, that's the known proot/Guix friction (no real namespaces).
 See the "Genuine IceCat via Guix" notes in termux/README.md — the manual daemon
 and substitute steps apply here too. Check 'guix weather PKG' before big builds.
 EOF
+
+unwake   # release the wakelock; builds done
