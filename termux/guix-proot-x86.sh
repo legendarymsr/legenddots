@@ -59,10 +59,13 @@ pdx() { DISTRO_ARCH=x86_64 PROOT_DISTRO_X64_EMULATOR="$EMU" proot-distro login "
 pd()  { pdx bash -lc "$PROOT_PREP
 $1"; }
 
-# Installed = the proot-distro rootfs dir exists and is non-empty. (Don't test
-# files under /bin — it's an absolute symlink to /usr/bin that resolves against
-# the HOST and gives false negatives.)
-installed() { [ -d "$ROOTFS_DIR" ] && [ -n "$(ls -A "$ROOTFS_DIR" 2>/dev/null)" ]; }
+# Installed = a login actually runs. Path-guessing is unreliable (proot-distro's
+# home/alias layout varies), so the authoritative test is "can we exec in it?".
+# Try the cheap dir check first, fall back to a real login.
+installed() {
+  { [ -d "$ROOTFS_DIR" ] && [ -n "$(ls -A "$ROOTFS_DIR" 2>/dev/null)" ]; } && return 0
+  pdx true >/dev/null 2>&1
+}
 
 # ── subcommands ──────────────────────────────────────────────────────────────
 case "${1:-setup}" in
@@ -97,9 +100,8 @@ exec $(printf '%q ' "$@")"
     rc=$?; unwake; exit $rc ;;
   doctor)
     echo ":: qemu: $(command -v qemu-x86_64 || echo MISSING)   emulator=$EMU"
-    echo ":: rootfs dir: $ROOTFS_DIR"
-    echo ":: rootfs: $(installed && echo installed || echo 'NOT installed (empty/missing dir above)')"
-    echo ":: proot-distro sees: $(proot-distro list 2>/dev/null | grep -i "$ALIAS" | tr -s ' ' || echo '(not listed)')"
+    echo ":: login runs? $(pdx true >/dev/null 2>&1 && echo yes || echo NO)  (the real test)"
+    echo ":: rootfs dir: $ROOTFS_DIR  ($([ -d "$ROOTFS_DIR" ] && echo exists || echo missing))"
     echo ":: daemon substitute-urls (configured): $SUBS"
     installed && pd '
       echo ":: arch: $(uname -m)  (want x86_64)"
