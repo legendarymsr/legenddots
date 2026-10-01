@@ -30,6 +30,30 @@ host the guest hands idle RAM back instead of pinning all 8 GB. At 4 GB IceCat i
 auto-skipped (use Emacs `eww`) and the heavy links page to the target's swap —
 pass **`MEM=8G ./libre/run-vm.sh`** if you want IceCat and no swapping.
 
+### Libre all the way down — build it from Guix System (experimental)
+
+`run-vm.sh` bootstraps from Debian, which the FSF does **not** endorse. For the
+ideologically-consistent version, `run-vm-guix.sh` uses a **Guix System** builder
+instead — FSF-endorsed, Linux-libre kernel, Shepherd init (the same init the
+system you're building runs). Libre building libre.
+
+```sh
+./libre/run-vm-guix.sh       # needs `guix` on the host (you run it on Gentoo)
+./libre/run-vm-guix.sh boot  # boot the finished system
+```
+
+It builds a Guix builder image from [`guix-builder.scm`](guix-builder.scm) with
+`guix system image`, then runs [`guest-build-guix.sh`](guest-build-guix.sh)
+(same two phases, no `apt` — the LFS toolchain is in the Guix system profile).
+Guix provides the host-FHS bits LFS needs (`/bin/sh`, `/usr/bin/env`, tools in
+`PATH`); set `FHS=1` to run the build inside `guix shell --emulate-fhs` if a step
+wants deeper FHS. It keeps its own `~/libre-vm-guix` dir — **don't mix the Debian
+and Guix builders on one target** (phase-1 checkpoints live on the builder).
+
+> **Untested here** — there's no Guix in the dev sandbox, so `guix-builder.scm`
+> may need a module/package-name tweak on your Guix. The Debian `run-vm.sh` is
+> the known-good path; this is the fun one.
+
 ### The manual way — two phases by hand
 
 ```sh
