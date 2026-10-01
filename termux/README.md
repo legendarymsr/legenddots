@@ -267,6 +267,27 @@ Two Android things, not Guix bugs:
    install PKG`). The script also holds `termux-wake-lock`. On 12 GB+ you won't
    need this.
 
+### "substitutes … 0.0%" on everything, then it crashes
+
+Two things are happening:
+
+1. **You haven't pulled.** The binary-tarball Guix is pinned to an old release
+   commit the build farms no longer serve, so *every* package reads `0.0%` and
+   Guix falls back to **building from source** — and a source build inside proot
+   crashes Termux. Fix: `guix-proot.sh pull` (setup now does this automatically).
+   After pulling you're on a recent commit Bordeaux has aarch64 binaries for, and
+   installs download instead of building.
+2. **Source builds don't really work in proot anyway.** proot can't give the build
+   daemon real namespaces, so a big build tends to crash rather than finish. Treat
+   this proot as **substitute-only**: install things that have a prebuilt aarch64
+   binary (`guix weather PKG` → >0%), and avoid anything that would compile.
+
+**IceCat is the main casualty.** It's a Firefox-class package with essentially no
+aarch64 substitute, so it can't be built here — `icecat.sh` now checks `weather`
+and refuses rather than crash. For libre browsing on-device use **lynx** or
+**w3m** (text, substituted) or Emacs **eww**; a GUI libre browser via Guix-in-proot
+isn't realistic on aarch64 today.
+
 Prefer substitutes over `guix pull` where you can — the installer's Guix already
 has a package set; you only need to pull to *update* it. `guix weather PKG` first
 so you're downloading binaries, not compiling.
@@ -305,10 +326,12 @@ bash ~/legenddots/termux/icecat.sh launch    # run IceCat, displayed in pocketwl
    guix pull
    guix install icecat
    ```
-2. **May build from source.** If Guix has no aarch64 *substitute* (prebuilt
-   binary) for icecat, it compiles it — a Firefox-class build, hours long. A
-   device with lots of RAM handles it; time is the cost. Check substitute
-   availability with `guix weather icecat` before committing.
+2. **Usually no aarch64 substitute → it won't install here.** IceCat is a
+   Firefox-class build and the farms rarely build it for aarch64, so there's no
+   binary to download — and compiling it inside proot crashes Termux. `icecat.sh`
+   now runs `guix weather icecat` first and **refuses** if it's 0% (override with
+   `ICECAT_FORCE=1`, not recommended). On aarch64 this effectively means IceCat is
+   off the table on-device; use lynx/w3m/eww instead.
 3. **Software rendering.** IceCat renders through pocketwl's llvmpipe path —
    usable for reading, not smooth for video.
 

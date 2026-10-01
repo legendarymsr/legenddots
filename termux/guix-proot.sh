@@ -207,10 +207,22 @@ in_proot '
       fi
     done
   done
-  # UTF-8 locales (has substitutes, quick) so Guix stops warning + text renders.
-  guix install glibc-locales 2>/dev/null && echo "   installed glibc-locales" || true
   guix --version 2>/dev/null || echo "!! guix not on PATH yet — see README"
 ' || warn "key/locale step hit errors — see termux/README.md."
+
+# REQUIRED: the binary-tarball Guix is pinned to an OLD release commit the build
+# farms no longer serve, so substitutes read 0.0% for everything and every install
+# tries to build from source (which crashes proot). `guix pull` realigns to a
+# recent commit Bordeaux has aarch64 binaries for. Skip only if you know why.
+if [ "${SKIP_PULL:-0}" = 1 ]; then
+  warn "SKIP_PULL=1 — skipping guix pull; substitutes will read ~0% until you pull."
+else
+  say "guix pull — REQUIRED so substitutes work (JIT-off; ~10–30 min, mostly download)…"
+  in_proot "guix pull && guix describe" \
+    || warn "guix pull failed — re-run it: bash ~/legenddots/termux/guix-proot.sh pull"
+  # locales after pull (now substitutable) so UTF-8 works + warnings stop.
+  in_proot "guix install glibc-locales 2>/dev/null && echo '   installed glibc-locales' || true"
+fi
 
 cat <<EOF
 
