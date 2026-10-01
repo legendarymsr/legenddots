@@ -14,6 +14,7 @@
 #   bash ~/legenddots/termux/guix-proot.sh login      # interactive shell in it
 #   bash ~/legenddots/termux/guix-proot.sh daemon     # just (re)start the daemon
 #   bash ~/legenddots/termux/guix-proot.sh doctor     # check the setup end-to-end
+#   bash ~/legenddots/termux/guix-proot.sh reset      # wipe the proot, start clean
 #
 # Env: GUIX_DISTRO  base proot distro (default: debian)
 #
@@ -120,8 +121,12 @@ exec bash -i" ;;
       grep -o "[a-z.]*\.guix\.gnu\.org" /etc/guix/acl 2>/dev/null | sort -u | sed "s/^/     /" || echo "     (none — run setup)"
     '
     exit $? ;;
+  reset)
+    warn "removing the '$DISTRO' proot for a clean start (deletes its Guix too)…"
+    proot-distro remove "$DISTRO" 2>/dev/null || proot-distro reset "$DISTRO" 2>/dev/null || true
+    echo ":: done — now re-run:  bash ~/legenddots/termux/guix-proot.sh"; exit 0 ;;
   setup|"") : ;;   # fall through to the setup below
-  *) warn "usage: guix-proot.sh [setup|guix ...|pull|weather PKG|login|daemon|doctor]"; exit 1 ;;
+  *) warn "usage: guix-proot.sh [setup|guix ...|pull|weather PKG|login|daemon|doctor|reset]"; exit 1 ;;
 esac
 
 # ── setup ─────────────────────────────────────────────────────────────────────
@@ -135,6 +140,20 @@ proot-distro install "$DISTRO" 2>/dev/null || say "  ($DISTRO already installed)
 say "Installing GNU Guix inside the proot (the fragile step)..."
 proot-distro login "$DISTRO" --shared-tmp -- bash -lc '
   set -e
+
+  # CRITICAL: bake the proot-safe Guix env into every shell of this proot BEFORE
+  # running the installer. The Guix binary installer itself runs `guix` (e.g.
+  # `guix archive --authorize`), and Guile`s JIT SIGILLs under proot — which is
+  # what crashed Termux the moment setup reached the installer. /etc/profile.d is
+  # sourced by every `bash -l`, so the installer child procs, the daemon, and any
+  # manual `proot-distro login` all inherit JIT-off + guix on PATH + a locale.
+  cat > /etc/profile.d/zz-guix-proot.sh <<PROF
+export GUILE_JIT_THRESHOLD=-1
+export GUIX_LOCPATH=/root/.guix-profile/lib/locale
+export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:\$PATH
+PROF
+  . /etc/profile.d/zz-guix-proot.sh
+
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
   # Guix binary-installer dependencies.
@@ -146,6 +165,7 @@ proot-distro login "$DISTRO" --shared-tmp -- bash -lc '
     cd /root
     wget -q https://guix.gnu.org/install.sh -O guix-install.sh
     # Non-interactive; sets up /gnu/store, the guixbuild users, and guix-daemon.
+    # GUILE_JIT_THRESHOLD is already exported, so the installer`s guix calls are safe.
     yes "" | bash guix-install.sh \
       || echo "!! Guix installer reported errors (common in proot) — finish by hand: guix-proot.sh login"
   else
