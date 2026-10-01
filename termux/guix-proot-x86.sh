@@ -63,9 +63,11 @@ PROOT_PREP="
 QEMU=""
 find_qemu() { QEMU="$(command -v qemu-x86_64 || echo "$PREFIX/bin/qemu-x86_64")"; [ -x "$QEMU" ]; }
 
-# run a bash -lc command string inside the emulated x86_64 rootfs
+# run a bash -lc command string inside the emulated x86_64 rootfs.
+# --link2symlink MUST match the extraction flag, or the hardlink-converted files
+# (incl. the ELF loader) can't be resolved and every binary "goes missing".
 pr() {
-  proot -q "$QEMU" -0 -r "$ROOTFS" -b /dev -b /proc -b /sys --kill-on-exit -w /root \
+  proot --link2symlink -q "$QEMU" -0 -r "$ROOTFS" -b /dev -b /proc -b /sys --kill-on-exit -w /root \
     /usr/bin/env -i HOME=/root TERM="${TERM:-xterm}" \
       PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
       /bin/bash -lc "$PROOT_PREP
@@ -104,7 +106,7 @@ case "${1:-setup}" in
     [ -S "$XDG_RUNTIME_DIR/$WL" ] || { warn "no Wayland socket — start pocketwl (termux/start) and run this INSIDE it"; exit 1; }
     wake
     # bind the Termux runtime dir (with the wayland socket) into the emulated rootfs
-    proot -q "$QEMU" -0 -r "$ROOTFS" -b /dev -b /proc -b /sys \
+    proot --link2symlink -q "$QEMU" -0 -r "$ROOTFS" -b /dev -b /proc -b /sys \
       -b "$XDG_RUNTIME_DIR:$XDG_RUNTIME_DIR" --kill-on-exit -w /root \
       /usr/bin/env -i HOME=/root TERM="${TERM:-xterm}" \
         PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
