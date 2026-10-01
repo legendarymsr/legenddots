@@ -43,6 +43,11 @@ for d in dev dev/pts proc sys run; do
   mount --make-rslave "$LFS/$d" 2>/dev/null || true
 done
 
+# 4 GB builder: enable the target's swap (vdb2) so phase 2's heavy links
+# (LLVM, Mesa, Emacs) page instead of OOM-killing. No-op/harmless on a big VM.
+swapon "${TARGET}2" 2>/dev/null && say "enabled ${TARGET}2 as swap" \
+  || say "note: ${TARGET}2 swap not enabled (fine if you gave the VM >=8G)"
+
 # put the repo inside the target so phase 2 finds it at the documented path
 say "staging repo into target:/root/legenddots"
 rm -rf "$LFS/root/legenddots"; cp -a "$REPO" "$LFS/root/legenddots"

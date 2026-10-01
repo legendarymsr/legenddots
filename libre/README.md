@@ -25,6 +25,11 @@ The build is long (~30–44 h — see the time tables below) and powers itself o
 when done. Needs KVM + qemu; the script installs qemu and a cloud-init ISO tool
 if they're missing.
 
+Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
+host the guest hands idle RAM back instead of pinning all 8 GB. At 4 GB IceCat is
+auto-skipped (use Emacs `eww`) and the heavy links page to the target's swap —
+pass **`MEM=8G ./libre/run-vm.sh`** if you want IceCat and no swapping.
+
 ### The manual way — two phases by hand
 
 ```sh
@@ -200,18 +205,20 @@ display). It runs, in effect:
 
 ```sh
 qemu-system-x86_64 \
-  -enable-kvm -cpu host -smp 2 -m 8G \
+  -enable-kvm -cpu host -smp 2 -m 4G \
   -drive file=/path/to/libre.qcow2,if=virtio \
   -device virtio-gpu -display gtk,gl=on \
   -device virtio-net,netdev=n0 -netdev user,id=n0 \
   -device virtio-rng \
+  -device virtio-balloon,free-page-reporting=on \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
   -drive if=pflash,format=raw,file=OVMF_VARS.fd
 ```
 
-`-m 8G` is deliberate — that's the RAM IceCat's link needs. Drop to `-m 4G` if
-you're skipping IceCat. `-display gtk,gl=on` gives Mesa's virgl real host GL;
-without it Mesa falls back to `swrast` (llvmpipe), which works but is slow.
+`-m 4G` runs the finished desktop comfortably and leaves your 8 GB host room; the
+balloon gives idle guest RAM back. `-display gtk,gl=on` gives Mesa's virgl real
+host GL; without it Mesa falls back to `swrast` (llvmpipe), which works but is
+slow. (Building IceCat earlier needs `MEM=8G`; running the desktop doesn't.)
 
 ### How the automated build drives QEMU
 

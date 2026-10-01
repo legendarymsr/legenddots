@@ -55,7 +55,10 @@ SEED="$VM_DIR/seed.iso"                    # cloud-init NoCloud seed
 WORK="$VM_DIR/work"                        # 9p-shared rw scratch (log + done marker)
 LOG="$WORK/build.log"                      # 9p-shared build log
 DONE="$WORK/done"                          # marker the guest touches when finished
-MEM="${MEM:-8G}"                           # 8G = IceCat/LLVM link without thrashing
+MEM="${MEM:-4G}"                           # 4G fits an 8G host; virtio-balloon
+                                           # (free-page-reporting) hands idle RAM
+                                           # back to the host. IceCat auto-skips
+                                           # under ~7G — set MEM=8G to build it.
 CPUS="${CPUS:-$(nproc)}"
 CLOUD_IMG="$VM_DIR/debian-builder-base.qcow2"
 CLOUD_IMG_URL="${CLOUD_IMG_URL:-https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2}"
@@ -155,6 +158,7 @@ run_build() {
     -drive "file=$TARGET,if=virtio" \
     -drive "file=$SEED,media=cdrom" \
     -netdev user,id=n0 -device virtio-net,netdev=n0 \
+    -device virtio-balloon,free-page-reporting=on \
     -virtfs "local,path=$REPO,mount_tag=repo,security_model=mapped-xattr,readonly=on" \
     -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr" \
     -display none -serial mon:stdio
@@ -194,7 +198,8 @@ run_boot() {
     -drive "if=pflash,format=raw,file=$nvram" \
     -drive "file=$TARGET,if=virtio" \
     -device virtio-gpu -display "${disp:-gtk},gl=on" \
-    -netdev user,id=n0 -device virtio-net,netdev=n0 -device virtio-rng
+    -netdev user,id=n0 -device virtio-net,netdev=n0 -device virtio-rng \
+    -device virtio-balloon,free-page-reporting=on
 }
 
 case "${1:-}" in
