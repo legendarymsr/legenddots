@@ -196,6 +196,28 @@ type `vi` for vis: `ln -sfn "$PREFIX/bin/vis" "$PREFIX/bin/vi"`.
 
 ---
 
+## GNU Guix in a proot (`guix-proot.sh`)
+
+A reusable Guix host on your phone. Termux can't run Guix natively (no root, no
+user namespaces, no `/gnu/store`), so this layers Guix on a **proot-distro**
+base (Debian by default) and runs `guix-daemon --disable-chroot`, which is what
+proot needs. It's the same Guix that `icecat.sh` uses — set it up once, then
+`guix install` anything.
+
+```sh
+bash ~/legenddots/termux/guix-proot.sh            # set up the proot + Guix
+bash ~/legenddots/termux/guix-proot.sh pull       # update Guix
+bash ~/legenddots/termux/guix-proot.sh guix install hello
+bash ~/legenddots/termux/guix-proot.sh login      # a shell inside it
+bash ~/legenddots/termux/guix-proot.sh daemon     # (re)start the daemon
+```
+
+Base distro via `GUIX_DISTRO` (default `debian`). Same honest caveats as below:
+Guix-in-proot is **fragile** (the daemon only gets proot's fake root/namespaces),
+and aarch64 **substitutes are patchy**, so a package with no prebuilt binary
+builds from source — check `guix weather PKG` first. If setup wedges, finish by
+hand in `guix-proot.sh login`.
+
 ## Genuine GNU IceCat via Guix (`icecat.sh`)
 
 A libre desktop browser running inside pocketwl. **Read this first — it's the
