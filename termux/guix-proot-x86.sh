@@ -26,7 +26,11 @@ set -u
 
 X86_DIR="${X86_DIR:-$HOME/guix-x86}"
 ROOTFS="$X86_DIR/rootfs"
-X86_ROOTFS_URL="${X86_ROOTFS_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-amd64.tar.gz}"
+# Clean Debian amd64 rootfs (apt-based, not Ubuntu). linuxcontainers timestamps
+# the dir daily; we resolve the newest at setup. Override with a direct tarball
+# URL via X86_ROOTFS_URL if you want to pin one (or use a different distro).
+X86_BASE="${X86_BASE:-https://images.linuxcontainers.org/images/debian/bookworm/amd64/default}"
+X86_ROOTFS_URL="${X86_ROOTFS_URL:-}"
 say()  { echo ":: $*"; }
 warn() { echo "!! $*" >&2; }
 
@@ -132,9 +136,18 @@ ensure_termux_deps || exit 1
 
 if [ ! -x "$ROOTFS/bin/bash" ]; then
   mkdir -p "$ROOTFS"
-  TB="$X86_DIR/rootfs.tar.gz"
-  say "Downloading x86_64 rootfs (Ubuntu base)…"
-  wget -O "$TB" "$X86_ROOTFS_URL" || { warn "rootfs download failed ($X86_ROOTFS_URL)"; exit 1; }
+  URL="$X86_ROOTFS_URL"
+  if [ -z "$URL" ]; then
+    say "Resolving the latest Debian amd64 rootfs…"
+    IDX="$(wget -qO- "$X86_BASE/" 2>/dev/null || curl -fsSL "$X86_BASE/" 2>/dev/null)"
+    # grab the newest timestamped dir's href (keeps the server's URL-encoding)
+    TS="$(printf '%s' "$IDX" | grep -oE 'href="[0-9]{8}_[^"]*/"' | sed 's/href="//; s/"$//' | sort | tail -1)"
+    [ -n "$TS" ] && URL="$X86_BASE/${TS}rootfs.tar.xz"
+  fi
+  [ -n "$URL" ] || { warn "couldn't resolve a rootfs URL — set X86_ROOTFS_URL=<tarball>"; exit 1; }
+  TB="$X86_DIR/rootfs.tar.xz"
+  say "Downloading Debian amd64 rootfs: $URL"
+  wget -O "$TB" "$URL" || { warn "rootfs download failed ($URL)"; exit 1; }
   say "Extracting rootfs…"
   # --link2symlink: Android FS often disallows hardlinks; convert them.
   proot --link2symlink -0 tar -xpf "$TB" -C "$ROOTFS" --exclude=dev 2>/dev/null \
