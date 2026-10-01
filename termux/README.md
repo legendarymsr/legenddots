@@ -233,9 +233,10 @@ Two Android things, not Guix bugs:
 1. **Phantom-process killer (the usual cause).** Android 12+ silently kills apps
    that spawn many child processes — and proot + guix-daemon + a compile spawn a
    *lot*. Termux just vanishes mid-build.
-   - **GrapheneOS:** just flip **Settings → Apps → Termux → "Disable child process
-     restrictions"** (no adb needed). ← you're here.
-   - **Stock Android:** disable it over **adb** (from a PC or wireless adb; survives
+   - **If your ROM exposes the toggle** (Nothing OS 5 and other recent Android
+     builds have **"Disable child process restrictions"** in Developer options;
+     GrapheneOS has it per-app) — just flip it. No adb needed. ← easiest.
+   - **Otherwise,** disable it over **adb** (from a PC or wireless adb; survives
      reboot), then reboot:
      ```sh
      adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
