@@ -304,8 +304,9 @@ bash ~/legenddots/termux/guix-proot-x86.sh guix install icecat
 bash ~/legenddots/termux/guix-proot-x86.sh run -- icecat
 ```
 
-It installs `qemu-user-x86-64`, downloads an Ubuntu-base amd64 rootfs
-(`X86_ROOTFS_URL` to override), and runs the same JIT-off Guix flow. Other
+It installs `qemu-user-x86-64`, downloads a clean Debian amd64 rootfs (from
+linuxcontainers — not Ubuntu; `X86_ROOTFS_URL` to override), and runs the same
+JIT-off Guix flow. Other
 commands: `login`, `pull`, `authorize`, `daemon`, `doctor`, `reset`. The native
 `guix-proot.sh` stays the fast default; reach for this only when a package has no
 aarch64 binary. (Untested here — qemu-user + proot + Guix is three fragile layers;
