@@ -226,6 +226,29 @@ Base distro via `GUIX_DISTRO` (default `debian`). It's tuned for Termux:
 Still honest: Guix-in-proot is **fragile** (the daemon only gets proot's fake
 root/namespaces). If setup wedges, finish by hand in `guix-proot.sh login`.
 
+### If `guix pull` (or a build) crashes/kills Termux
+
+Two Android things, not Guix bugs:
+
+1. **Phantom-process killer (the usual cause).** Android 12+ silently kills apps
+   that spawn many child processes — and proot + guix-daemon + a compile spawn a
+   *lot*. Termux just vanishes mid-build. Disable it over **adb** (from a PC or
+   wireless adb; survives reboot):
+   ```sh
+   adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
+   adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
+   adb shell settings put global settings_enable_monitor_phantom_procs false
+   ```
+   Then reboot. This is the single biggest fix.
+2. **Out-of-memory.** `guix pull` spikes RAM (Guile compiling the whole of Guix).
+   `guix-proot.sh pull` already runs it with `--cores=1 --max-jobs=1` to cap the
+   peak; lower a *build* too with `GUIX_CORES=1 GUIX_MAX_JOBS=1 guix-proot.sh guix install PKG`.
+   The script also grabs `termux-wake-lock` so Android won't suspend it.
+
+Prefer substitutes over `guix pull` where you can — the installer's Guix already
+has a package set; you only need to pull to *update* it. `guix weather PKG` first
+so you're downloading binaries, not compiling.
+
 ## Genuine GNU IceCat via Guix (`icecat.sh`)
 
 A libre desktop browser running inside pocketwl. **Read this first — it's the
