@@ -8,6 +8,25 @@ no binary blobs, no proprietary software anywhere in the stack.
 One script, two phases — the same shape as `../blfs/setup`, but every choice is
 the free-software one.
 
+### The easy way — one command builds it all in a VM
+
+`run-vm.sh` does the whole thing for you: it boots a throwaway Debian cloud VM as
+a builder, attaches a fresh target disk, shares this repo in, and runs **both
+phases unattended** — phase 1 (base) natively, phase 2 (desktop) in a chroot of
+the result. It's checkpointed, so re-running resumes.
+
+```sh
+./libre/run-vm.sh            # build (or resume) the whole libre system, headless
+./libre/run-vm.sh watch      # tail the live build log
+./libre/run-vm.sh boot       # boot the FINISHED system (UEFI + GUI) to use it
+```
+
+The build is long (~30–44 h — see the time tables below) and powers itself off
+when done. Needs KVM + qemu; the script installs qemu and a cloud-init ISO tool
+if they're missing.
+
+### The manual way — two phases by hand
+
 ```sh
 # Phase 1 — from a host distro, as root (builds the base onto a target disk):
 LFS_DISK=/dev/vdb bash ~/legenddots/libre/setup
@@ -176,19 +195,33 @@ Change both immediately: `passwd gnu`, `passwd root`.
 
 ## QEMU launch
 
+`./run-vm.sh boot` does this for you (finds OVMF, makes writable NVRAM, picks a
+display). It runs, in effect:
+
 ```sh
 qemu-system-x86_64 \
   -enable-kvm -cpu host -smp 2 -m 8G \
-  -drive file=/path/to/libre.img,if=virtio \
+  -drive file=/path/to/libre.qcow2,if=virtio \
   -device virtio-gpu -display gtk,gl=on \
   -device virtio-net,netdev=n0 -netdev user,id=n0 \
   -device virtio-rng \
-  -bios /usr/share/ovmf/OVMF.fd
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
+  -drive if=pflash,format=raw,file=OVMF_VARS.fd
 ```
 
 `-m 8G` is deliberate — that's the RAM IceCat's link needs. Drop to `-m 4G` if
 you're skipping IceCat. `-display gtk,gl=on` gives Mesa's virgl real host GL;
 without it Mesa falls back to `swrast` (llvmpipe), which works but is slow.
+
+### How the automated build drives QEMU
+
+`run-vm.sh` (build mode) boots a headless Debian cloud VM with **two** disks —
+the Debian builder (`vda`) and your target (`vdb`) — plus a cloud-init seed CD and
+this repo shared over 9p. cloud-init runs `guest-build.sh`, which `apt`-installs
+the LFS host tools, runs phase 1 onto `vdb`, then chroots the built target and
+runs phase 2. The target is partitioned by `libre/setup` exactly as the manual
+path does (`vdb1` ESP, `vdb2` swap, `vdb3` root), so the result is identical —
+you just didn't have to sit through two phases by hand.
 
 ---
 
