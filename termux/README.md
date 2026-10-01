@@ -286,7 +286,30 @@ Two things are happening:
 aarch64 substitute, so it can't be built here — `icecat.sh` now checks `weather`
 and refuses rather than crash. For libre browsing on-device use **lynx** or
 **w3m** (text, substituted) or Emacs **eww**; a GUI libre browser via Guix-in-proot
-isn't realistic on aarch64 today.
+isn't realistic on aarch64 today — unless you emulate x86_64 (below).
+
+### Want IceCat anyway? Emulated x86_64 (`guix-proot-x86.sh`)
+
+proot alone runs native (arm64) binaries — it does **not** emulate a CPU. But
+`proot -q qemu-x86_64` (QEMU user-mode) runs an **x86_64** rootfs on your arm64
+phone, and x86_64 is Guix's best-covered arch, so **IceCat and friends download as
+prebuilt binaries — nothing builds, nothing crashes.** The price is emulation:
+2–10× slower, and a GUI browser is sluggish.
+
+```sh
+bash ~/legenddots/termux/guix-proot-x86.sh                 # qemu + x86_64 rootfs + Guix + pull
+bash ~/legenddots/termux/guix-proot-x86.sh weather icecat  # now >0% (x86_64 has it)
+bash ~/legenddots/termux/guix-proot-x86.sh guix install icecat
+# then, from a terminal INSIDE pocketwl (termux/start):
+bash ~/legenddots/termux/guix-proot-x86.sh run -- icecat
+```
+
+It installs `qemu-user-x86-64`, downloads an Ubuntu-base amd64 rootfs
+(`X86_ROOTFS_URL` to override), and runs the same JIT-off Guix flow. Other
+commands: `login`, `pull`, `authorize`, `daemon`, `doctor`, `reset`. The native
+`guix-proot.sh` stays the fast default; reach for this only when a package has no
+aarch64 binary. (Untested here — qemu-user + proot + Guix is three fragile layers;
+`doctor` reports where it stands.)
 
 Prefer substitutes over `guix pull` where you can — the installer's Guix already
 has a package set; you only need to pull to *update* it. `guix weather PKG` first
