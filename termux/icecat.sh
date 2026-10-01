@@ -69,9 +69,23 @@ GUIX_DISTRO="$DISTRO" bash "$SELF_DIR/guix-proot.sh" \
 proot-distro login "$DISTRO" --shared-tmp -- bash -lc \
   'export DEBIAN_FRONTEND=noninteractive; apt-get install -y libgtk-3-0 fonts-dejavu >/dev/null 2>&1 || true' || true
 
-say "Installing genuine GNU IceCat (downloads a binary if Bordeaux has it; else builds)..."
+say "Checking for a prebuilt aarch64 IceCat (building it in proot = crash)..."
+# IceCat is a Firefox-class build with usually NO aarch64 substitute. Building it
+# from source inside proot crashes Termux, so don't even start unless a binary
+# exists — or the user forces it with ICECAT_FORCE=1.
+if GUIX_DISTRO="$DISTRO" bash "$SELF_DIR/guix-proot.sh" weather icecat 2>/dev/null | grep -qE '(^|[^.0-9])0\.0% substitutes'; then
+  warn "No aarch64 substitute for IceCat — a source build in proot will almost"
+  warn "certainly CRASH Termux. NOT installing. Realistic libre browsing options:"
+  warn "  • text: lynx / w3m (both have aarch64 substitutes)"
+  warn "  • Emacs: eww (built in)"
+  warn "  • try a lighter Guix GUI browser that IS substituted (check 'guix weather PKG')"
+  warn "Override (not recommended): ICECAT_FORCE=1 bash ~/legenddots/termux/icecat.sh"
+  [ "${ICECAT_FORCE:-0}" = 1 ] || exit 0
+  warn "ICECAT_FORCE=1 set — attempting the source build anyway. Expect a long, crashy ride."
+fi
+say "Installing genuine GNU IceCat..."
 GUIX_DISTRO="$DISTRO" bash "$SELF_DIR/guix-proot.sh" guix install icecat \
-  || warn "guix install icecat failed — check 'bash guix-proot.sh guix weather icecat', see README."
+  || warn "guix install icecat failed — check 'bash guix-proot.sh weather icecat', see README."
 
 cat <<EOF
 
