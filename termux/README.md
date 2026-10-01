@@ -244,14 +244,17 @@ Two Android things, not Guix bugs:
      adb shell settings put global settings_enable_monitor_phantom_procs false
      ```
    This is the single biggest fix.
-2. **Out-of-memory** (the likely cause once the killer is off). `guix pull` spikes
-   RAM — Guile compiles the whole of Guix. `guix-proot.sh pull` now runs it with
-   `--cores=1 --max-jobs=1` **and** `GUILE_JIT_THRESHOLD=-1 GC_MARKERS=1` (no JIT,
-   single GC thread) to shave the peak. Throttle a *build* the same way with
-   `GUIX_CORES=1 GUIX_MAX_JOBS=1 guix-proot.sh guix install PKG`. The script also
-   holds `termux-wake-lock`. If a pull still OOMs, close other apps first — or skip
-   pulling and lean on substitutes (`guix weather PKG`); you only need to pull to
-   *update* Guix, not to install from the set you already have.
+2. **Guile JIT under proot (the real cause on a RAM-rich phone).** Guile's JIT
+   emits machine code / executable mmaps that proot's emulation mishandles, so
+   heavy Guile work like `guix pull` crashes (SIGILL/SIGSEGV) and takes Termux
+   with it — *not* an out-of-memory thing on a 12/16 GB device. `guix-proot.sh`
+   now exports **`GUILE_JIT_THRESHOLD=-1`** for every guix op (client and daemon)
+   to turn the JIT off; costs a little speed, buys stability. Combined with
+   `PROOT_NO_SECCOMP=1`, that's the pair that keeps proot from dying.
+3. **Out-of-memory** (only on low-RAM devices). If you're tight on RAM, cap
+   parallelism: `GUIX_CORES=1 GUIX_MAX_JOBS=1 guix-proot.sh pull` (or `… guix
+   install PKG`). The script also holds `termux-wake-lock`. On 12 GB+ you won't
+   need this.
 
 Prefer substitutes over `guix pull` where you can — the installer's Guix already
 has a package set; you only need to pull to *update* it. `guix weather PKG` first
