@@ -105,9 +105,9 @@ MKFSFAT=$(command -v mkfs.fat || command -v mkdosfs)
 
 # Require wget or curl
 if command -v wget &>/dev/null; then
-  dl() { wget -q --show-progress -c -O "$1" "$2"; }
+  dl() { wget -q --show-progress --timeout=30 --tries=3 -c -O "$1" "$2"; }
 elif command -v curl &>/dev/null; then
-  dl() { curl -fL --progress-bar -C - -o "$1" "$2"; }
+  dl() { curl -fL --progress-bar --connect-timeout 30 --retry 2 -C - -o "$1" "$2"; }
 else
   die "Neither wget nor curl found — emerge net-misc/wget"
 fi
@@ -173,7 +173,7 @@ if ! step_done sources; then
     ["gmp-6.3.0.tar.xz"]="https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz"
     ["mpc-1.3.1.tar.gz"]="https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz"
     ["m4-1.4.20.tar.xz"]="https://ftp.gnu.org/gnu/m4/m4-1.4.20.tar.xz"
-    ["ncurses-6.5-20250809.tgz"]="https://invisible-mirror.net/archives/ncurses/ncurses-6.5-20250809.tgz"
+    ["ncurses-6.5-20250809.tgz"]="https://ftp.osuosl.org/pub/lfs/lfs-packages/12.4/ncurses-6.5-20250809.tgz"
     ["bash-5.3.tar.gz"]="https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz"
     ["coreutils-9.7.tar.xz"]="https://ftp.gnu.org/gnu/coreutils/coreutils-9.7.tar.xz"
     ["diffutils-3.12.tar.xz"]="https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz"
@@ -193,7 +193,7 @@ if ! step_done sources; then
     ["Python-3.13.7.tar.xz"]="https://www.python.org/ftp/python/3.13.7/Python-3.13.7.tar.xz"
     ["texinfo-7.2.tar.xz"]="https://ftp.gnu.org/gnu/texinfo/texinfo-7.2.tar.xz"
     ["util-linux-2.41.1.tar.xz"]="https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
-    ["zlib-1.3.1.tar.gz"]="https://zlib.net/zlib-1.3.1.tar.gz"
+    ["zlib-1.3.1.tar.gz"]="https://zlib.net/fossils/zlib-1.3.1.tar.gz"
     ["bzip2-1.0.8.tar.gz"]="https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
     ["lz4-1.10.0.tar.gz"]="https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
     ["zstd-1.5.7.tar.gz"]="https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
@@ -248,21 +248,37 @@ if ! step_done sources; then
     ["gc-8.2.8.tar.gz"]="https://github.com/ivmai/bdwgc/releases/download/v8.2.8/gc-8.2.8.tar.gz"
     ["libunistring-1.3.tar.xz"]="https://ftp.gnu.org/gnu/libunistring/libunistring-1.3.tar.xz"
     ["guile-3.0.10.tar.xz"]="https://ftp.gnu.org/gnu/guile/guile-3.0.10.tar.xz"
-    ["shepherd-0.10.7.tar.gz"]="https://ftp.gnu.org/gnu/shepherd/shepherd-0.10.7.tar.gz"
+    ["shepherd-0.10.5.tar.gz"]="https://ftp.gnu.org/gnu/shepherd/shepherd-0.10.5.tar.gz"  # 0.10.7 never existed; last 0.10.x (keeps the GOOPS <service> API init.scm uses)
     ["iana-etc-20250807.tar.gz"]="https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
     ["cmake-3.30.2.tar.gz"]="https://cmake.org/files/v3.30/cmake-3.30.2.tar.gz"
     ["git-2.46.0.tar.xz"]="https://www.kernel.org/pub/software/scm/git/git-2.46.0.tar.xz"
     ["wget-1.24.5.tar.gz"]="https://ftp.gnu.org/gnu/wget/wget-1.24.5.tar.gz"
-    ["zsh-5.9.tar.xz"]="https://www.zsh.org/pub/zsh-5.9.tar.xz"
+    ["zsh-5.9.tar.xz"]="https://www.zsh.org/pub/old/zsh-5.9.tar.xz"
     ["opendoas-6.8.2.tar.gz"]="https://github.com/Duncaen/OpenDoas/releases/download/v6.8.2/opendoas-6.8.2.tar.gz"
     ["curl-8.9.1.tar.xz"]="https://curl.se/download/curl-8.9.1.tar.xz"
   )
 
+  # Try the listed URL, then the GNU mirror network (ftp.gnu.org itself is often
+  # slow/unreachable), then the LFS package mirror. Download to .part so a failed
+  # or interrupted fetch never leaves a truncated file that a resume would skip.
+  fetch_src() {  # fetch_src <out> <url>
+    local out="$1" url="$2" f u
+    f=$(basename "$out")
+    local cands=("$url")
+    [[ $url == https://ftp.gnu.org/gnu/* ]] && cands+=("https://ftpmirror.gnu.org/gnu/${url#https://ftp.gnu.org/gnu/}")
+    cands+=("https://ftp.osuosl.org/pub/lfs/lfs-packages/12.4/$f")
+    for u in "${cands[@]}"; do
+      if dl "$out.part" "$u" && [[ -s "$out.part" ]]; then mv -f "$out.part" "$out"; return 0; fi
+      rm -f "$out.part"
+    done
+    return 1
+  }
+  failed=()
   for f in "${!PKGS[@]}"; do
     out="$LFS/sources/$f"
-    [[ -f "$out" ]] && continue
+    [[ -s "$out" ]] && continue
     info "Downloading $f..."
-    dl "$out" "${PKGS[$f]}" || warn "Failed: $f"
+    fetch_src "$out" "${PKGS[$f]}" || { warn "Failed: $f"; failed+=("$f"); }
   done
 
   for url in \
@@ -270,9 +286,11 @@ if ! step_done sources; then
     "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch" \
     "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch"; do
     out="$LFS/sources/$(basename "$url")"
-    [[ -f "$out" ]] || dl "$out" "$url" || warn "Failed patch: $(basename "$url")"
+    [[ -s "$out" ]] || fetch_src "$out" "$url" || { warn "Failed patch: $(basename "$url")"; failed+=("$(basename "$url")"); }
   done
 
+  # Don't checkpoint a half-downloaded source set: re-running retries the rest.
+  (( ${#failed[@]} == 0 )) || die "${#failed[@]} source(s) failed to download: ${failed[*]} — re-run to retry"
   mark_step sources
 fi
 
@@ -1041,7 +1059,7 @@ pkg guile_f "$SRC/guile-3.0.10.tar.xz" bash -c "
   make \$MAKEFLAGS && make install
   find /usr/lib /usr/libexec -name '*.la' -delete 2>/dev/null || true
 "
-pkg shepherd_f "$SRC/shepherd-0.10.7.tar.gz" bash -c "
+pkg shepherd_f "$SRC/shepherd-0.10.5.tar.gz" bash -c "
   ./configure --prefix=/usr --localstatedir=/var
   make \$MAKEFLAGS && make install
 "
@@ -1277,9 +1295,14 @@ NPROC=2
 fetch() {
   local url="$1"
   local out="$SOURCES/$(basename "$url")"
-  if [[ ! -f "$out" ]]; then
+  if [[ ! -s "$out" ]]; then
     info "Fetching $(basename "$url")..."
-    wget -q --show-progress -c -O "$out" "$url" || { rm -f "$out"; die "Download failed: $url"; }
+    # ftp.gnu.org is often slow/unreachable: fall back to the GNU mirror network
+    wget -q --show-progress --timeout=30 --tries=3 -c -O "$out.part" "$url" \
+      || { [[ $url == https://ftp.gnu.org/gnu/* ]] && rm -f "$out.part" \
+           && wget -q --show-progress --timeout=30 --tries=3 -c -O "$out.part" "https://ftpmirror.gnu.org/gnu/${url#https://ftp.gnu.org/gnu/}"; } \
+      || { rm -f "$out.part"; die "Download failed: $url"; }
+    mv -f "$out.part" "$out"
   fi
   echo "$out"
 }
