@@ -69,6 +69,7 @@ legenddots/
 ├── init.el                    Emacs config
 ├── alacritty.toml             Terminal (Tokyo Night, 95% opacity)
 ├── tmux.conf                  tmux (Tokyo Night, vi-mode, hjkl — mirrors nvim)
+├── fastfetch/config.jsonc     fastfetch (Tokyo Night) — libre: /etc/xdg, blfs: ~/.config
 │
 ├── niri/                      Niri rice (Wayland)
 │   ├── config.kdl
