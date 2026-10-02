@@ -55,13 +55,19 @@ Guix provides the host-FHS bits LFS needs (`/bin/sh`, `/usr/bin/env`, tools in
 wants deeper FHS. It keeps its own `~/libre-vm-guix` dir — **don't mix the Debian
 and Guix builders on one target** (phase-1 checkpoints live on the builder).
 
-> **Not run through `guix system image` here** — there's no Guix in the dev
-> sandbox. `guix-builder.scm` is checked against current Guix sources: it uses
-> `dhcpcd-service-type` (Guix removed `dhcp-client-service-type` in May 2026;
-> older Guix falls back to it automatically), mounts root by the image's
-> `Guix_image` label, and bakes in `guest-bootstrap.sh`, which uses 9p when the
-> host QEMU has it and the tar-disk/virtio-serial transport otherwise. The
-> Debian `run-vm.sh` is the known-good path; this is the fun one.
+> **Tested** (Oct 2026, under TCG): `guix system image` builds this config with
+> Guix 1.5.0, a late-July 2026 Guix (`620ce4ff16`) and a current one
+> (`1a1ebcc9b7`, 2026-10-01; today's master evaluates the same), and the image
+> boots, picks up the repo (9p or the tar disk) and gets into the
+> cross-toolchain compile. `guix-builder.scm` uses `dhcpcd-service-type`
+> (Guix removed `dhcp-client-service-type` in May 2026; older Guix falls back
+> to it automatically), mounts root by the image's `Guix_image` label, declares
+> the `lfs` build user (Guix rebuilds `/etc/passwd` every boot) and puts the
+> console on the serial port so you see the boot in your terminal. On a Guix
+> host `libre/setup` appends the system profile to the `lfs` user's `PATH` and
+> wraps the *host* `gcc`/`g++` so they get Guix's header/library search paths
+> (without them configure fails with `C preprocessor "/lib/cpp" fails sanity
+> check`) without leaking host headers into the cross-compiler.
 
 ### The manual way — two phases by hand
 
