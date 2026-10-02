@@ -147,17 +147,63 @@ ensure_kvm_access() {
 }
 
 # ── build the Guix System builder image (once; kept for resume) ──────────────
+# Guix writes its qcow2 with zstd compression ("compression type: zstd"), which
+# a QEMU built without zstd can't open ("qcow2: unknown compression type: 2").
+# So the builder is always rewritten as a plain, uncompressed qcow2 with
+# qemu-img; if qemu-img can't read zstd either, Guix builds a raw image (same
+# MBR-hybrid layout, root label Guix_image) and that gets converted instead.
+# Read the qcow2 header ourselves: a qemu-img without zstd can't even 'info' it.
+# (qcow2 v3: magic QFI\xfb, version @4, header_length @100, compression_type @104;
+#  1 = zstd, 0 = zlib — same as `qemu-img info` "compression type: zstd")
+image_is_zstd() {
+  local b
+  b=$(od -An -tu1 -N105 "$1" 2>/dev/null | tr -s ' \n' ' ') || return 1
+  read -r -a b <<< "$b"
+  (( ${#b[@]} >= 105 )) || return 1
+  [[ "${b[0]} ${b[1]} ${b[2]} ${b[3]}" == "81 70 73 251" ]] || return 1   # "QFI\xfb"
+  (( b[7] >= 3 )) || return 1                                              # version >= 3
+  (( (b[100]<<24 | b[101]<<16 | b[102]<<8 | b[103]) > 104 )) || return 1  # has the field
+  (( b[104] == 1 ))
+}
+
+write_builder() {   # write_builder <src> <raw|qcow2>: uncompressed qcow2 -> $BUILDER
+  local tmp="$BUILDER.tmp"
+  rm -f "$tmp"
+  if qemu-img convert -f "$2" -O qcow2 "$1" "$tmp" && ! image_is_zstd "$tmp"; then
+    mv -f "$tmp" "$BUILDER"; chmod u+w "$BUILDER"
+  else
+    rm -f "$tmp"; return 1
+  fi
+}
+
+guix_image() {      # guix_image <image type>: prints the store path of the image
+  local out
+  out="$(guix system image -t "$1" --image-size="$BUILDER_SIZE" "$SELF_DIR/guix-builder.scm")" || return 1
+  out="$(printf '%s\n' "$out" | tail -n1)"
+  [[ -f "$out" ]] || return 1
+  printf '%s\n' "$out"
+}
+
 build_guix_image() {
-  [[ -f "$BUILDER" ]] && return 0        # keep it: phase-1 checkpoints live on it
+  if [[ -f "$BUILDER" ]]; then
+    image_is_zstd "$BUILDER" || return 0   # keep it: phase-1 checkpoints live on it
+    header "Existing builder image is zstd-compressed — rewriting it uncompressed"
+    write_builder "$BUILDER" qcow2 && return 0
+    warn "qemu-img can't read zstd qcow2 either — rebuilding the builder from a raw image"
+    rm -f "$BUILDER"
+  fi
   command -v guix >/dev/null 2>&1 || die "guix not found"
   header "Building the Guix System builder image (guix system image)…"
   local out
-  out="$(guix system image -t qcow2 --image-size="$BUILDER_SIZE" "$SELF_DIR/guix-builder.scm")" \
+  out="$(guix_image qcow2)" \
     || die "guix system image failed — fix guix-builder.scm (module/package names), or use ./run-vm.sh"
-  out="$(printf '%s\n' "$out" | tail -n1)"
-  [[ -f "$out" ]] || die "couldn't locate the built image (got: $out)"
-  header "Copying image out of the store -> $BUILDER"
-  cp "$out" "$BUILDER"; chmod u+w "$BUILDER"
+  header "Writing it out as an uncompressed qcow2 -> $BUILDER"
+  if ! write_builder "$out" qcow2; then
+    warn "qemu-img can't read Guix's zstd-compressed qcow2 (QEMU built without zstd) — building a raw image instead"
+    out="$(guix_image mbr-hybrid-raw)" || die "guix system image -t mbr-hybrid-raw failed"
+    write_builder "$out" raw || die "qemu-img convert of $out failed"
+    guix gc -D "$out" >/dev/null 2>&1 || true   # the raw image is a full-size store file
+  fi
 }
 
 provision() {
