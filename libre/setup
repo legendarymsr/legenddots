@@ -304,11 +304,15 @@ if ! step_done lfs_env; then
   groupadd -f lfs
   useradd -s /bin/bash -g lfs -m -k /dev/null lfs 2>/dev/null || true
   chown -v lfs "$LFS/"{usr{,/*},lib,lib64,var,etc,bin,sbin,tools,sources}
+  mark_step lfs_env
+fi
 
-  cat > /home/lfs/.bash_profile << 'EOF'
+# lfs dotfiles: rewritten on every run (cheap), so a resume picks up a fixed
+# environment or a different JOBS instead of the one frozen at first run.
+cat > /home/lfs/.bash_profile << 'EOF'
 exec env -i HOME=$HOME TERM=$TERM PS1='\u:\w\$ ' /bin/bash
 EOF
-  cat > /home/lfs/.bashrc << EOF
+cat > /home/lfs/.bashrc << EOF
 set +h
 umask 022
 LFS=$LFS
@@ -317,13 +321,36 @@ LFS_TGT=$LFS_TGT
 PATH=/usr/bin
 if [ ! -L /bin ]; then PATH=/bin:\$PATH; fi
 PATH=\$LFS/tools/bin:\$PATH
+# Guix System host (the run-vm-guix.sh builder): no /usr/bin toolchain, the
+# host tools live in the system profile — append it, after the LFS tools, with
+# the host-compiler wrappers (see below) in front of the real gcc.
+if [ -d /run/current-system/profile/bin ]; then PATH=\$PATH:/home/lfs/guix-host-cc:/run/current-system/profile/bin:/run/current-system/profile/sbin; fi
 CONFIG_SITE=\$LFS/usr/share/config.site
 export LFS LC_ALL LFS_TGT PATH CONFIG_SITE
 MAKEFLAGS="$MAKEFLAGS"
 export MAKEFLAGS
 EOF
-  chown lfs /home/lfs/.bash_profile /home/lfs/.bashrc
-  mark_step lfs_env
+chown lfs /home/lfs/.bash_profile /home/lfs/.bashrc
+
+# Guix System host: Guix's gcc only finds the kernel headers (linux/limits.h…)
+# and profile libs through C_INCLUDE_PATH/CPLUS_INCLUDE_PATH/LIBRARY_PATH, which
+# the clean lfs environment doesn't have — configure then dies with 'C
+# preprocessor "/lib/cpp" fails sanity check'. Exporting them globally would leak
+# host headers into the $LFS_TGT cross-compiler, so wrap just the HOST compiler.
+if [[ -d /run/current-system/profile/bin ]]; then
+  GP=/run/current-system/profile
+  mkdir -p /home/lfs/guix-host-cc
+  for t in gcc:gcc cc:gcc g++:g++ c++:g++ cpp:cpp; do
+    cat > "/home/lfs/guix-host-cc/${t%%:*}" << EOF
+#!$GP/bin/bash
+export C_INCLUDE_PATH="$GP/include\${C_INCLUDE_PATH:+:\$C_INCLUDE_PATH}"
+export CPLUS_INCLUDE_PATH="$GP/include/c++:$GP/include\${CPLUS_INCLUDE_PATH:+:\$CPLUS_INCLUDE_PATH}"
+export LIBRARY_PATH="$GP/lib\${LIBRARY_PATH:+:\$LIBRARY_PATH}"
+exec $GP/bin/${t#*:} "\$@"
+EOF
+    chmod 755 "/home/lfs/guix-host-cc/${t%%:*}"
+  done
+  chown -R lfs /home/lfs/guix-host-cc
 fi
 
 # =============================================================================
@@ -341,7 +368,7 @@ MAKEFLAGS="${MAKEFLAGS:--j3}"
 
 STATE="$HOME/.lfs-phase12.state"
 touch "$STATE"
-done() { grep -qx "$1" "$STATE"; }
+is_done() { grep -qx "$1" "$STATE"; }  # NB: "done" is a bash reserved word
 mark() { echo "$1" >> "$STATE"; }
 
 bpkg() {
@@ -356,7 +383,7 @@ bpkg() {
 
 # ── Phase 1: Cross-toolchain ──────────────────────────────────────────────────
 
-if ! done binutils_p1; then
+if ! is_done binutils_p1; then
   echo "==> Binutils (pass 1)"
   bpkg "$SRC/binutils-2.45.tar.xz" bash -c "
     mkdir build && cd build
@@ -368,7 +395,7 @@ if ! done binutils_p1; then
   mark binutils_p1
 fi
 
-if ! done gcc_p1; then
+if ! is_done gcc_p1; then
   echo "==> GCC (pass 1)"
   bpkg "$SRC/gcc-15.2.0.tar.xz" bash -c "
     tar -xf \$SRC/mpfr-4.2.2.tar.xz && mv mpfr-4.2.2 mpfr
@@ -391,7 +418,7 @@ if ! done gcc_p1; then
   mark gcc_p1
 fi
 
-if ! done linux_headers; then
+if ! is_done linux_headers; then
   echo "==> Linux API headers"
   bpkg "$SRC/linux-libre-6.16-gnu.tar.xz" bash -c "
     make mrproper && make headers
@@ -401,7 +428,7 @@ if ! done linux_headers; then
   mark linux_headers
 fi
 
-if ! done glibc; then
+if ! is_done glibc; then
   echo "==> Glibc"
   bpkg "$SRC/glibc-2.42.tar.xz" bash -c "
     ln -sfnv ../lib/ld-linux-x86-64.so.2 \$LFS/lib64
@@ -418,7 +445,7 @@ if ! done glibc; then
   mark glibc
 fi
 
-if ! done libstdcxx_p1; then
+if ! is_done libstdcxx_p1; then
   echo "==> Libstdc++ (pass 1)"
   bpkg "$SRC/gcc-15.2.0.tar.xz" bash -c "
     mkdir build && cd build
@@ -436,7 +463,7 @@ fi
 
 p2() {
   local name="$1" arc="$2"; shift 2
-  done "$name" && return 0
+  is_done "$name" && return 0
   echo "==> $name (temp)"
   bpkg "$arc" "$@"
   mark "$name"
@@ -601,9 +628,17 @@ PHASE12
 
 chmod +x /tmp/lfs-phase12.sh
 
-if ! step_done phase12; then
+# (the bash check also re-runs it for state files from the old "su - lfs" bug,
+#  which marked phase12 done without building anything; the lfs script keeps
+#  its own per-package state, so a re-run only redoes what is missing)
+if ! step_done phase12 || [[ ! -x "$LFS/usr/bin/bash" ]]; then
   header "Phase 1 & 2 — cross-toolchain + temp tools (as lfs user)"
-  su - lfs -c "bash /tmp/lfs-phase12.sh"
+  # Not "su - lfs": a login shell sources ~/.bash_profile, whose LFS-style
+  # "exec env -i ... /bin/bash" replaces the shell before -c ever runs (the
+  # build silently did nothing). The script sources ~/.bashrc itself.
+  # ($BASH, not /bin/bash: a Guix System host has no /bin/bash)
+  su lfs -s "$BASH" -c "env -i HOME=/home/lfs TERM=${TERM:-dumb} $BASH /tmp/lfs-phase12.sh" \
+    || die "Phase 1 & 2 failed (re-run to resume)"
   mark_step phase12
 fi
 
@@ -645,7 +680,7 @@ SRC=/sources
 
 STATE=/tmp/lfs-chroot.state
 touch "$STATE"
-done() { grep -qx "$1" "$STATE"; }
+is_done() { grep -qx "$1" "$STATE"; }  # NB: "done" is a bash reserved word
 mark() { echo "$1" >> "$STATE"; }
 
 bpkg() {
@@ -658,10 +693,10 @@ bpkg() {
   rm -rf "$d"
 }
 
-pkg() { local n="$1" a="$2"; shift 2; done "$n" && return 0; echo "==> $n"; bpkg "$a" "$@"; mark "$n"; }
+pkg() { local n="$1" a="$2"; shift 2; is_done "$n" && return 0; echo "==> $n"; bpkg "$a" "$@"; mark "$n"; }
 
 # ── Initial directory structure ───────────────────────────────────────────────
-if ! done chroot_init; then
+if ! is_done chroot_init; then
   mkdir -pv /{boot,home,mnt,opt,srv} /etc/{opt,sysconfig} /lib/firmware
   mkdir -pv /media/{floppy,cdrom} /usr/{,local/}{include,src} /usr/lib/locale
   mkdir -pv /usr/local/{bin,lib,sbin}
@@ -1065,7 +1100,7 @@ pkg shepherd_f "$SRC/shepherd-0.10.5.tar.gz" bash -c "
 "
 
 # ── System configuration ───────────────────────────────────────────────────────
-if ! done sysconfig; then
+if ! is_done sysconfig; then
   echo "==> System configuration"
   ROOT_UUID=$(blkid -s UUID -o value $ROOT 2>/dev/null || echo "CHANGEME")
   EFI_UUID=$(blkid  -s UUID -o value $EFI  2>/dev/null || echo "CHANGEME")
@@ -1171,7 +1206,7 @@ EOF2
 fi
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
-if ! done kernel; then
+if ! is_done kernel; then
   echo "==> Linux-libre 6.16 (KVM/QEMU, x86_64, deblobbed)"
   bpkg "$SRC/linux-libre-6.16-gnu.tar.xz" bash -c "
     make defconfig
