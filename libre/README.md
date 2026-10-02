@@ -27,7 +27,8 @@ if they're missing. **No 9p/virtfs needed:** the repo goes into the builder as a
 read-only tarball disk and the log comes back over virtio-serial, so a QEMU
 built without virtfs (`'virtio-9p-pci' is not a valid device model name`) works
 fine. Tunables: `MEM`, `CPUS`, `JOBS` (make -j in the guest), `SHARE`
-(`auto`/`9p`/`copy`), `ALLOW_TCG=1` (build without KVM — very slow).
+(`auto`/`9p`/`copy`), `ACCEL` (`auto`/`kvm`/`tcg`), `ALLOW_TCG=1` (build
+without KVM instead of exiting — very slow).
 
 Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
 host the guest hands idle RAM back instead of pinning all 8 GB. At 4 GB IceCat is
