@@ -1399,6 +1399,7 @@ FREEFONT_VER="20120503"
 XDM_VER="1.1.16"
 GNUTLS_VER="3.8.5"
 NCURSES_VER="6.5"
+FASTFETCH_VER="2.67.1"   # SLFS 13.1
 
 # Xorg mirror + a build helper: fetch a package from x.org/pub/individual/<sect>
 # and build it with the standard autotools incantation shared by nearly all
@@ -1871,6 +1872,59 @@ EOF
 
   chown -R gnu:gnu /home/gnu
   mark_step user_setup
+fi
+
+# =============================================================================
+# 14. fastfetch — SLFS 13.1 (Supplemental LFS, ch. 3), system info tool.
+#     Only hard dep is CMake (built in phase 1, cmake_f). The book's
+#     ENABLE_SYSTEM_YYJSON=ON needs yyjson, which libre doesn't build, so it's
+#     OFF here: fastfetch then compiles its bundled src/3rdparty/yyjson.
+#     Non-fatal and left unchecked on failure, so a re-run retries it.
+# =============================================================================
+if ! step_done fastfetch; then
+  header "fastfetch ${FASTFETCH_VER} (SLFS 13.1, bundled yyjson)"
+  a=$(fetch "https://github.com/fastfetch-cli/fastfetch/archive/${FASTFETCH_VER}/fastfetch-${FASTFETCH_VER}.tar.gz") \
+    && bpkg "$a" bash -c "
+      mkdir build && cd build &&
+      cmake -D CMAKE_INSTALL_PREFIX=/usr    \
+            -D CMAKE_BUILD_TYPE=Release     \
+            -D BUILD_FLASHFETCH=OFF         \
+            -D ENABLE_SYSTEM_YYJSON=OFF     \
+            -D PACKAGES_REMOVE_DISABLED=ON  \
+            -D PACKAGES_DISABLE_CHOCO=ON    \
+            -D PACKAGES_DISABLE_MACPORTS=ON \
+            -D PACKAGES_DISABLE_SCOOP=ON    \
+            -D PACKAGES_DISABLE_WINGET=ON   \
+            .. &&
+      make -j${NPROC} &&
+      make install
+    " \
+    && mark_step fastfetch || warn "fastfetch failed — re-run to retry (nothing else depends on it)"
+fi
+# System-wide config: fastfetch falls back to /etc/xdg/fastfetch/config.jsonc
+# when the user has no ~/.config/fastfetch/config.jsonc. Same file blfs/setup
+# symlinks into ~/.config (Tokyo Night). Plus run it from gnu's interactive
+# bash, like legenddots' .zshrc does (guarded: no-op if fastfetch is missing).
+if ! step_done fastfetch_config; then
+  header "fastfetch config (/etc/xdg/fastfetch, Tokyo Night)"
+  FF_CONF="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/fastfetch/config.jsonc"
+  if [ -f "$FF_CONF" ]; then
+    install -Dm644 "$FF_CONF" /etc/xdg/fastfetch/config.jsonc
+  else
+    warn "fastfetch config not found at $FF_CONF — fastfetch will use its built-in defaults"
+  fi
+  if id gnu >/dev/null 2>&1 && ! grep -q 'legenddots: fastfetch' /home/gnu/.bashrc 2>/dev/null; then
+    cat >> /home/gnu/.bashrc << 'EOF'
+# legenddots: fastfetch on interactive shells (skipped on tty1, which execs startx)
+case $- in *i*)
+  if command -v fastfetch >/dev/null 2>&1 && { [ -n "$DISPLAY" ] || [ "$(tty)" != /dev/tty1 ]; }; then
+    fastfetch
+  fi ;;
+esac
+EOF
+    chown gnu:gnu /home/gnu/.bashrc
+  fi
+  mark_step fastfetch_config
 fi
 
 echo ""

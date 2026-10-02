@@ -167,6 +167,7 @@ virtio disk is what stretches the 4 GB times.
 | ALSA | ~10 min | ~10 min |
 | **GNU IceCat** | **skipped** (needs ~8 GB — see below) | **~4–7 h** |
 | xdm, user + dotfiles | ~15 min | ~15 min |
+| fastfetch 2.67.1 (SLFS 13.1) + config | ~5 min | ~5 min |
 
 ### Totals
 
@@ -225,6 +226,11 @@ is **C-t** (Control-t), screen-style:
 
 Config lives in `~/.ratpoisonrc`, `~/.xinitrc`, and `~/.Xresources` — edit and
 `C-t :source ~/.ratpoisonrc` to reload.
+
+`fastfetch` (built per SLFS 13.1, with its bundled yyjson) runs in every
+interactive bash except the tty1 login that starts X. Its system-wide config is
+`/etc/xdg/fastfetch/config.jsonc` (Tokyo Night, from `../fastfetch/config.jsonc`).
+Copy it to `~/.config/fastfetch/config.jsonc` to customise it per user.
 
 ### Default credentials
 
