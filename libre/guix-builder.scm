@@ -28,15 +28,16 @@
 ;;     mounted by its label "Guix_image", not /dev/vda1 (which is the vfat ESP).
 ;;   - Shepherd's `halt` takes no -p (it always powers off; unknown args fail).
 ;;
-;; NOTE: verified with Guile + against Guix's sources, but not run through
-;; `guix system image` in the dev sandbox (no Guix there). The Debian builder in
-;; run-vm.sh is the tested-path fallback.
+;; Tested (Oct 2026, QEMU/TCG): `guix system image -t qcow2` with Guix 1.5.0,
+;; 620ce4ff16 (2026-07-28) and 1a1ebcc9b7 (2026-10-01); the image boots, the
+;; bootstrap finds the repo (9p and tar-disk) and libre/setup starts compiling.
 ;; =============================================================================
 
 (use-modules (gnu)
              (gnu packages)
              (gnu services shepherd)
-             (guix gexp))
+             (guix gexp)
+             (srfi srfi-1))           ; append-map
 (use-service-modules base networking)
 
 ;; DHCP client: dhcpcd-service-type on Guix >= 2025-03 (the only one left since
@@ -54,13 +55,21 @@
 ;; LFS host requirements, resolved by name so we don't chase module imports.
 (define build-tools
   (map specification->package
-       '("gcc-toolchain" "make" "bison" "m4" "texinfo"
+       '("gcc-toolchain" "make" "bison" "flex" "m4" "texinfo"
          "parted" "dosfstools" "e2fsprogs" "util-linux"
          "perl" "python" "wget" "git" "sed" "tar"
          "gzip" "xz" "bzip2" "patch" "diffutils" "findutils" "grep"
          "gawk" "coreutils" "pkg-config" "file" "gettext"
          "which" "bash" "guix")))   ; no "binutils": gcc-toolchain ships
                                     ; them (+ the ld-wrapper) already
+
+;; Optional extras, only if this Guix has them (no "unknown package" error on
+;; older Guix): refind provides refind-install for libre/setup's bootloader step.
+(define optional-tools
+  (append-map (lambda (name)
+                (let ((found (find-packages-by-name name)))
+                  (if (null? found) '() (list (car found)))))
+              '("refind")))
 
 ;; Run the build at boot (backgrounded, not one-shot so the console stays free),
 ;; then power the VM off when it finishes. Logs land on the 9p work share, or
@@ -90,6 +99,10 @@
   (locale "en_US.utf8")
   (keyboard-layout (keyboard-layout "us"))
 
+  ;; Headless VM (-display none -serial mon:stdio): send the console to the
+  ;; serial port so boot + Shepherd messages show up in the launcher's terminal.
+  (kernel-arguments (cons "console=ttyS0,115200" %default-kernel-arguments))
+
   (bootloader (bootloader-configuration
                (bootloader grub-bootloader)
                (targets '("/dev/vda"))))
@@ -104,7 +117,19 @@
            (type "ext4"))
          %base-file-systems))
 
-  (packages (append build-tools %base-packages))
+  ;; libre/setup builds the cross-toolchain as an unprivileged "lfs" user. It
+  ;; useradd's one itself, but Guix regenerates /etc/passwd from this list at
+  ;; every boot, so an imperatively added user would vanish on a resume.
+  (groups (cons (user-group (name "lfs")) %base-groups))
+  (users (cons (user-account
+                (name "lfs")
+                (group "lfs")
+                (comment "LFS cross-toolchain builder")
+                (home-directory "/home/lfs")
+                (shell (file-append (specification->package "bash") "/bin/bash")))
+               %base-user-accounts))
+
+  (packages (append build-tools optional-tools %base-packages))
 
   (services (append (list libre-build-service
                           %dhcp-client-service)

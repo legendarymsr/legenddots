@@ -28,7 +28,7 @@ if [ "$FHS" = 1 ] && command -v guix >/dev/null 2>&1; then
   say "FHS=1 — re-exec inside guix shell --emulate-fhs (experimental)"
   export FHS=0
   exec guix shell --container --emulate-fhs --network --share=/dev --share=/mnt \
-    gcc-toolchain make bison m4 texinfo parted dosfstools e2fsprogs util-linux \
+    gcc-toolchain make bison flex m4 texinfo parted dosfstools e2fsprogs util-linux \
     perl python wget git sed tar gzip xz bzip2 patch diffutils findutils grep \
     gawk coreutils pkg-config file gettext which binutils bash \
     -- bash "$0"

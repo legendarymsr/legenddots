@@ -17,11 +17,15 @@ TARGET=/dev/vdb
 say "installing LFS host build tools"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-# The LFS 'host system requirements' set, plus parted/dosfstools for the disk.
+# rEFInd: libre/setup runs `refind-install --usedefault` onto the TARGET's ESP;
+# don't let the package's postinst try to install it onto the builder itself.
+echo 'refind refind/install_to_esp boolean false' | debconf-set-selections
+# The LFS 'host system requirements' set (everything libre/setup's host check
+# looks for — incl. flex), plus parted/dosfstools for the disk and refind.
 apt-get install -y --no-install-recommends \
-  build-essential gcc g++ make bison gawk m4 texinfo gzip bzip2 xz-utils \
+  build-essential gcc g++ make bison flex gawk m4 texinfo gzip bzip2 xz-utils \
   patch perl python3 sed tar wget curl git file findutils diffutils grep \
-  parted dosfstools e2fsprogs gettext pkg-config || { say "apt failed"; exit 1; }
+  parted dosfstools e2fsprogs gettext pkg-config refind || { say "apt failed"; exit 1; }
 
 # ── PHASE 1 — build the libre BASE onto the target disk ──────────────────────
 if ! grep -qx lfs_complete "$LFS/etc/libre-setup.state" 2>/dev/null \
