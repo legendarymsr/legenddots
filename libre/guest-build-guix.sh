@@ -65,7 +65,7 @@ rm -rf "$LFS/root/legenddots"; cp -a "$REPO" "$LFS/root/legenddots"
 say "PHASE 2 — desktop build in chroot"
 chroot "$LFS" /usr/bin/env -i \
   HOME=/root TERM="${TERM:-xterm}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-  MAKEFLAGS="-j$(nproc)" \
+  MAKEFLAGS="${MAKEFLAGS:--j$(nproc)}" \
   bash /root/legenddots/libre/setup || { say "phase 2 failed (re-run the launcher to resume)"; exit 1; }
 
 say "cleanup — unmount target"
