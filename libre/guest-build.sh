@@ -10,7 +10,7 @@
 # =============================================================================
 set -uo pipefail
 say() { echo "== $(date '+%F %T') :: $*"; }
-REPO=/mnt/repo                 # this git repo, shared read-only over 9p
+REPO=/mnt/repo                 # this git repo: 9p share (ro) or unpacked snapshot
 LFS=/mnt/lfs                   # the target root gets mounted here
 TARGET=/dev/vdb
 
@@ -56,7 +56,7 @@ rm -rf "$LFS/root/legenddots"; cp -a "$REPO" "$LFS/root/legenddots"
 say "PHASE 2 — desktop build in chroot"
 chroot "$LFS" /usr/bin/env -i \
   HOME=/root TERM="${TERM:-xterm}" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-  MAKEFLAGS="-j$(nproc)" \
+  MAKEFLAGS="${MAKEFLAGS:--j$(nproc)}" \
   bash /root/legenddots/libre/setup || { say "phase 2 failed (resume: re-run the launcher)"; exit 1; }
 
 say "cleanup — unmount target"

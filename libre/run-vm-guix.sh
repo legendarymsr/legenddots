@@ -7,7 +7,9 @@
 #
 # Needs `guix` on the HOST (you run Guix on Gentoo already). It:
 #   - builds a Guix System builder image from guix-builder.scm,
-#   - attaches a fresh target disk (/dev/vdb) + shares this repo over 9p,
+#   - attaches a fresh target disk (/dev/vdb) + shares this repo over 9p — or,
+#     if your QEMU lacks 9p/virtfs, a read-only repo tarball disk + a
+#     virtio-serial log (SHARE=auto|9p|copy, same as run-vm.sh),
 #   - the builder's Shepherd service auto-runs libre/guest-build-guix.sh:
 #     phase 1 (base) natively, phase 2 (desktop) in a chroot, then halts.
 #
@@ -20,7 +22,8 @@
 # it. EXPERIMENTAL / untested here (no Guix in the sandbox); run-vm.sh (Debian)
 # is the known-good fallback.
 #
-# Tunables: VM_DIR TARGET_SIZE MEM CPUS BUILDER_SIZE FHS  (+ boot: FW_CODE/VARS)
+# Tunables: VM_DIR TARGET_SIZE MEM CPUS BUILDER_SIZE FHS SHARE ALLOW_TCG
+#           (+ boot: FW_CODE/VARS)
 # =============================================================================
 set -euo pipefail
 
@@ -42,6 +45,9 @@ BUILDER_SIZE="${BUILDER_SIZE:-24G}"
 WORK="$VM_DIR/work"
 LOG="$WORK/build.log"
 DONE="$WORK/done"
+DONE_TAG="LIBRE-BUILD-DONE"                 # copy mode: guest prints this line instead
+REPO_TAR="$VM_DIR/repo.tar"                 # copy mode: repo snapshot, attached ro
+SHARE="${SHARE:-auto}"                      # auto | 9p | copy (see run-vm.sh)
 MEM="${MEM:-4G}"                           # 4G + balloon fits an 8G host; MEM=8G builds IceCat
 CPUS="${CPUS:-$(nproc)}"
 export FHS="${FHS:-0}"                      # passed through to guest-build-guix.sh
@@ -59,10 +65,54 @@ ensure_prereqs() {
       echo 'QEMU_SOFTMMU_TARGETS="x86_64"' | doas tee -a /etc/portage/make.conf >/dev/null
     doas emerge -avN "${need[@]}" || die "emerge failed — install ${need[*]} by hand"
   fi
-  if ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
-    header "Adding $USER_NAME to the kvm group"; doas usermod -aG kvm "$USER_NAME"
+  if [[ -e /dev/kvm && ! -w /dev/kvm ]] && ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
+    header "Adding $USER_NAME to the kvm group"
+    doas usermod -aG kvm "$USER_NAME" || warn "couldn't add $USER_NAME to the kvm group — do it by hand"
   fi
 }
+
+# ── how the repo gets into the builder: 9p if QEMU has it, else a tar disk ────
+qemu_has_9p() {
+  qemu-system-x86_64 -device help 2>/dev/null | grep -q '"virtio-9p-pci"'
+}
+how_to_get_9p() {
+  cat >&2 <<'EOT'
+  To get 9p/virtfs in QEMU (optional — the copy transport works without it):
+    Gentoo:  echo 'app-emulation/qemu virtfs xattr' | doas tee /etc/portage/package.use/qemu-virtfs
+             doas emerge -1av app-emulation/qemu
+    Others:  use a QEMU built with --enable-virtfs (needs libcap-ng + libattr at
+             build time). Debian/Ubuntu qemu-system-x86, Fedora qemu-kvm and Arch
+             qemu-base/qemu-full ship it; self-built or minimal builds often don't.
+    Check:   qemu-system-x86_64 -device help | grep virtio-9p
+EOT
+}
+pick_share() {
+  case "$SHARE" in
+    9p)   qemu_has_9p || { warn "SHARE=9p but this QEMU has no virtio-9p device"; how_to_get_9p; die "re-run with SHARE=copy (or SHARE=auto)"; } ;;
+    copy) echo -e "  share: copy (repo tar disk + virtio-serial log)" >&2 ;;
+    auto) if qemu_has_9p; then SHARE=9p
+            echo -e "  share: 9p offered (+ tar-disk fallback if the guest kernel can't mount it)" >&2
+          else SHARE=copy
+            warn "this QEMU ($(command -v qemu-system-x86_64)) has no 9p/virtfs support ('virtio-9p-pci' missing)"
+            echo -e "  ${CYAN}->${NC} using SHARE=copy: the repo goes in as a read-only tarball disk and the" >&2
+            echo -e "     build log streams back over virtio-serial. Same build, same checkpoints —" >&2
+            echo -e "     nothing to install." >&2
+            echo -e "     Optional — 9p gives the Guix builder a live, read-only view of the repo:" >&2
+            how_to_get_9p
+          fi ;;
+    *)    die "SHARE must be auto, 9p or copy (got: $SHARE)" ;;
+  esac
+}
+
+# copy mode: snapshot the repo (working tree as-is, incl. uncommitted edits)
+make_repo_tar() {
+  local ex=()
+  case "$VM_DIR/" in "$REPO"/*) ex=(--exclude="./${VM_DIR#"$REPO"/}") ;; esac
+  tar -C "$REPO" "${ex[@]}" -cf "$REPO_TAR.tmp" . || die "failed to tar up $REPO"
+  mv -f "$REPO_TAR.tmp" "$REPO_TAR"
+  echo -e "  repo snapshot: $REPO_TAR ($(du -h "$REPO_TAR" | cut -f1))"
+}
+
 ensure_kvm_access() {
   [[ -w /dev/kvm ]] && return 0
   if getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
@@ -72,7 +122,11 @@ ensure_kvm_access() {
     fi
     warn "in kvm group but this shell predates it — log out/in and re-run"; exit 0
   fi
-  warn "no /dev/kvm — a software build would take weeks; fix kvm first"; exit 1
+  if [[ "${ALLOW_TCG:-0}" == 1 ]]; then
+    warn "no usable /dev/kvm — ALLOW_TCG=1: building with TCG software emulation (many times slower)"
+    return 0
+  fi
+  warn "no /dev/kvm — a software build would take weeks; fix kvm first (or ALLOW_TCG=1)"; exit 1
 }
 
 # ── build the Guix System builder image (once; kept for resume) ──────────────
@@ -96,12 +150,33 @@ provision() {
 }
 
 run_build() {
-  [[ -f "$SELF_DIR/guest-build-guix.sh" ]] || die "missing libre/guest-build-guix.sh"
+  local f
+  for f in guest-build-guix.sh guest-bootstrap.sh; do
+    [[ -f "$SELF_DIR/$f" ]] || die "missing libre/$f"
+  done
+  pick_share
   provision
   rm -f "$DONE"; : > "$LOG"
-  local accel=(-cpu qemu64); [[ -w /dev/kvm ]] && accel=(-enable-kvm -cpu host)
+  # shellcheck disable=SC2054  # the commas are QEMU option syntax
+  local accel=(-accel tcg,thread=multi -cpu qemu64); [[ -w /dev/kvm ]] && accel=(-enable-kvm -cpu host)
+  # The copy transport (repo tar as a read-only virtio disk — added LAST so the
+  # target stays /dev/vdb — plus the log over virtio-serial into $LOG, append=on)
+  # is ALWAYS attached; the 9p shares are added on top when QEMU has virtfs.
+  # guest-bootstrap.sh tries 9p first and falls back to the tar disk, so a guest
+  # kernel without 9p (e.g. Debian's genericcloud kernel) still works.
+  # NB: plain if=virtio, not -device virtio-blk-pci: explicit -device disks get
+  # PCI slots before if=virtio ones and would renumber vda/vdb.
+  make_repo_tar
+  local share=(-drive "file=$REPO_TAR,if=virtio,format=raw,readonly=on"
+               -chardev "file,id=buildlog,path=$LOG,append=on"
+               -device virtio-serial-pci
+               -device "virtserialport,chardev=buildlog,name=libre.log")
+  if [[ "$SHARE" == 9p ]]; then
+    share+=(-virtfs "local,path=$REPO,mount_tag=repo,security_model=mapped-xattr,readonly=on"
+            -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr")
+  fi
   header "Building the libre system from a GUIX SYSTEM builder — headless, ~30–44 h"
-  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS  FHS=$FHS"
+  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS  FHS=$FHS  share=$SHARE"
   echo -e "  ${GRN}watch:${NC}  ./run-vm-guix.sh watch   (or tail -f $LOG)"
   echo -e "  the VM powers off by itself when the build finishes.\n"
   qemu-system-x86_64 \
@@ -110,10 +185,9 @@ run_build() {
     -drive "file=$TARGET,if=virtio" \
     -netdev user,id=n0 -device virtio-net,netdev=n0 \
     -device virtio-balloon,free-page-reporting=on \
-    -virtfs "local,path=$REPO,mount_tag=repo,security_model=mapped-xattr,readonly=on" \
-    -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr" \
+    "${share[@]}" \
     -display none -serial mon:stdio
-  if [[ -f "$DONE" ]]; then
+  if [[ -f "$DONE" ]] || grep -qx "$DONE_TAG" "$LOG" 2>/dev/null; then
     touch "$VM_DIR/.built"
     header "Build complete ✓ (bootstrapped from Guix System)"
     echo -e "  boot it:  ${GRN}./run-vm-guix.sh boot${NC}"

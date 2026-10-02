@@ -6,8 +6,12 @@
 # How it works (so you can trust it):
 #   - Boots a tiny headless Debian *cloud* VM as a disposable "builder".
 #   - Attaches your real target disk as a second virtio disk (/dev/vdb) and
-#     shares this repo into the guest over 9p (read-only).
-#   - cloud-init auto-runs libre/guest-build.sh inside the builder, which:
+#     hands this repo in as a read-only tarball disk (/dev/vdc), streaming the
+#     build log back over virtio-serial. If your QEMU has 9p/virtfs it's also
+#     offered as a live read-only share, but it's optional: Debian's
+#     genericcloud guest kernel can't mount 9p anyway. No root needed.
+#   - cloud-init auto-runs libre/guest-bootstrap.sh -> libre/guest-build.sh
+#     inside the builder, which:
 #       1. installs the LFS host build tools (gcc, bison, parted, …) via apt,
 #       2. PHASE 1: `LFS_DISK=/dev/vdb libre/setup`  -> builds the libre base
 #          onto the target disk (toolchain, temp tools, chroot base,
@@ -26,8 +30,16 @@
 #   ./run-vm.sh boot     boot the FINISHED libre system (UEFI + GUI) to use it
 #   ./run-vm.sh watch    tail the live build log
 #
-# Tunables (env): VM_DIR TARGET_SIZE MEM CPUS CLOUD_IMG_URL  (and for boot:
-#                 FW_CODE FW_VARS DISPLAY_TYPE)
+# Tunables (env): VM_DIR TARGET_SIZE MEM CPUS JOBS CLOUD_IMG_URL SHARE ALLOW_TCG
+#                 (and for boot: FW_CODE FW_VARS DISPLAY_TYPE)
+#   SHARE=auto  (default) offer 9p too if this QEMU has virtio-9p
+#   SHARE=9p    require 9p in QEMU (errors out if it's missing)
+#   SHARE=copy  never offer 9p: repo -> read-only tar disk, log -> virtio-serial
+#               (the tar disk is ALWAYS attached as the fallback; the repo is
+#               snapshotted at launch — re-run to pick up edits)
+#   ALLOW_TCG=1 build without KVM (software emulation, very slow) instead of exiting
+#   JOBS=N      make -jN in the guest for both phases (default: libre/setup's
+#               own default in phase 1, nproc in phase 2)
 #
 # NOTE: this orchestration is new and the full build is ~30–44 h; it has not
 # been run end-to-end on this machine. If a step wedges, `./run-vm.sh watch`
@@ -53,8 +65,12 @@ TARGET_SIZE="${TARGET_SIZE:-80G}"          # LFS + LLVM/IceCat build trees are h
 BUILDER="$VM_DIR/builder.qcow2"            # disposable Debian overlay
 SEED="$VM_DIR/seed.iso"                    # cloud-init NoCloud seed
 WORK="$VM_DIR/work"                        # 9p-shared rw scratch (log + done marker)
-LOG="$WORK/build.log"                      # 9p-shared build log
+LOG="$WORK/build.log"                      # build log (9p file, or virtio-serial sink)
 DONE="$WORK/done"                          # marker the guest touches when finished
+DONE_TAG="LIBRE-BUILD-DONE"                # copy mode: guest prints this line instead
+REPO_TAR="$VM_DIR/repo.tar"                # copy mode: repo snapshot, attached ro
+SHARE="${SHARE:-auto}"                     # auto | 9p | copy
+JOBS="${JOBS:-}"
 MEM="${MEM:-4G}"                           # 4G fits an 8G host; virtio-balloon
                                            # (free-page-reporting) hands idle RAM
                                            # back to the host. IceCat auto-skips
@@ -82,9 +98,51 @@ ensure_prereqs() {
     doas emerge -avN "${need[@]}" || die "emerge failed — install ${need[*]} by hand"
     find_iso_tool || die "still no mkisofs/genisoimage/xorrisofs — install app-cdr/cdrtools (or cdrkit / libisoburn)"
   fi
-  if ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
-    header "Adding $USER_NAME to the kvm group"; doas usermod -aG kvm "$USER_NAME"
+  if [[ -e /dev/kvm && ! -w /dev/kvm ]] && ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
+    header "Adding $USER_NAME to the kvm group"
+    doas usermod -aG kvm "$USER_NAME" || warn "couldn't add $USER_NAME to the kvm group — do it by hand"
   fi
+}
+
+# ── how the repo gets into the builder: 9p if QEMU has it, else a tar disk ────
+qemu_has_9p() {
+  qemu-system-x86_64 -device help 2>/dev/null | grep -q '"virtio-9p-pci"'
+}
+how_to_get_9p() {
+  cat >&2 <<'EOT'
+  To get 9p/virtfs in QEMU (optional — the copy transport works without it):
+    Gentoo:  echo 'app-emulation/qemu virtfs xattr' | doas tee /etc/portage/package.use/qemu-virtfs
+             doas emerge -1av app-emulation/qemu
+    Others:  use a QEMU built with --enable-virtfs (needs libcap-ng + libattr at
+             build time). Debian/Ubuntu qemu-system-x86, Fedora qemu-kvm and Arch
+             qemu-base/qemu-full ship it; self-built or minimal builds often don't.
+    Check:   qemu-system-x86_64 -device help | grep virtio-9p
+EOT
+}
+pick_share() {
+  case "$SHARE" in
+    9p)   qemu_has_9p || { warn "SHARE=9p but this QEMU has no virtio-9p device"; how_to_get_9p; die "re-run with SHARE=copy (or SHARE=auto)"; } ;;
+    copy) echo -e "  share: copy (repo tar disk + virtio-serial log)" >&2 ;;
+    auto) if qemu_has_9p; then SHARE=9p
+            echo -e "  share: 9p offered (+ tar-disk fallback if the guest kernel can't mount it)" >&2
+          else SHARE=copy
+            warn "this QEMU ($(command -v qemu-system-x86_64)) has no 9p/virtfs support ('virtio-9p-pci' missing)"
+            echo -e "  ${CYAN}->${NC} using SHARE=copy: the repo goes in as a read-only tarball disk and the" >&2
+            echo -e "     build log streams back over virtio-serial. Same build, same checkpoints —" >&2
+            echo -e "     nothing to install." >&2
+            echo -e "     (9p wouldn't help here anyway: Debian's genericcloud guest kernel has no 9p.)" >&2
+          fi ;;
+    *)    die "SHARE must be auto, 9p or copy (got: $SHARE)" ;;
+  esac
+}
+
+# copy mode: snapshot the repo (working tree as-is, incl. uncommitted edits)
+make_repo_tar() {
+  local ex=()
+  case "$VM_DIR/" in "$REPO"/*) ex=(--exclude="./${VM_DIR#"$REPO"/}") ;; esac
+  tar -C "$REPO" "${ex[@]}" -cf "$REPO_TAR.tmp" . || die "failed to tar up $REPO"
+  mv -f "$REPO_TAR.tmp" "$REPO_TAR"
+  echo -e "  repo snapshot: $REPO_TAR ($(du -h "$REPO_TAR" | cut -f1))"
 }
 
 ensure_kvm_access() {
@@ -96,7 +154,11 @@ ensure_kvm_access() {
     fi
     warn "you're in the kvm group but this shell predates it — log out/in and re-run"; exit 0
   fi
-  warn "no /dev/kvm — building WITHOUT acceleration would take weeks; fix kvm first"; exit 1
+  if [[ "${ALLOW_TCG:-0}" == 1 ]]; then
+    warn "no usable /dev/kvm — ALLOW_TCG=1: building with TCG software emulation (many times slower)"
+    return 0
+  fi
+  warn "no /dev/kvm — building WITHOUT acceleration would take weeks; fix kvm first (or ALLOW_TCG=1 to do it anyway)"; exit 1
 }
 
 # ── cloud-init NoCloud seed: mount the shares, run guest-build.sh, power off ──
@@ -106,15 +168,21 @@ write_seed() {
 instance-id: libre-build-$(date +%s)
 local-hostname: libre-builder
 EOF
-  cat > "$cidir/user-data" <<'EOF'
+  # guest-bootstrap.sh mounts the 9p shares, or (no 9p) unpacks the repo tar
+  # disk and logs over virtio-serial, then runs guest-build.sh. It's embedded
+  # base64 so it exists in the guest before the repo does.
+  [[ "$JOBS" =~ ^[0-9]*$ ]] || die "JOBS must be a number (got: $JOBS)"
+  cat > "$cidir/user-data" <<EOF
 #cloud-config
 bootcmd:
   - [ sh, -c, "modprobe 9pnet_virtio 2>/dev/null || true" ]
+write_files:
+  - path: /usr/local/sbin/libre-bootstrap
+    permissions: '0755'
+    encoding: b64
+    content: $(base64 -w0 < "$SELF_DIR/guest-bootstrap.sh")
 runcmd:
-  - [ sh, -c, "mkdir -p /mnt/repo /mnt/work" ]
-  - [ sh, -c, "mount -t 9p -o trans=virtio,version=9p2000.L,ro  repo /mnt/repo" ]
-  - [ sh, -c, "mount -t 9p -o trans=virtio,version=9p2000.L     work /mnt/work" ]
-  - [ sh, -c, "bash /mnt/repo/libre/guest-build.sh >>/mnt/work/build.log 2>&1; echo EXIT=$? >>/mnt/work/build.log" ]
+  - [ sh, -c, "JOBS=$JOBS /usr/local/sbin/libre-bootstrap libre/guest-build.sh" ]
   - [ sh, -c, "sync; poweroff" ]
 EOF
   "$ISO_TOOL" -output "$SEED" -volid cidata -joliet -rock \
@@ -141,17 +209,38 @@ provision() {
 
 # ── run the headless builder until it powers off ─────────────────────────────
 run_build() {
-  [[ -f "$SELF_DIR/guest-build.sh" ]] || die "missing libre/guest-build.sh next to this script"
+  local f
+  for f in guest-build.sh guest-bootstrap.sh; do
+    [[ -f "$SELF_DIR/$f" ]] || die "missing libre/$f next to this script"
+  done
+  pick_share
   write_seed
   provision
   rm -f "$DONE" "$LOG"; : > "$LOG"
-  local accel=(-cpu qemu64)
+  # shellcheck disable=SC2054  # MTTCG (one host thread per vCPU); commas are QEMU syntax
+  local accel=(-accel tcg,thread=multi -cpu qemu64)
   [[ -w /dev/kvm ]] && accel=(-enable-kvm -cpu host)
+  # The copy transport (repo tar as a read-only virtio disk — added LAST so the
+  # target stays /dev/vdb — plus the log over virtio-serial into $LOG, append=on)
+  # is ALWAYS attached; the 9p shares are added on top when QEMU has virtfs.
+  # guest-bootstrap.sh tries 9p first and falls back to the tar disk, so a guest
+  # kernel without 9p (e.g. Debian's genericcloud kernel) still works.
+  # NB: plain if=virtio, not -device virtio-blk-pci: explicit -device disks get
+  # PCI slots before if=virtio ones and would renumber vda/vdb.
+  make_repo_tar
+  local share=(-drive "file=$REPO_TAR,if=virtio,format=raw,readonly=on"
+               -chardev "file,id=buildlog,path=$LOG,append=on"
+               -device virtio-serial-pci
+               -device "virtserialport,chardev=buildlog,name=libre.log")
+  if [[ "$SHARE" == 9p ]]; then
+    share+=(-virtfs "local,path=$REPO,mount_tag=repo,security_model=mapped-xattr,readonly=on"
+            -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr")
+  fi
   header "Building the libre system — headless, ~30–44 h, checkpointed"
-  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS"
+  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS  jobs=${JOBS:-default}  share=$SHARE"
   echo -e "  ${GRN}watch the log:${NC}  ./run-vm.sh watch   (or: tail -f $LOG)"
   echo -e "  the VM powers off by itself when the build finishes.\n"
-  # serial goes to the terminal AND the 9p 'work' share carries the detailed log
+  # serial goes to the terminal; $LOG carries the detailed build log
   qemu-system-x86_64 \
     "${accel[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "file=$BUILDER,if=virtio" \
@@ -159,10 +248,9 @@ run_build() {
     -drive "file=$SEED,media=cdrom" \
     -netdev user,id=n0 -device virtio-net,netdev=n0 \
     -device virtio-balloon,free-page-reporting=on \
-    -virtfs "local,path=$REPO,mount_tag=repo,security_model=mapped-xattr,readonly=on" \
-    -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr" \
+    "${share[@]}" \
     -display none -serial mon:stdio
-  if [[ -f "$DONE" ]]; then
+  if [[ -f "$DONE" ]] || grep -qx "$DONE_TAG" "$LOG" 2>/dev/null; then
     touch "$VM_DIR/.built"
     header "Build complete ✓"
     echo -e "  boot your new GNU/Linux-libre system:  ${GRN}./run-vm.sh boot${NC}"
