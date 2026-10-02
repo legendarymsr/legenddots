@@ -22,7 +22,7 @@
 # it. EXPERIMENTAL / untested here (no Guix in the sandbox); run-vm.sh (Debian)
 # is the known-good fallback.
 #
-# Tunables: VM_DIR TARGET_SIZE MEM CPUS BUILDER_SIZE FHS SHARE ALLOW_TCG
+# Tunables: VM_DIR TARGET_SIZE MEM CPUS BUILDER_SIZE FHS SHARE ACCEL ALLOW_TCG
 #           (+ boot: FW_CODE/VARS)
 # =============================================================================
 set -euo pipefail
@@ -65,7 +65,7 @@ ensure_prereqs() {
       echo 'QEMU_SOFTMMU_TARGETS="x86_64"' | doas tee -a /etc/portage/make.conf >/dev/null
     doas emerge -avN "${need[@]}" || die "emerge failed — install ${need[*]} by hand"
   fi
-  if [[ -e /dev/kvm && ! -w /dev/kvm ]] && ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
+  if [[ "$ACCEL" != tcg && -e /dev/kvm && ! -w /dev/kvm ]] && ! getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
     header "Adding $USER_NAME to the kvm group"
     doas usermod -aG kvm "$USER_NAME" || warn "couldn't add $USER_NAME to the kvm group — do it by hand"
   fi
@@ -113,8 +113,25 @@ make_repo_tar() {
   echo -e "  repo snapshot: $REPO_TAR ($(du -h "$REPO_TAR" | cut -f1))"
 }
 
+# ── accelerator: KVM if /dev/kvm is usable, else multi-threaded TCG ──────────
+# ACCEL=auto (default) | kvm | tcg.  ACCEL=tcg never touches /dev/kvm (for
+# hosts where KVM is present but broken); TCG uses -cpu max + MTTCG.
+ACCEL="${ACCEL:-auto}"
+kvm_usable() { [[ "$ACCEL" != tcg && -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; }
+pick_accel() {   # sets the global ACCEL_ARGS array
+  case "$ACCEL" in auto|kvm|tcg) ;; *) die "ACCEL must be auto, kvm or tcg (got: $ACCEL)" ;; esac
+  if kvm_usable; then
+    ACCEL_ARGS=(-enable-kvm -cpu host)
+  else
+    [[ "$ACCEL" == kvm ]] && die "ACCEL=kvm but /dev/kvm isn't usable"
+    # shellcheck disable=SC2054  # the commas are QEMU option syntax
+    ACCEL_ARGS=(-accel tcg,thread=multi -cpu max)
+  fi
+}
+
 ensure_kvm_access() {
-  [[ -w /dev/kvm ]] && return 0
+  [[ "$ACCEL" == tcg ]] && { warn "ACCEL=tcg: software emulation (TCG), /dev/kvm untouched — many times slower"; return 0; }
+  kvm_usable && return 0
   if getent group kvm 2>/dev/null | grep -qw "$USER_NAME"; then
     if [[ -z "${RUNVM_SG:-}" ]] && command -v sg >/dev/null 2>&1; then
       warn "activating the kvm group for this session…"; export RUNVM_SG=1
@@ -157,8 +174,7 @@ run_build() {
   pick_share
   provision
   rm -f "$DONE"; : > "$LOG"
-  # shellcheck disable=SC2054  # the commas are QEMU option syntax
-  local accel=(-accel tcg,thread=multi -cpu qemu64); [[ -w /dev/kvm ]] && accel=(-enable-kvm -cpu host)
+  pick_accel
   # The copy transport (repo tar as a read-only virtio disk — added LAST so the
   # target stays /dev/vdb — plus the log over virtio-serial into $LOG, append=on)
   # is ALWAYS attached; the 9p shares are added on top when QEMU has virtfs.
@@ -176,11 +192,11 @@ run_build() {
             -virtfs "local,path=$WORK,mount_tag=work,security_model=mapped-xattr")
   fi
   header "Building the libre system from a GUIX SYSTEM builder — headless, ~30–44 h"
-  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS  FHS=$FHS  share=$SHARE"
+  echo -e "  target=$TARGET  mem=$MEM  cpus=$CPUS  FHS=$FHS  share=$SHARE  accel=${ACCEL_ARGS[*]}"
   echo -e "  ${GRN}watch:${NC}  ./run-vm-guix.sh watch   (or tail -f $LOG)"
   echo -e "  the VM powers off by itself when the build finishes.\n"
   qemu-system-x86_64 \
-    "${accel[@]}" -m "$MEM" -smp "$CPUS" \
+    "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "file=$BUILDER,if=virtio" \
     -drive "file=$TARGET,if=virtio" \
     -netdev user,id=n0 -device virtio-net,netdev=n0 \
@@ -215,10 +231,10 @@ run_boot() {
   [[ -f "$fw_vars" ]] || die "OVMF_VARS not found — set FW_VARS=/path/OVMF_VARS.fd"
   local nvram="$VM_DIR/OVMF_VARS.fd"; [[ -f "$nvram" ]] || cp "$fw_vars" "$nvram"
   local disp="${DISPLAY_TYPE:-}"; [[ -z "$disp" ]] && for d in gtk sdl; do qemu-system-x86_64 -display help 2>/dev/null | grep -qw "$d" && { disp="$d"; break; }; done
-  local accel=(-cpu qemu64); [[ -w /dev/kvm ]] && accel=(-enable-kvm -cpu host)
+  pick_accel
   header "Booting the libre system (login: gnu / libre — X starts into ratpoison)"
   exec qemu-system-x86_64 \
-    "${accel[@]}" -m "$MEM" -smp "$CPUS" \
+    "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE" \
     -drive "if=pflash,format=raw,file=$nvram" \
     -drive "file=$TARGET,if=virtio" \
