@@ -23,7 +23,11 @@ the result. It's checkpointed, so re-running resumes.
 
 The build is long (~30–44 h — see the time tables below) and powers itself off
 when done. Needs KVM + qemu; the script installs qemu and a cloud-init ISO tool
-if they're missing.
+if they're missing. **No 9p/virtfs needed:** the repo goes into the builder as a
+read-only tarball disk and the log comes back over virtio-serial, so a QEMU
+built without virtfs (`'virtio-9p-pci' is not a valid device model name`) works
+fine. Tunables: `MEM`, `CPUS`, `JOBS` (make -j in the guest), `SHARE`
+(`auto`/`9p`/`copy`), `ALLOW_TCG=1` (build without KVM — very slow).
 
 Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
 host the guest hands idle RAM back instead of pinning all 8 GB. At 4 GB IceCat is
@@ -50,9 +54,13 @@ Guix provides the host-FHS bits LFS needs (`/bin/sh`, `/usr/bin/env`, tools in
 wants deeper FHS. It keeps its own `~/libre-vm-guix` dir — **don't mix the Debian
 and Guix builders on one target** (phase-1 checkpoints live on the builder).
 
-> **Untested here** — there's no Guix in the dev sandbox, so `guix-builder.scm`
-> may need a module/package-name tweak on your Guix. The Debian `run-vm.sh` is
-> the known-good path; this is the fun one.
+> **Not run through `guix system image` here** — there's no Guix in the dev
+> sandbox. `guix-builder.scm` is checked against current Guix sources: it uses
+> `dhcpcd-service-type` (Guix removed `dhcp-client-service-type` in May 2026;
+> older Guix falls back to it automatically), mounts root by the image's
+> `Guix_image` label, and bakes in `guest-bootstrap.sh`, which uses 9p when the
+> host QEMU has it and the tar-disk/virtio-serial transport otherwise. The
+> Debian `run-vm.sh` is the known-good path; this is the fun one.
 
 ### The manual way — two phases by hand
 
@@ -246,9 +254,12 @@ slow. (Building IceCat earlier needs `MEM=8G`; running the desktop doesn't.)
 
 ### How the automated build drives QEMU
 
-`run-vm.sh` (build mode) boots a headless Debian cloud VM with **two** disks —
-the Debian builder (`vda`) and your target (`vdb`) — plus a cloud-init seed CD and
-this repo shared over 9p. cloud-init runs `guest-build.sh`, which `apt`-installs
+`run-vm.sh` (build mode) boots a headless Debian cloud VM with the Debian
+builder (`vda`), your target (`vdb`), a read-only tarball of this repo (`vdc`),
+a cloud-init seed CD and a virtio-serial port that carries the build log back to
+`~/libre-vm/work/build.log` (9p shares are added too if your QEMU has virtfs).
+cloud-init runs `guest-bootstrap.sh` (unpacks the repo, wires up the log), which
+runs `guest-build.sh`, which `apt`-installs
 the LFS host tools, runs phase 1 onto `vdb`, then chroots the built target and
 runs phase 2. The target is partitioned by `libre/setup` exactly as the manual
 path does (`vdb1` ESP, `vdb2` swap, `vdb3` root), so the result is identical —
