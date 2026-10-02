@@ -1416,6 +1416,51 @@ xbuild() {  # xbuild <section> <tarball> [extra configure args...]
 }
 
 # =============================================================================
+# 0. CA certificates — must run before ANY phase-2 download.
+#    Phase 1 builds OpenSSL (OPENSSLDIR=/etc/ssl) and wget (+https) but no CA
+#    store, so every https fetch below would die with "cannot verify ...
+#    certificate" (wget exit 5). Install Mozilla's root bundle as extracted by
+#    curl.se, pinned by SHA-256 in this script: that pin, not the transport, is
+#    what we trust, so the one bootstrap download may skip TLS verification.
+#    /etc/ssl/cert.pem is OpenSSL's default CA file (used by wget, Python, …).
+#    To manage the store the full BLFS way later, build make-ca + p11-kit.
+# =============================================================================
+CA_BUNDLE_DATE="2026-09-25"
+CA_BUNDLE_SHA256="a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
+if ! step_done ca_certs; then
+  header "CA certificates (Mozilla bundle ${CA_BUNDLE_DATE}, sha256-pinned)"
+  mkdir -p /etc/ssl/certs
+  if [[ ! -s /etc/ssl/certs/ca-certificates.crt ]]; then
+    ca="$SOURCES/cacert-${CA_BUNDLE_DATE}.pem"
+    if [[ ! -s "$ca" ]]; then
+      wget -q --show-progress --timeout=30 --tries=3 --no-check-certificate \
+        -O "$ca.part" "https://curl.se/ca/cacert-${CA_BUNDLE_DATE}.pem" \
+        || { rm -f "$ca.part"; die "CA bundle download failed (DNS/network in the chroot? see /etc/resolv.conf)"; }
+      mv -f "$ca.part" "$ca"
+    fi
+    echo "${CA_BUNDLE_SHA256}  $ca" | sha256sum -c --quiet - \
+      || { rm -f "$ca"; die "CA bundle checksum mismatch — refusing to trust it"; }
+    install -m644 "$ca" /etc/ssl/certs/ca-certificates.crt
+  fi
+  ln -sfn certs/ca-certificates.crt /etc/ssl/cert.pem
+  wget -q --timeout=30 --tries=2 --spider https://curl.se/ \
+    || die "https still fails after installing the CA bundle (check DNS: /etc/resolv.conf)"
+  ok "https works (wget verified curl.se against the new store)"
+  mark_step ca_certs
+fi
+# curl (and git's https, which goes through libcurl) was built in phase 1
+# before any CA store existed, so it has no CA bundle compiled in and ignores
+# OpenSSL's cert.pem. Rebuild it pointing at the bundle (same flags as phase
+# 1's curl_f + --with-ca-bundle). Phase 2 itself only uses wget: non-fatal.
+if ! step_done curl_ca; then
+  header "curl 8.9.1 rebuild with the CA bundle (for curl/git https)"
+  a="$SOURCES/curl-8.9.1.tar.xz"
+  { [[ -s "$a" ]] || a=$(fetch "https://curl.se/download/curl-8.9.1.tar.xz"); } \
+    && bpkg "$a" bash -c "./configure --prefix=/usr --disable-static --with-openssl --enable-threaded-resolver --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt && make -j${NPROC} && make install" \
+    && mark_step curl_ca || warn "curl rebuild failed — curl/git https need --cacert /etc/ssl/certs/ca-certificates.crt; re-run to retry"
+fi
+
+# =============================================================================
 # 1. Shared graphics foundation (expat, image libs, freetype, fontconfig)
 # =============================================================================
 if ! step_done expat; then

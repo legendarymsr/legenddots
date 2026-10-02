@@ -52,6 +52,16 @@ done
 swapon "${TARGET}2" 2>/dev/null && say "enabled ${TARGET}2 as swap" \
   || say "note: ${TARGET}2 swap not enabled (fine if you gave the VM >=8G)"
 
+# The target has no /etc/resolv.conf of its own, and without one glibc only
+# asks 127.0.0.1 — so DNS (hence every phase-2 download) fails in the chroot.
+# Hand it the builder's resolvers; refreshed each run, and a resolv.conf that
+# didn't come from here (one you wrote in the target) is left alone.
+if [ ! -e "$LFS/etc/resolv.conf" ] || grep -q '^# libre-builder:' "$LFS/etc/resolv.conf" 2>/dev/null; then
+  rm -f "$LFS/etc/resolv.conf"
+  { echo "# libre-builder: copied from the builder VM for the phase-2 chroot"; grep -v '^#' /etc/resolv.conf; } > "$LFS/etc/resolv.conf"
+  say "target /etc/resolv.conf: $(grep -c '^nameserver' "$LFS/etc/resolv.conf") nameserver(s) from the builder"
+fi
+
 # put the repo inside the target so phase 2 finds it at the documented path
 say "staging repo into target:/root/legenddots"
 rm -rf "$LFS/root/legenddots"; cp -a "$REPO" "$LFS/root/legenddots"
