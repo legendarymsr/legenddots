@@ -363,7 +363,7 @@ source ~/.bashrc
 
 LFS="${LFS:-/mnt/lfs}"
 LFS_TGT="${LFS_TGT:-x86_64-lfs-linux-gnu}"
-SRC="$LFS/sources"
+export SRC="$LFS/sources"   # exported: the per-package "bash -c" snippets use \$SRC
 MAKEFLAGS="${MAKEFLAGS:--j3}"
 
 STATE="$HOME/.lfs-phase12.state"
@@ -673,10 +673,10 @@ mkdir -p "$LFS/tmp"
 cat > "$LFS/tmp/lfs-chroot.sh" << 'CHROOT'
 #!/bin/bash
 set -euo pipefail
-export HOME=/root TERM=$TERM PS1='(lfs chroot) \u:\w\$ '
+export HOME=/root TERM=${TERM:-dumb} PS1='(lfs chroot) \u:\w\$ '
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export MAKEFLAGS="${MAKEFLAGS:--j3}"
-SRC=/sources
+export SRC=/sources            # exported: the per-package "bash -c" snippets use \$SRC
 
 STATE=/tmp/lfs-chroot.state
 touch "$STATE"
@@ -1256,7 +1256,7 @@ if ! step_done chroot_build; then
   header "Phase 3 — base system in chroot"
   source /var/log/lfs-parts.env
   chroot "$LFS" /usr/bin/env -i \
-    HOME=/root TERM="$TERM" PS1='(lfs) \u:\w\$ ' \
+    HOME=/root TERM="${TERM:-dumb}" PS1='(lfs) \u:\w\$ ' \
     PATH=/usr/sbin:/usr/bin:/sbin:/bin \
     MAKEFLAGS="$MAKEFLAGS" \
     ROOT="$ROOT" EFI="$EFI" SWAP="$SWAP" \
