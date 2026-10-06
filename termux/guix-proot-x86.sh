@@ -134,6 +134,13 @@ say "Installing Termux deps (proot-distro + qemu-user-x86-64)…"
 pkg install -y proot-distro qemu-user-x86-64 >/dev/null 2>&1 \
   || pkg install -y proot-distro qemu-user-x86-64 \
   || { warn "could not install proot-distro / qemu-user-x86-64"; exit 1; }
+# Blink = an alternative x86-64 emulator; QEMU's TCG SIGILLs on some of Guix's
+# instructions, Blink may not. Install it when BLINK is selected.
+if [ "$EMU" = BLINK ]; then
+  say "Installing the Blink emulator…"
+  pkg install -y blink >/dev/null 2>&1 || pkg install -y blink \
+    || warn "couldn't install 'blink' — proot-distro may bundle it; continuing"
+fi
 
 if ! installed; then
   say "Installing x86_64 Debian via proot-distro (DISTRO_ARCH=x86_64, emulator=$EMU)…"
