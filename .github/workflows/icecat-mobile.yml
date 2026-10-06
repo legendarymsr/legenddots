@@ -33,12 +33,23 @@ jobs:
           echo "$ANDROID_HOME/build-tools/34.0.0" >> "$GITHUB_PATH"
 
       - name: Install apktool
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          APKTOOL_VERSION=$(curl -fsSL https://api.github.com/repos/iBotPeaches/Apktool/releases/latest | jq -r .tag_name | sed 's/^v//')
+          set -euo pipefail
+          # Authenticate the API call so repeated runs don't hit the 60/hr
+          # anonymous rate limit; fall back to a pinned version if it still fails.
+          APKTOOL_VERSION=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/iBotPeaches/Apktool/releases/latest \
+            | jq -r '.tag_name // empty' | sed 's/^v//')
+          [ -n "$APKTOOL_VERSION" ] || APKTOOL_VERSION=2.11.1
+          echo "Using apktool $APKTOOL_VERSION"
           sudo curl -fL -o /usr/local/bin/apktool.jar \
             "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar"
+          test -s /usr/local/bin/apktool.jar
           printf '#!/usr/bin/env bash\nexec java -jar /usr/local/bin/apktool.jar "$@"\n' | sudo tee /usr/local/bin/apktool >/dev/null
           sudo chmod +x /usr/local/bin/apktool
+          apktool --version
 
       - name: Build IceCat APK
         working-directory: icecat-mobile
