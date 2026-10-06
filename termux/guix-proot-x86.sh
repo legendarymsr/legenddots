@@ -155,19 +155,19 @@ GUIX_VER="${GUIX_VER:-1.5.0}"
 TBNAME="guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
 HOST_TB="$PREFIX/tmp/$TBNAME"
 mkdir -p "$PREFIX/tmp"
-dl_host() { # $1=outfile $2=url ; follow redirects, fail on 404, retry
-  if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 --retry-delay 2 -o "$1" "$2"
-  else wget --tries=3 -O "$1" "$2"; fi
+dl_host() { # $1=outfile $2=url ; follow redirects, fail on 404, short connect timeout
+  if command -v curl >/dev/null 2>&1; then curl -fL --connect-timeout 15 --retry 2 --retry-delay 2 -o "$1" "$2"
+  else wget --tries=2 --timeout=20 -O "$1" "$2"; fi
 }
 if [ ! -s "$HOST_TB" ]; then
   say "Downloading $TBNAME on the host (native network)…"
-  # ftpmirror.gnu.org redirects to a working mirror — more reliable than hitting
-  # ftp.gnu.org directly (which is often overloaded/503).
+  # kernel.org mirrors GNU and is very reliable; ftp.gnu.org itself is often
+  # overloaded/down (503, connection timeouts). Try the solid mirrors first.
   for url in \
+    "https://mirrors.kernel.org/gnu/guix/$TBNAME" \
+    "https://mirror.us-midwest-1.nexcess.net/gnu/guix/$TBNAME" \
     "https://ftpmirror.gnu.org/guix/$TBNAME" \
-    "https://ftp.gnu.org/gnu/guix/$TBNAME" \
-    "https://mirror.koddos.net/gnu/guix/$TBNAME" \
-    "https://gnu.mirror.constant.com/guix/$TBNAME"; do
+    "https://ftp.gnu.org/gnu/guix/$TBNAME"; do
     say "  trying $url"
     if dl_host "$HOST_TB" "$url" && [ -s "$HOST_TB" ]; then say "got Guix from $url"; break; fi
     rm -f "$HOST_TB"
