@@ -155,14 +155,25 @@ GUIX_VER="${GUIX_VER:-1.5.0}"
 TBNAME="guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
 HOST_TB="$PREFIX/tmp/$TBNAME"
 mkdir -p "$PREFIX/tmp"
+dl_host() { # $1=outfile $2=url ; follow redirects, fail on 404, retry
+  if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 --retry-delay 2 -o "$1" "$2"
+  else wget --tries=3 -O "$1" "$2"; fi
+}
 if [ ! -s "$HOST_TB" ]; then
   say "Downloading $TBNAME on the host (native network)…"
-  for base in https://ftp.gnu.org/gnu/guix https://alpha.gnu.org/gnu/guix https://ci.guix.gnu.org/guix; do
-    if wget -O "$HOST_TB" "$base/$TBNAME" && [ -s "$HOST_TB" ]; then say "got Guix from $base"; break; fi
+  # ftpmirror.gnu.org redirects to a working mirror — more reliable than hitting
+  # ftp.gnu.org directly (which is often overloaded/503).
+  for url in \
+    "https://ftpmirror.gnu.org/guix/$TBNAME" \
+    "https://ftp.gnu.org/gnu/guix/$TBNAME" \
+    "https://mirror.koddos.net/gnu/guix/$TBNAME" \
+    "https://gnu.mirror.constant.com/guix/$TBNAME"; do
+    say "  trying $url"
+    if dl_host "$HOST_TB" "$url" && [ -s "$HOST_TB" ]; then say "got Guix from $url"; break; fi
     rm -f "$HOST_TB"
   done
 fi
-[ -s "$HOST_TB" ] || warn "host couldn't fetch $TBNAME (set GUIX_VER= or check network) — will try the in-proot installer (likely fails)"
+[ -s "$HOST_TB" ] || warn "host couldn't fetch $TBNAME (set GUIX_VER= or try later — ftp.gnu.org may be down) — will try the in-proot installer (likely fails)"
 
 say "Installing GNU Guix inside the x86_64 proot (emulated — be patient)…"
 pdx bash -lc '
