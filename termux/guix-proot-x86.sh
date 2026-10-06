@@ -31,6 +31,10 @@ say()  { echo ":: $*"; }
 warn() { echo "!! $*" >&2; }
 
 export PROOT_NO_SECCOMP=1
+# qemu-user defaults to a baseline x86_64 CPU; Guix's binaries use newer
+# instructions (AVX/BMI/…) and SIGILL ("Illegal instruction") on it. QEMU_CPU=max
+# makes qemu-x86_64 emulate every feature it supports, so they run.
+export QEMU_CPU="${QEMU_CPU:-max}"
 wake()   { command -v termux-wake-lock   >/dev/null 2>&1 && termux-wake-lock   2>/dev/null || true; }
 unwake() { command -v termux-wake-unlock >/dev/null 2>&1 && termux-wake-unlock 2>/dev/null || true; }
 
