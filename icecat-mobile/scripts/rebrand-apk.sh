@@ -108,6 +108,50 @@ else
   echo "==> ENABLE_HARDENING=false, skipping hardening prefs"
 fi
 
+# ── Rebrand the GeckoView engine strings inside omni.ja ───────────────────────
+# A: rewrite the per-locale brand files so every string using the brand variable
+#    (-brand-short-name / brandShortName / vendorShortName / …) shows APP_NAME /
+#    VENDOR_NAME. B: sweep the remaining hardcoded Fennec/Firefox/Mozilla literals
+#    in the engine .ftl/.properties. URLs are MASKED before the sweep so help/MDN
+#    links (…/docs/Mozilla/…) aren't mangled; only capitalized brand words in
+#    display text are changed. omni.ja integrity is verified afterwards.
+if [ "${REBRAND_ENGINE:-true}" = "true" ]; then
+  echo "==> Rebranding engine strings in omni.ja (brand files + literal sweep)"
+  OMNI_E="$(realpath "$WORK_DIR/src/assets/omni.ja")"
+  OEDIT=$(mktemp -d); trap 'rm -rf "$OEDIT"' EXIT
+  unzip -oq "$OMNI_E" '*.ftl' '*.properties' -d "$OEDIT"
+
+  # A — brand files (all locales): set the brand keys explicitly.
+  find "$OEDIT" -path '*branding/brand.ftl' -print0 | xargs -0 -r sed -i -E \
+    -e "s/^(-brand-short-name[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(-brand-shorter-name[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(-brand-full-name[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(-brand-product-name[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(-vendor-short-name[[:space:]]*=[[:space:]]*).*/\1${VENDOR_NAME}/"
+  find "$OEDIT" -path '*branding/brand.properties' -print0 | xargs -0 -r sed -i -E \
+    -e "s/^(brandShortName[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(brandShorterName[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(brandFullName[[:space:]]*=[[:space:]]*).*/\1${APP_NAME}/" \
+    -e "s/^(vendorShortName[[:space:]]*=[[:space:]]*).*/\1${VENDOR_NAME}/"
+
+  # B — literal sweep over .ftl/.properties, masking URLs so links survive.
+  find "$OEDIT" -type f \( -name '*.ftl' -o -name '*.properties' \) -print0 \
+    | APP_NAME="$APP_NAME" VENDOR_NAME="$VENDOR_NAME" xargs -0 -r perl -i -pe '
+        my @u;
+        s{(\b[a-z][a-z0-9+.-]*://\S+)}{ push @u,$1; "\x00".$#u."\x00" }ge;   # stash URLs
+        s/Fennec/$ENV{APP_NAME}/g; s/Firefox/$ENV{APP_NAME}/g; s/Mozilla/$ENV{VENDOR_NAME}/g;
+        s{\x00(\d+)\x00}{ $u[$1] }ge;                                         # restore URLs
+      '
+
+  # Repack the edited entries into omni.ja and verify it is still a valid zip.
+  ( cd "$OEDIT" && find . -type f | sed 's#^\./##' | zip -q "$OMNI_E" -@ )
+  unzip -tq "$OMNI_E" >/dev/null || { echo "ERROR: omni.ja failed integrity check after engine rebrand"; exit 1; }
+  echo "    omni.ja repacked OK ($(unzip -Z1 "$OMNI_E" | wc -l) entries)"
+  rm -rf "$OEDIT"; trap - EXIT
+else
+  echo "==> REBRAND_ENGINE=false, leaving engine (omni.ja) strings as-is"
+fi
+
 if [ "$BUNDLE_EXTENSIONS" = "true" ]; then
   echo "==> [EXPERIMENTAL] Bundling built-in extensions (BUNDLE_EXTENSIONS=true)"
   [ -d "$WORK_DIR/extensions" ] || { echo "Run scripts/download-extensions.sh first"; exit 1; }
