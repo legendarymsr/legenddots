@@ -112,9 +112,16 @@ exec $(printf '%q ' "$@")"
       n=$(grep -o "public-key" /etc/guix/acl 2>/dev/null | wc -l | tr -d " "); echo ":: authorized substitute keys: ${n:-0}"
     '
     exit 0 ;;
+  reguix)  # wipe ONLY the Guix install inside the proot (keep the Debian rootfs),
+           # e.g. to replace an aarch64 Guix with the x86_64 one. Then re-run setup.
+    installed || { warn "nothing installed — run setup"; exit 1; }
+    warn "removing the Guix install inside '$ALIAS' (keeping Debian)…"
+    pdx bash -lc 'pkill -x guix-daemon 2>/dev/null; rm -rf /gnu /var/guix /root/.config/guix /root/.guix-profile /root/.cache/guix /etc/profile.d/zz-guix-proot.sh /root/guix-install.sh; echo "   guix wiped"' || true
+    echo ":: done — now re-run setup to reinstall (x86_64):  bash ~/legenddots/termux/guix-proot-x86.sh"
+    exit 0 ;;
   reset)   warn "removing the '$ALIAS' proot…"; proot-distro remove "$ALIAS" 2>/dev/null || true; echo ":: done — re-run setup"; exit 0 ;;
   setup|"") : ;;
-  *) warn "usage: guix-proot-x86.sh [setup|guix ...|pull|weather PKG|run -- CMD|authorize|login|daemon|doctor|reset]"; exit 1 ;;
+  *) warn "usage: guix-proot-x86.sh [setup|guix ...|pull|weather PKG|run -- CMD|authorize|login|daemon|doctor|reguix|reset]"; exit 1 ;;
 esac
 
 # ── setup ─────────────────────────────────────────────────────────────────────
@@ -149,6 +156,15 @@ export GUIX_LOCPATH=/root/.guix-profile/lib/locale
 export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:$PATH
 PROF
   . /etc/profile.d/zz-guix-proot.sh
+  # qemu+proot report the HOST arch (aarch64) for `uname -m`, so guix-install.sh
+  # would fetch the AARCH64 Guix — then Guix runs as aarch64-linux and ignores the
+  # x86_64 substitutes (the whole point). Shim uname -m -> x86_64 on PATH so the
+  # installer grabs the x86_64 Guix; the x86_64 guix/daemon then report x86_64-linux.
+  mkdir -p /usr/local/bin
+  { echo "#!/bin/sh"; echo "case \" \$* \" in *\" -m \"*) echo x86_64 ;; *) exec /bin/uname \"\$@\" ;; esac"; } > /usr/local/bin/uname
+  chmod +x /usr/local/bin/uname
+  export PATH=/usr/local/bin:$PATH
+  echo ":: uname -m now reports: $(uname -m) (want x86_64)"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y || true
   apt-get install -y wget xz-utils gpg ca-certificates locales || true
