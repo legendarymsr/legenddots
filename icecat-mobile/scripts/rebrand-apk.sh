@@ -13,12 +13,15 @@ echo "==> Setting app_name to '${APP_NAME}'"
 find "$WORK_DIR/src/res" -path '*/values*/strings.xml' -print0 \
   | xargs -0 -r sed -i -E "s#(<string name=\"app_name\"[^>]*>).*(</string>)#\1${APP_NAME}\2#"
 
-echo "==> Removing Fennec/Firefox branding from strings (-> '${APP_NAME}')"
+echo "==> Removing Fennec/Firefox branding from strings (-> '${APP_NAME}'), Mozilla -> '${VENDOR_NAME}'"
 EXCLUDE_NAMES=$(sed -n 's/.*<string name="\([^"]*\)".*/\1/p' branding/strings/overrides.xml | paste -sd'|' -)
+# Only capitalized "Mozilla" (the brand) is rewritten; lowercase "mozilla" in
+# URLs/package IDs is untouched so the app keeps working.
 find "$WORK_DIR/src/res" -path '*/values*/strings.xml' -print0 \
   | xargs -0 -r sed -i -E \
       -e "/<string name=\"(${EXCLUDE_NAMES})\"/!s/Fennec/${APP_NAME}/g" \
-      -e "/<string name=\"(${EXCLUDE_NAMES})\"/!s/Firefox/${APP_NAME}/g"
+      -e "/<string name=\"(${EXCLUDE_NAMES})\"/!s/Firefox/${APP_NAME}/g" \
+      -e "/<string name=\"(${EXCLUDE_NAMES})\"/!s/Mozilla/${VENDOR_NAME}/g"
 
 echo "==> Setting default search engine to '${DEFAULT_SEARCH_ENGINE}'"
 SEARCH_LIST="$WORK_DIR/src/assets/search/list.json"
