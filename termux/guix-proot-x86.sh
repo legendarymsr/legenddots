@@ -147,6 +147,23 @@ if ! pdx bash -lc 'true' >/dev/null 2>&1; then
 fi
 say "x86_64 Debian runs under $EMU ✓"
 
+# Download the x86_64 Guix BINARY tarball on the HOST. Native Termux reaches the
+# Guix servers fine (the aarch64 install proved it); only the EMULATED proot's
+# network can't. proot-distro --shared-tmp maps $PREFIX/tmp -> /tmp in the guest,
+# so a file dropped here is visible inside as /tmp/<name>, no in-proot download.
+GUIX_VER="${GUIX_VER:-1.5.0}"
+TBNAME="guix-binary-${GUIX_VER}.x86_64-linux.tar.xz"
+HOST_TB="$PREFIX/tmp/$TBNAME"
+mkdir -p "$PREFIX/tmp"
+if [ ! -s "$HOST_TB" ]; then
+  say "Downloading $TBNAME on the host (native network)…"
+  for base in https://ftp.gnu.org/gnu/guix https://alpha.gnu.org/gnu/guix https://ci.guix.gnu.org/guix; do
+    if wget -O "$HOST_TB" "$base/$TBNAME" && [ -s "$HOST_TB" ]; then say "got Guix from $base"; break; fi
+    rm -f "$HOST_TB"
+  done
+fi
+[ -s "$HOST_TB" ] || warn "host couldn't fetch $TBNAME (set GUIX_VER= or check network) — will try the in-proot installer (likely fails)"
+
 say "Installing GNU Guix inside the x86_64 proot (emulated — be patient)…"
 pdx bash -lc '
   set -e
@@ -176,21 +193,26 @@ PROF
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y || true
   apt-get install -y wget xz-utils gpg ca-certificates locales || true
-  if ! command -v guix >/dev/null 2>&1 \
-     && [ ! -x /var/guix/profiles/per-user/root/current-guix/bin/guix ] \
-     && [ ! -x /usr/bin/guix ]; then
-    # apt reaches deb.debian.org fine, but guix-install.sh fetches from
-    # ftp.gnu.org/ci.guix.gnu.org which fail under emulation (No route to host).
-    # So install Guix from the Debian apt package (over the working mirror);
-    # fall back to the upstream installer only if Debian has no guix.
-    if apt-get install -y guix; then
-      echo ":: installed Guix from Debian (apt) ✓"
-    else
-      echo ":: Debian has no guix package — falling back to guix-install.sh"
-      cd /root; wget -q https://guix.gnu.org/install.sh -O guix-install.sh
-      yes "" | bash guix-install.sh || echo "!! installer errors (see README)"
-    fi
-  else echo ":: Guix already present."; fi
+  if command -v guix >/dev/null 2>&1 || [ -x /var/guix/profiles/per-user/root/current-guix/bin/guix ]; then
+    echo ":: Guix already present."
+  elif [ -s /tmp/'"$TBNAME"' ]; then
+    # Extract the host-downloaded binary tarball (no network needed) and do the
+    # few setup steps guix-install.sh would: root profile symlink + build users.
+    echo ":: extracting the host-downloaded x86_64 Guix tarball (slow, emulated)…"
+    tar --warning=no-timestamp -xf /tmp/'"$TBNAME"' -C /
+    mkdir -p /root/.config/guix
+    ln -sfn /var/guix/profiles/per-user/root/current-guix /root/.config/guix/current
+    groupadd --system guixbuild 2>/dev/null || true
+    for i in $(seq 1 10); do
+      useradd -g guixbuild -G guixbuild -d /var/empty -s /usr/sbin/nologin \
+        -c "Guix build $i" --system guixbuilder$i 2>/dev/null || true
+    done
+    echo ":: extracted $(/var/guix/profiles/per-user/root/current-guix/bin/guix --version 2>/dev/null | head -1 || echo Guix)"
+  else
+    echo ":: no host tarball — trying guix-install.sh (likely fails under emulation)"
+    cd /root; wget -q https://guix.gnu.org/install.sh -O guix-install.sh
+    yes "" | bash guix-install.sh || echo "!! installer errors (see README)"
+  fi
 ' || warn "x86_64 Guix base setup hit errors — see termux/README.md"
 
 say "Authorizing substitute servers…"
