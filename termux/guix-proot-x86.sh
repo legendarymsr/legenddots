@@ -53,6 +53,10 @@ PROOT_PREP="
   export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:\$PATH
   export GUIX_LOCPATH=/root/.guix-profile/lib/locale
   export GUILE_JIT_THRESHOLD=-1
+  # glibc picks AVX/FMA/ERMS-optimized string routines via CPUID; the emulators
+  # can't run them -> SIGILL (Illegal instruction) in guix/guix-daemon. Tell glibc
+  # to use the baseline routines instead.
+  export GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA,-FMA4,-ERMS,-AVX_Fast_Unaligned_Load
   . /root/.guix-profile/etc/profile 2>/dev/null || true
   $DAEMON_START
 "
@@ -192,6 +196,7 @@ pdx bash -lc '
   cat > /etc/profile.d/zz-guix-proot.sh <<PROF
 export GUILE_JIT_THRESHOLD=-1
 export GUIX_LOCPATH=/root/.guix-profile/lib/locale
+export GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA,-FMA4,-ERMS,-AVX_Fast_Unaligned_Load
 export PATH=/root/.config/guix/current/bin:/var/guix/profiles/per-user/root/current-guix/bin:$PATH
 PROF
   . /etc/profile.d/zz-guix-proot.sh
