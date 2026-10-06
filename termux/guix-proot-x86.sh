@@ -165,6 +165,13 @@ PROF
   chmod +x /usr/local/bin/uname
   export PATH=/usr/local/bin:$PATH
   echo ":: uname -m now reports: $(uname -m) (want x86_64)"
+  # Network for the EMULATED guest: qemu-user usually cannot route IPv6, which
+  # gives "Network is unreachable" on hosts with AAAA records (ci.guix.gnu.org,
+  # the Debian mirrors). Force IPv4 precedence + make sure there is a resolver.
+  printf "nameserver 1.1.1.1\nnameserver 9.9.9.9\n" > /etc/resolv.conf 2>/dev/null || true
+  grep -q "^precedence ::ffff:0:0/96" /etc/gai.conf 2>/dev/null \
+    || printf "precedence ::ffff:0:0/96  100\n" >> /etc/gai.conf 2>/dev/null || true
+  echo ":: net check: $(getent hosts ci.guix.gnu.org >/dev/null 2>&1 && echo "DNS ok" || echo "DNS FAIL")"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y || true
   apt-get install -y wget xz-utils gpg ca-certificates locales || true
