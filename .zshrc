@@ -8,6 +8,9 @@
 setopt AUTO_CD
 # Turn off "no match" errors
 setopt nonomatch
+# Treat '#' as a comment on the interactive command line too (bash-like), so
+# pasting commands with trailing "# ..." notes doesn't pass them as arguments.
+setopt interactive_comments
 
 fastfetch
 
