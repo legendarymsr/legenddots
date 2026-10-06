@@ -95,3 +95,36 @@ pref("browser.safebrowsing.downloads.remote.enabled", false);
 // Dark Reader - see README's "Recommended add-ons"). Set to 3 in about:config
 // to follow the browser theme instead, or 1 to force light.
 pref("layout.css.prefers-color-scheme.content-override", 0);
+
+// =============================================================================
+// Extra hardening (added on request). All unlocked — flip in about:config if a
+// site breaks.
+// =============================================================================
+
+// --- WebRTC: disable entirely ------------------------------------------------
+// Stronger than the ice.* prefs above (which keep WebRTC on but hide local
+// IPs): this turns WebRTC OFF completely, so there's zero WebRTC fingerprint or
+// IP-leak surface. Trade-off: breaks in-browser video/voice calls (Jitsi,
+// Meet, Discord web, etc.). Set to true in about:config to re-enable calls.
+pref("media.peerconnection.enabled", false);
+
+// --- Geolocation: off --------------------------------------------------------
+// The Geolocation API is disabled outright, so no site can even prompt for
+// location. (Separate from GPS — this is the browser API.)
+pref("geo.enabled", false);
+
+// --- Total Cookie Protection (dFPI) ------------------------------------------
+// Each site gets its own cookie jar, so third-party cookies can't follow you
+// across sites. 5 = dynamic first-party isolation; pairs cleanly with RFP.
+pref("network.cookie.cookieBehavior", 5);
+
+// --- WebGL: disabled ---------------------------------------------------------
+// RFP already blocks WebGL readback; this removes the API entirely to drop the
+// whole fingerprint surface. Trade-off: breaks WebGL maps, 3D, some games. Set
+// to false in about:config if you need them.
+pref("webgl.disabled", true);
+
+// --- Clipboard events: hidden ------------------------------------------------
+// Sites can't observe copy/cut/paste events (a small fingerprint/behaviour
+// signal). May break paste handling in a few web editors; flip to true there.
+pref("dom.event.clipboardevents.enabled", false);
