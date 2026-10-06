@@ -41,6 +41,13 @@ This folder is self-contained: all paths below are relative to
    - applies the hardening prefs from `branding/hardening-prefs.js` to
      GeckoView's bundled default preferences (unless
      `ENABLE_HARDENING="false"`);
+   - unless `REBRAND_ENGINE="false"`, rebrands the **engine** strings inside
+     `assets/omni.ja`: rewrites the per-locale brand files (`-brand-short-name`,
+     `vendorShortName`, …) so `about:` pages using the brand variable show
+     `APP_NAME`/`VENDOR_NAME`, then sweeps remaining hardcoded
+     Fennec/Firefox/Mozilla literals in the engine `.ftl`/`.properties` — with
+     URLs masked so help/MDN links aren't mangled — and verifies `omni.ja`
+     integrity afterwards;
    - if `BUNDLE_EXTENSIONS="true"`, bundles the extensions fetched in step 2
      as built-in WebExtensions (see "Bundled extensions (experimental)"
      below);
