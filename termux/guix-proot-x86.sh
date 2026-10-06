@@ -171,13 +171,25 @@ PROF
   printf "nameserver 1.1.1.1\nnameserver 9.9.9.9\n" > /etc/resolv.conf 2>/dev/null || true
   grep -q "^precedence ::ffff:0:0/96" /etc/gai.conf 2>/dev/null \
     || printf "precedence ::ffff:0:0/96  100\n" >> /etc/gai.conf 2>/dev/null || true
+  grep -q "^inet4_only" /etc/wgetrc 2>/dev/null || echo "inet4_only = on" >> /etc/wgetrc 2>/dev/null || true
   echo ":: net check: $(getent hosts ci.guix.gnu.org >/dev/null 2>&1 && echo "DNS ok" || echo "DNS FAIL")"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y || true
   apt-get install -y wget xz-utils gpg ca-certificates locales || true
-  if ! command -v guix >/dev/null 2>&1 && [ ! -x /var/guix/profiles/per-user/root/current-guix/bin/guix ]; then
-    cd /root; wget -q https://guix.gnu.org/install.sh -O guix-install.sh
-    yes "" | bash guix-install.sh || echo "!! installer errors (see README)"
+  if ! command -v guix >/dev/null 2>&1 \
+     && [ ! -x /var/guix/profiles/per-user/root/current-guix/bin/guix ] \
+     && [ ! -x /usr/bin/guix ]; then
+    # apt reaches deb.debian.org fine, but guix-install.sh fetches from
+    # ftp.gnu.org/ci.guix.gnu.org which fail under emulation (No route to host).
+    # So install Guix from the Debian apt package (over the working mirror);
+    # fall back to the upstream installer only if Debian has no guix.
+    if apt-get install -y guix; then
+      echo ":: installed Guix from Debian (apt) ✓"
+    else
+      echo ":: Debian has no guix package — falling back to guix-install.sh"
+      cd /root; wget -q https://guix.gnu.org/install.sh -O guix-install.sh
+      yes "" | bash guix-install.sh || echo "!! installer errors (see README)"
+    fi
   else echo ":: Guix already present."; fi
 ' || warn "x86_64 Guix base setup hit errors — see termux/README.md"
 
