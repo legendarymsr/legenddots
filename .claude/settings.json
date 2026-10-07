@@ -3,5 +3,16 @@
   "attribution": {
     "commit": "",
     "pr": ""
+  },
+  "enabledPlugins": {
+    "universal-modder@universal-modder": true
+  },
+  "extraKnownMarketplaces": {
+    "universal-modder": {
+      "source": {
+        "source": "github",
+        "repo": "rehan-remade/universal-modder"
+      }
+    }
   }
 }
