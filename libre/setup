@@ -376,8 +376,21 @@ bpkg() {
   local d; d=$(mktemp -d "$SRC/build.XXXXXX")
   tar -xf "$arc" -C "$d" --strip-components=1
   pushd "$d" >/dev/null
-  "$@"
+  # Fail fast: the per-package snippets are "bash -c '...'" with several
+  # commands; without -e a failed "make" fell through to later lines (e.g. the
+  # limits.h step after a broken GCC pass 1). Run them with -e and keep a log.
+  if [[ "${1:-}" == bash && "${2:-}" == -c ]]; then shift; set -- bash -e -o pipefail "$@"; fi
+  local log; log="$SRC/logs/$(basename "$arc").log"
+  mkdir -p "$SRC/logs"
+  local rc=0
+  "$@" > >(tee "$log") 2>&1 || rc=$?
   popd >/dev/null
+  if (( rc != 0 )); then
+    echo "!!! $(basename "$arc") failed (exit $rc) — last 40 lines of $log:" >&2
+    echo "    (build dir kept: $d; first errors: grep -n 'error' $log | head)" >&2
+    tail -n 40 "$log" >&2
+    return "$rc"
+  fi
   rm -rf "$d"
 }
 
@@ -386,11 +399,11 @@ bpkg() {
 if ! is_done binutils_p1; then
   echo "==> Binutils (pass 1)"
   bpkg "$SRC/binutils-2.45.tar.xz" bash -c "
-    mkdir build && cd build
+    mkdir build; cd build
     ../configure --prefix=\$LFS/tools --with-sysroot=\$LFS --target=\$LFS_TGT \
       --disable-nls --enable-gprofng=no --disable-werror \
       --enable-new-dtags --enable-default-hash-style=gnu
-    make \$MAKEFLAGS && make install
+    make \$MAKEFLAGS; make install
   "
   mark binutils_p1
 fi
@@ -398,11 +411,11 @@ fi
 if ! is_done gcc_p1; then
   echo "==> GCC (pass 1)"
   bpkg "$SRC/gcc-15.2.0.tar.xz" bash -c "
-    tar -xf \$SRC/mpfr-4.2.2.tar.xz && mv mpfr-4.2.2 mpfr
-    tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
-    tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
+    tar -xf \$SRC/mpfr-4.2.2.tar.xz; mv mpfr-4.2.2 mpfr
+    tar -xf \$SRC/gmp-6.3.0.tar.xz; mv gmp-6.3.0  gmp
+    tar -xf \$SRC/mpc-1.3.1.tar.gz; mv mpc-1.3.1  mpc
     sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
-    mkdir build && cd build
+    mkdir build; cd build
     ../configure --target=\$LFS_TGT --prefix=\$LFS/tools \
       --with-glibc-version=2.42 --with-sysroot=\$LFS --with-newlib \
       --without-headers --enable-default-pie --enable-default-ssp \
@@ -410,8 +423,9 @@ if ! is_done gcc_p1; then
       --disable-libatomic --disable-libgomp --disable-libquadmath \
       --disable-libssp --disable-libvtv --disable-libstdcxx \
       --enable-languages=c,c++
-    make \$MAKEFLAGS && make install
+    make \$MAKEFLAGS; make install
     cd ..
+    command -v \$LFS_TGT-gcc >/dev/null || { echo \"\$LFS_TGT-gcc not installed\" >&2; exit 1; }
     cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
       \$(\$LFS_TGT-gcc -print-libgcc-file-name | sed 's/libgcc/limits/')
   "
@@ -421,7 +435,7 @@ fi
 if ! is_done linux_headers; then
   echo "==> Linux API headers"
   bpkg "$SRC/linux-libre-6.16-gnu.tar.xz" bash -c "
-    make mrproper && make headers
+    make mrproper; make headers
     find usr/include -type f ! -name '*.h' -delete
     cp -rv usr/include \$LFS/usr
   "
@@ -434,12 +448,12 @@ if ! is_done glibc; then
     ln -sfnv ../lib/ld-linux-x86-64.so.2 \$LFS/lib64
     ln -sfnv ../lib/ld-linux-x86-64.so.2 \$LFS/lib64/ld-lsb-x86-64.so.3
     patch -Np1 -i \$SRC/glibc-2.42-fhs-1.patch
-    mkdir build && cd build
+    mkdir build; cd build
     echo rootsbindir=/usr/sbin > configparms
     ../configure --prefix=/usr --host=\$LFS_TGT \
       --build=\$(../scripts/config.guess) --enable-kernel=4.19 \
       --with-headers=\$LFS/usr/include --disable-nscd libc_cv_slibdir=/usr/lib
-    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+    make \$MAKEFLAGS; make DESTDIR=\$LFS install
     sed '/RTLDLIST=/s@/usr@@g' -i \$LFS/usr/bin/ldd
   "
   mark glibc
@@ -448,12 +462,12 @@ fi
 if ! is_done libstdcxx_p1; then
   echo "==> Libstdc++ (pass 1)"
   bpkg "$SRC/gcc-15.2.0.tar.xz" bash -c "
-    mkdir build && cd build
+    mkdir build; cd build
     ../libstdc++-v3/configure --host=\$LFS_TGT \
       --build=\$(../config.guess) --prefix=/usr \
       --disable-multilib --disable-nls --disable-libstdcxx-pch \
       --with-gxx-include-dir=/tools/\$LFS_TGT/include/c++/15.2.0
-    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+    make \$MAKEFLAGS; make DESTDIR=\$LFS install
     rm -v \$LFS/usr/lib/lib{stdc++{,exp},supc++}.la
   "
   mark libstdcxx_p1
@@ -471,19 +485,19 @@ p2() {
 
 p2 m4_tmp "$SRC/m4-1.4.20.tar.xz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess)
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 ncurses_tmp "$SRC/ncurses-6.5-20250809.tgz" bash -c "
   sed -i s/mawk// configure
-  mkdir build && pushd build
-    ../configure && make -C include && make -C progs tic
+  mkdir build; pushd build
+    ../configure; make -C include; make -C progs tic
   popd
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./config.guess) \
     --mandir=/usr/share/man --with-manpage-format=normal \
     --with-shared --without-normal --with-cxx-shared --without-debug \
     --without-ada --disable-stripping
-  make \$MAKEFLAGS && make DESTDIR=\$LFS TIC_PATH=\$(pwd)/build/progs/tic install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS TIC_PATH=\$(pwd)/build/progs/tic install
   ln -sv libncursesw.so \$LFS/usr/lib/libncurses.so
   sed -e 's/^#if.*XOPEN.*$/\n#if 1/' -i \$LFS/usr/include/curses.h
 "
@@ -491,14 +505,14 @@ p2 ncurses_tmp "$SRC/ncurses-6.5-20250809.tgz" bash -c "
 p2 bash_tmp "$SRC/bash-5.3.tar.gz" bash -c "
   ./configure --prefix=/usr --build=\$(sh support/config.guess) --host=\$LFS_TGT \
     --without-bash-malloc
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   ln -sv bash \$LFS/bin/sh
 "
 
 p2 coreutils_tmp "$SRC/coreutils-9.7.tar.xz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
     --enable-install-program=hostname --enable-no-install-program=kill,uptime
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   mv -v \$LFS/usr/bin/chroot \$LFS/usr/sbin
   mkdir -pv \$LFS/usr/share/man/man8
   mv -v \$LFS/usr/share/man/man1/chroot.1 \$LFS/usr/share/man/man8/chroot.8
@@ -506,7 +520,7 @@ p2 coreutils_tmp "$SRC/coreutils-9.7.tar.xz" bash -c "
 "
 
 p2 file_tmp "$SRC/file-5.46.tar.gz" bash -c "
-  mkdir build && pushd build
+  mkdir build; pushd build
     ../configure --disable-bzlib --disable-libseccomp --disable-xzlib --disable-zlib
     make \$MAKEFLAGS
   popd
@@ -527,53 +541,53 @@ for pkg_args in \
   read -r name arc <<< "$pkg_args"
   p2 "$name" "$arc" bash -c "
     ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess 2>/dev/null || ./config.guess)
-    make \$MAKEFLAGS && make DESTDIR=\$LFS install
+    make \$MAKEFLAGS; make DESTDIR=\$LFS install
   "
 done
 
 p2 gawk_tmp "$SRC/gawk-5.3.2.tar.xz" bash -c "
   sed -i 's/extras//' Makefile.in
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess)
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 make_tmp "$SRC/make-4.4.1.tar.gz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./build-aux/config.guess) --without-guile
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 xz_tmp "$SRC/xz-5.8.1.tar.xz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
     --disable-static --docdir=/usr/share/doc/xz-5.8.1
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   rm -v \$LFS/usr/lib/liblzma.la
 "
 
 p2 binutils_p2 "$SRC/binutils-2.45.tar.xz" bash -c "
   sed '6009s/\$add_dir//' -i ltmain.sh
-  mkdir build && cd build
+  mkdir build; cd build
   ../configure --prefix=/usr --build=\$(../config.guess) --host=\$LFS_TGT \
     --disable-nls --enable-shared --enable-gprofng=no --disable-werror \
     --enable-64-bit-bfd --enable-new-dtags --enable-default-hash-style=gnu
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   rm -v \$LFS/usr/lib/lib{bfd,ctf,ctf-nobfd,opcodes,sframe}.{a,la}
 "
 
 p2 gcc_p2 "$SRC/gcc-15.2.0.tar.xz" bash -c "
-  tar -xf \$SRC/mpfr-4.2.2.tar.xz && mv mpfr-4.2.2 mpfr
-  tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
-  tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
+  tar -xf \$SRC/mpfr-4.2.2.tar.xz; mv mpfr-4.2.2 mpfr
+  tar -xf \$SRC/gmp-6.3.0.tar.xz; mv gmp-6.3.0  gmp
+  tar -xf \$SRC/mpc-1.3.1.tar.gz; mv mpc-1.3.1  mpc
   sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
   sed '/thread_header =/s/@.*@/gthr-posix.h/' \
     -i libgcc/Makefile.in libstdc++-v3/include/Makefile.in
-  mkdir build && cd build
+  mkdir build; cd build
   ../configure --build=\$(../config.guess) --host=\$LFS_TGT --target=\$LFS_TGT \
     LDFLAGS_FOR_TARGET=-L\$PWD/\$LFS_TGT/libgcc \
     --prefix=/usr --with-build-sysroot=\$LFS --enable-default-pie \
     --enable-default-ssp --disable-nls --disable-multilib \
     --disable-libatomic --disable-libgomp --disable-libquadmath \
     --disable-libssp --disable-libvtv --enable-languages=c,c++
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   ln -sv gcc \$LFS/usr/bin/cc
 "
 
@@ -586,7 +600,7 @@ p2 gettext_tmp "$SRC/gettext-0.26.tar.xz" bash -c "
 p2 bison_tmp "$SRC/bison-3.8.2.tar.xz" bash -c "
   ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2 \
     --host=\$LFS_TGT --build=\$(build-aux/config.guess)
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 perl_tmp "$SRC/perl-5.42.0.tar.xz" bash -c "
@@ -597,17 +611,17 @@ p2 perl_tmp "$SRC/perl-5.42.0.tar.xz" bash -c "
     -Dsitearch=/usr/lib/perl5/5.42/site_perl \
     -Dvendorlib=/usr/lib/perl5/5.42/vendor_perl \
     -Dvendorarch=/usr/lib/perl5/5.42/vendor_perl
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 python_tmp "$SRC/Python-3.13.7.tar.xz" bash -c "
   ./configure --prefix=/usr --enable-shared --without-ensurepip
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 texinfo_tmp "$SRC/texinfo-7.2.tar.xz" bash -c "
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess)
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 p2 util_linux_tmp "$SRC/util-linux-2.41.1.tar.xz" bash -c "
@@ -619,7 +633,7 @@ p2 util_linux_tmp "$SRC/util-linux-2.41.1.tar.xz" bash -c "
     --disable-static --disable-liblastlog2 --without-python \
     ADJTIME_PATH=/var/lib/hwclock/adjtime \
     --docdir=/usr/share/doc/util-linux-2.41.1
-  make \$MAKEFLAGS && make DESTDIR=\$LFS install
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
 "
 
 find "$LFS/usr/lib" "$LFS/usr/lib64" -name '*.la' -delete 2>/dev/null || true
@@ -688,8 +702,21 @@ bpkg() {
   local d; d=$(mktemp -d "$SRC/build.XXXXXX")
   tar -xf "$arc" -C "$d" --strip-components=1
   pushd "$d" >/dev/null
-  "$@"
+  # Fail fast: the per-package snippets are "bash -c '...'" with several
+  # commands; without -e a failed "make" fell through to later lines (e.g. the
+  # limits.h step after a broken GCC pass 1). Run them with -e and keep a log.
+  if [[ "${1:-}" == bash && "${2:-}" == -c ]]; then shift; set -- bash -e -o pipefail "$@"; fi
+  local log; log="$SRC/logs/$(basename "$arc").log"
+  mkdir -p "$SRC/logs"
+  local rc=0
+  "$@" > >(tee "$log") 2>&1 || rc=$?
   popd >/dev/null
+  if (( rc != 0 )); then
+    echo "!!! $(basename "$arc") failed (exit $rc) — last 40 lines of $log:" >&2
+    echo "    (build dir kept: $d; first errors: grep -n 'error' $log | head)" >&2
+    tail -n 40 "$log" >&2
+    return "$rc"
+  fi
   rm -rf "$d"
 }
 
