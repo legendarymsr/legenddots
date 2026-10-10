@@ -161,6 +161,14 @@ mountpoint -q "$LFS" || { mount "${ROOT}" "$LFS"; mount "${EFI}" "$LFS/boot/efi"
 # ── Sources ──────────────────────────────────────────────────────────────────
 if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" ]]; then
   header "Downloading GNU/Linux-libre sources"
+  # On the Guix builder the 'networking' service is up before DHCP has a lease,
+  # so the first fetches fail instantly. Wait (up to ~2 min) until a mirror answers.
+  for i in $(seq 1 24); do
+    { wget -q --spider --timeout=10 https://www.linuxfromscratch.org/ \
+      || curl -sfI --max-time 10 -o /dev/null https://www.linuxfromscratch.org/; } >/dev/null 2>&1 && break
+    (( i == 1 )) && info "Waiting for the network…"
+    sleep 5
+  done
   mkdir -p "$LFS/sources"
   chmod a+wt "$LFS/sources"
 
