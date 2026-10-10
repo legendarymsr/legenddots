@@ -159,7 +159,7 @@ source /var/log/lfs-parts.env 2>/dev/null || true
 mountpoint -q "$LFS" || { mount "${ROOT}" "$LFS"; mount "${EFI}" "$LFS/boot/efi"; }
 
 # ── Sources ──────────────────────────────────────────────────────────────────
-if ! step_done sources; then
+if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" ]]; then
   header "Downloading GNU/Linux-libre sources"
   mkdir -p "$LFS/sources"
   chmod a+wt "$LFS/sources"
@@ -256,6 +256,7 @@ if ! step_done sources; then
     ["zsh-5.9.tar.xz"]="https://www.zsh.org/pub/old/zsh-5.9.tar.xz"
     ["opendoas-6.8.2.tar.gz"]="https://github.com/Duncaen/OpenDoas/releases/download/v6.8.2/opendoas-6.8.2.tar.gz"
     ["curl-8.9.1.tar.xz"]="https://curl.se/download/curl-8.9.1.tar.xz"
+    ["tzdata2025b.tar.gz"]="https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
   )
 
   # Try the listed URL, then the GNU mirror network (ftp.gnu.org itself is often
@@ -284,7 +285,10 @@ if ! step_done sources; then
   for url in \
     "https://www.linuxfromscratch.org/patches/lfs/12.4/bzip2-1.0.8-install_docs-1.patch" \
     "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch" \
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch"; do
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch" \
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-upstream_fix-1.patch" \
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-i18n-1.patch" \
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/expect-5.45.4-gcc15-1.patch"; do
     out="$LFS/sources/$(basename "$url")"
     [[ -s "$out" ]] || fetch_src "$out" "$url" || { warn "Failed patch: $(basename "$url")"; failed+=("$(basename "$url")"); }
   done
@@ -469,7 +473,7 @@ if ! is_done glibc; then
     mkdir build; cd build
     echo rootsbindir=/usr/sbin > configparms
     ../configure --prefix=/usr --host=\$LFS_TGT \
-      --build=\$(../scripts/config.guess) --enable-kernel=4.19 \
+      --build=\$(../scripts/config.guess) --enable-kernel=5.4 \
       --with-headers=\$LFS/usr/include --disable-nscd libc_cv_slibdir=/usr/lib
     make \$MAKEFLAGS; make DESTDIR=\$LFS install
     sed '/RTLDLIST=/s@/usr@@g' -i \$LFS/usr/bin/ldd
@@ -507,17 +511,18 @@ p2 m4_tmp "$SRC/m4-1.4.20.tar.xz" bash -c "
 "
 
 p2 ncurses_tmp "$SRC/ncurses-6.5-20250809.tgz" bash -c "
-  sed -i s/mawk// configure
   mkdir build; pushd build
-    ../configure; make -C include; make -C progs tic
+    ../configure --prefix=\$LFS/tools AWK=gawk
+    make -C include; make -C progs tic
+    install progs/tic \$LFS/tools/bin
   popd
   ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(./config.guess) \
     --mandir=/usr/share/man --with-manpage-format=normal \
     --with-shared --without-normal --with-cxx-shared --without-debug \
-    --without-ada --disable-stripping
-  make \$MAKEFLAGS; make DESTDIR=\$LFS TIC_PATH=\$(pwd)/build/progs/tic install
+    --without-ada --disable-stripping AWK=gawk
+  make \$MAKEFLAGS; make DESTDIR=\$LFS install
   ln -sv libncursesw.so \$LFS/usr/lib/libncurses.so
-  sed -e 's/^#if.*XOPEN.*$/\n#if 1/' -i \$LFS/usr/include/curses.h
+  sed -e 's/^#if.*XOPEN.*$/#if 1/' -i \$LFS/usr/include/curses.h
 "
 
 p2 bash_tmp "$SRC/bash-5.3.tar.gz" bash -c "
@@ -582,7 +587,7 @@ p2 xz_tmp "$SRC/xz-5.8.1.tar.xz" bash -c "
 "
 
 p2 binutils_p2 "$SRC/binutils-2.45.tar.xz" bash -c "
-  sed '6009s/\$add_dir//' -i ltmain.sh
+  sed '6031s/\$add_dir//' -i ltmain.sh
   mkdir build; cd build
   ../configure --prefix=/usr --build=\$(../config.guess) --host=\$LFS_TGT \
     --disable-nls --enable-shared --enable-gprofng=no --disable-werror \
@@ -609,50 +614,9 @@ p2 gcc_p2 "$SRC/gcc-15.2.0.tar.xz" bash -c "
   ln -sv gcc \$LFS/usr/bin/cc
 "
 
-p2 gettext_tmp "$SRC/gettext-0.26.tar.xz" bash -c "
-  ./configure --disable-shared
-  make \$MAKEFLAGS
-  cp -v gettext-tools/src/{msgfmt,msgmerge,xgettext} \$LFS/usr/bin
-"
-
-p2 bison_tmp "$SRC/bison-3.8.2.tar.xz" bash -c "
-  ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2 \
-    --host=\$LFS_TGT --build=\$(build-aux/config.guess)
-  make \$MAKEFLAGS; make DESTDIR=\$LFS install
-"
-
-p2 perl_tmp "$SRC/perl-5.42.0.tar.xz" bash -c "
-  sh Configure -des -Dprefix=/usr -Dvendorprefix=/usr \
-    -Dprivlib=/usr/lib/perl5/5.42/core_perl \
-    -Darchlib=/usr/lib/perl5/5.42/core_perl \
-    -Dsitelib=/usr/lib/perl5/5.42/site_perl \
-    -Dsitearch=/usr/lib/perl5/5.42/site_perl \
-    -Dvendorlib=/usr/lib/perl5/5.42/vendor_perl \
-    -Dvendorarch=/usr/lib/perl5/5.42/vendor_perl
-  make \$MAKEFLAGS; make DESTDIR=\$LFS install
-"
-
-p2 python_tmp "$SRC/Python-3.13.7.tar.xz" bash -c "
-  ./configure --prefix=/usr --enable-shared --without-ensurepip
-  make \$MAKEFLAGS; make DESTDIR=\$LFS install
-"
-
-p2 texinfo_tmp "$SRC/texinfo-7.2.tar.xz" bash -c "
-  ./configure --prefix=/usr --host=\$LFS_TGT --build=\$(build-aux/config.guess)
-  make \$MAKEFLAGS; make DESTDIR=\$LFS install
-"
-
-p2 util_linux_tmp "$SRC/util-linux-2.41.1.tar.xz" bash -c "
-  mkdir -p \$LFS/var/lib/hwclock
-  ./configure --libdir=/usr/lib --runstatedir=/run \
-    --host=\$LFS_TGT --build=\$(build-aux/config.guess) \
-    --disable-chfn-chsh --disable-login --disable-nologin --disable-su \
-    --disable-setpriv --disable-runuser --disable-pylibmount \
-    --disable-static --disable-liblastlog2 --without-python \
-    ADJTIME_PATH=/var/lib/hwclock/adjtime \
-    --docdir=/usr/share/doc/util-linux-2.41.1
-  make \$MAKEFLAGS; make DESTDIR=\$LFS install
-"
+# LFS ch7.7-7.12 (Gettext, Bison, Perl, Python, Texinfo, Util-linux) are
+# built natively INSIDE the chroot (see the chroot script), not here: built
+# with the host compiler they would link against the host's libc/paths.
 
 find "$LFS/usr/lib" "$LFS/usr/lib64" -name '*.la' -delete 2>/dev/null || true
 echo "Phase 1 & 2 complete."
@@ -674,6 +638,13 @@ if ! step_done phase12 || [[ ! -x "$LFS/usr/bin/bash" ]]; then
   mark_step phase12
 fi
 
+# LFS 7.2: hand $LFS back to root (everything above was built as user lfs)
+if ! step_done lfs_chown; then
+  chown --from lfs -R root:root "$LFS"/{usr,var,etc,tools}
+  [[ -e "$LFS/lib64" ]] && chown --from lfs -R root:root "$LFS/lib64"
+  mark_step lfs_chown
+fi
+
 # =============================================================================
 # PHASE 1b — Virtual filesystems
 # =============================================================================
@@ -685,7 +656,8 @@ if ! step_done vfs_mount; then
   mount -vt proc  proc       "$LFS/proc"
   mount -vt sysfs sysfs      "$LFS/sys"
   mount -vt tmpfs tmpfs      "$LFS/run"
-  [[ -h "$LFS/dev/shm" ]] && install -v -d -m 1777 "$LFS/$(readlink "$LFS/dev/shm")"
+  if [[ -h "$LFS/dev/shm" ]]; then install -v -d -m 1777 "$LFS$(realpath /dev/shm)"
+  else mountpoint -q "$LFS/dev/shm" || mount -vt tmpfs -o nosuid,nodev tmpfs "$LFS/dev/shm"; fi
   mark_step vfs_mount
 elif ! mountpoint -q "$LFS/proc"; then
   # Host was rebooted — mounts are gone but step is marked done; remount
@@ -695,7 +667,8 @@ elif ! mountpoint -q "$LFS/proc"; then
   mount -vt proc  proc       "$LFS/proc"
   mount -vt sysfs sysfs      "$LFS/sys"
   mount -vt tmpfs tmpfs      "$LFS/run"
-  [[ -h "$LFS/dev/shm" ]] && install -v -d -m 1777 "$LFS/$(readlink "$LFS/dev/shm")"
+  if [[ -h "$LFS/dev/shm" ]]; then install -v -d -m 1777 "$LFS$(realpath /dev/shm)"
+  else mountpoint -q "$LFS/dev/shm" || mount -vt tmpfs -o nosuid,nodev tmpfs "$LFS/dev/shm"; fi
 fi
 
 # =============================================================================
@@ -769,22 +742,80 @@ EOF
 
   cat > /etc/group << 'EOF'
 root:x:0:
-bin:x:1:root,bin,daemon
-daemon:x:6:root,bin,daemon
-sys:x:8:
+bin:x:1:daemon
+sys:x:2:
+kmem:x:3:
+tape:x:4:
+tty:x:5:
+daemon:x:6:
+floppy:x:7:
+disk:x:8:
+lp:x:9:
+dialout:x:10:
 audio:x:11:
 video:x:12:
+utmp:x:13:
 cdrom:x:15:
-usb:x:85:
-utmp:x:43:
+adm:x:16:
+messagebus:x:18:
+input:x:24:
+mail:x:34:
+kvm:x:61:
+uuidd:x:80:
+wheel:x:97:
 users:x:999:
-nogroup:x:65533:
-nobody:x:65534:
+nogroup:x:65534:
 EOF
 
   for f in /var/log/{btmp,lastlog,faillog,wtmp}; do touch "$f"; done
   chgrp -v utmp /var/log/lastlog; chmod -v 664 /var/log/lastlog; chmod -v 600 /var/log/btmp
   mark chroot_init
+fi
+
+# ── LFS ch7.7-7.13: additional temporary tools, built in the chroot ─────────
+pkg gettext_tmp "$SRC/gettext-0.26.tar.xz" bash -c "
+  ./configure --disable-shared
+  make \$MAKEFLAGS
+  cp -v gettext-tools/src/{msgfmt,msgmerge,xgettext} /usr/bin
+"
+pkg bison_tmp "$SRC/bison-3.8.2.tar.xz" bash -c "
+  ./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2
+  make \$MAKEFLAGS; make install
+"
+pkg perl_tmp "$SRC/perl-5.42.0.tar.xz" bash -c "
+  sh Configure -des -Dprefix=/usr -Dvendorprefix=/usr -Duseshrplib \
+    -Dprivlib=/usr/lib/perl5/5.42/core_perl \
+    -Darchlib=/usr/lib/perl5/5.42/core_perl \
+    -Dsitelib=/usr/lib/perl5/5.42/site_perl \
+    -Dsitearch=/usr/lib/perl5/5.42/site_perl \
+    -Dvendorlib=/usr/lib/perl5/5.42/vendor_perl \
+    -Dvendorarch=/usr/lib/perl5/5.42/vendor_perl
+  make \$MAKEFLAGS; make install
+"
+pkg python_tmp "$SRC/Python-3.13.7.tar.xz" bash -c "
+  ./configure --prefix=/usr --enable-shared --without-ensurepip --without-static-libpython
+  make \$MAKEFLAGS; make install
+"
+pkg texinfo_tmp "$SRC/texinfo-7.2.tar.xz" bash -c "
+  ./configure --prefix=/usr
+  make \$MAKEFLAGS; make install
+"
+pkg util_linux_tmp "$SRC/util-linux-2.41.1.tar.xz" bash -c "
+  mkdir -pv /var/lib/hwclock
+  ./configure --libdir=/usr/lib --runstatedir=/run \
+    --disable-chfn-chsh --disable-login --disable-nologin --disable-su \
+    --disable-setpriv --disable-runuser --disable-pylibmount \
+    --disable-static --disable-liblastlog2 --without-python \
+    ADJTIME_PATH=/var/lib/hwclock/adjtime \
+    --docdir=/usr/share/doc/util-linux-2.41.1
+  make \$MAKEFLAGS; make install
+"
+# LFS 7.13: clean up the temporary system
+if ! is_done ch7_cleanup; then
+  rm -rf /usr/share/{info,man,doc}/*
+  find /usr/{lib,libexec} -name '*.la' -delete
+  rm -rf /tools
+  mark ch7_cleanup
 fi
 
 # ── Final system packages ─────────────────────────────────────────────────────
@@ -800,9 +831,14 @@ pkg iana_etc "$SRC/iana-etc-20250807.tar.gz" bash -c "
 
 pkg glibc_final "$SRC/glibc-2.42.tar.xz" bash -c "
   patch -Np1 -i \$SRC/glibc-2.42-fhs-1.patch
+  sed -e '/unistd.h/i #include <string.h>' \
+      -e '/libc_rwlock_init/c\\
+  __libc_rwlock_define_initialized (, reset_lock);\\
+  memcpy (&lock, &reset_lock, sizeof (lock));' \
+      -i stdlib/abort.c
   mkdir build && cd build
   echo rootsbindir=/usr/sbin > configparms
-  ../configure --prefix=/usr --disable-werror --enable-kernel=4.19 \
+  ../configure --prefix=/usr --disable-werror --enable-kernel=5.4 \
     --enable-stack-protector=strong --disable-nscd libc_cv_slibdir=/usr/lib
   make \$MAKEFLAGS
   touch /etc/ld.so.conf
@@ -831,6 +867,27 @@ include /etc/ld.so.conf.d/*.conf
 EOF2
   mkdir -pv /etc/ld.so.conf.d
 "
+
+# LFS 8.5.2.2: time zone data (the tarball has no top-level dir, so not bpkg).
+# Own step so builds that already finished glibc_final still get it.
+if ! is_done tzdata_f; then
+  echo "==> tzdata 2025b"
+  td=$(mktemp -d "$SRC/build.XXXXXX")
+  tar -xf "$SRC/tzdata2025b.tar.gz" -C "$td"
+  ( cd "$td"
+    ZONEINFO=/usr/share/zoneinfo
+    mkdir -pv $ZONEINFO/{posix,right}
+    for tz in etcetera southamerica northamerica europe africa antarctica \
+              asia australasia backward; do
+      zic -L /dev/null   -d $ZONEINFO       ${tz}
+      zic -L /dev/null   -d $ZONEINFO/posix ${tz}
+      zic -L leapseconds -d $ZONEINFO/right ${tz}
+    done
+    cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
+    zic -d $ZONEINFO -p America/New_York )
+  rm -rf "$td"
+  mark tzdata_f
+fi
 
 pkg zlib_f   "$SRC/zlib-1.3.1.tar.gz"     bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libz.a"
 pkg bzip2_f  "$SRC/bzip2-1.0.8.tar.gz"    bash -c "
@@ -864,19 +921,25 @@ pkg flex_f   "$SRC/flex-2.6.4.tar.gz"      bash -c "./configure --prefix=/usr --
 
 pkg tcl_f    "$SRC/tcl8.6.16-src.tar.gz"   bash -c "
   SRCDIR=\$(pwd); cd unix
-  ./configure --prefix=/usr --mandir=/usr/share/man
+  ./configure --prefix=/usr --mandir=/usr/share/man --disable-rpath
   make \$MAKEFLAGS
-  sed -e \"s|'\$SRCDIR'|'/usr/src'|\" -i tclConfig.sh
-  sed -e \"s|\$SRCDIR/unix|'/usr/lib'|\" -i tclConfig.sh
-  sed -e \"s|\$SRCDIR|'/usr/include'|\" -i tclConfig.sh
-  sed -e '/SRCDIR/d' -i tclConfig.sh
-  make install; chmod -v u+w /usr/lib/libtcl8.6.so
+  sed -e \"s|\$SRCDIR/unix|/usr/lib|\" -e \"s|\$SRCDIR|/usr/include|\" -i tclConfig.sh
+  sed -e \"s|\$SRCDIR/unix/pkgs/tdbc1.1.10|/usr/lib/tdbc1.1.10|\" \
+      -e \"s|\$SRCDIR/pkgs/tdbc1.1.10/generic|/usr/include|\" \
+      -e \"s|\$SRCDIR/pkgs/tdbc1.1.10/library|/usr/lib/tcl8.6|\" \
+      -e \"s|\$SRCDIR/pkgs/tdbc1.1.10|/usr/include|\" -i pkgs/tdbc1.1.10/tdbcConfig.sh
+  sed -e \"s|\$SRCDIR/unix/pkgs/itcl4.3.2|/usr/lib/itcl4.3.2|\" \
+      -e \"s|\$SRCDIR/pkgs/itcl4.3.2/generic|/usr/include|\" \
+      -e \"s|\$SRCDIR/pkgs/itcl4.3.2|/usr/include|\" -i pkgs/itcl4.3.2/itclConfig.sh
+  make install; chmod 644 /usr/lib/libtclstub8.6.a; chmod -v u+w /usr/lib/libtcl8.6.so
   make install-private-headers; ln -sfv tclsh8.6 /usr/bin/tclsh
+  mv /usr/share/man/man3/{Thread,Tcl_Thread}.3
 "
 
 pkg expect_f   "$SRC/expect5.45.4.tar.gz"  bash -c "
+  patch -Np1 -i \$SRC/expect-5.45.4-gcc15-1.patch
   ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared \
-    --disable-rpath --mandir=/usr/share/man
+    --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include
   make \$MAKEFLAGS && make install
   ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib
 "
@@ -886,14 +949,14 @@ pkg pkgconf_f  "$SRC/pkgconf-2.5.1.tar.xz" bash -c "./configure --prefix=/usr --
 
 pkg binutils_f "$SRC/binutils-2.45.tar.xz" bash -c "
   mkdir build && cd build
-  ../configure --prefix=/usr --sysconfdir=/etc --enable-gold --enable-ld=default \
+  ../configure --prefix=/usr --sysconfdir=/etc --enable-ld=default \
     --enable-plugins --enable-shared --disable-werror --enable-64-bit-bfd \
     --enable-new-dtags --with-system-zlib --enable-default-hash-style=gnu
   make tooldir=/usr \$MAKEFLAGS && make tooldir=/usr install
   rm -fv /usr/lib/lib{bfd,ctf,ctf-nobfd,gprofng,opcodes,sframe}.a
 "
 
-pkg gmp_f  "$SRC/gmp-6.3.0.tar.xz"  bash -c "./configure --prefix=/usr --enable-cxx --disable-static; make \$MAKEFLAGS; make install"
+pkg gmp_f  "$SRC/gmp-6.3.0.tar.xz"  bash -c "sed -i '/long long t1;/,+1s/()/(...)/' configure; ./configure --prefix=/usr --enable-cxx --disable-static; make \$MAKEFLAGS; make install"
 pkg mpfr_f "$SRC/mpfr-4.2.2.tar.xz" bash -c "./configure --prefix=/usr --disable-static --enable-thread-safe; make \$MAKEFLAGS; make install"
 pkg mpc_f  "$SRC/mpc-1.3.1.tar.gz"  bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
 pkg attr_f "$SRC/attr-2.5.2.tar.gz" bash -c "./configure --prefix=/usr --disable-static --sysconfdir=/etc; make \$MAKEFLAGS; make install"
@@ -907,11 +970,14 @@ pkg libxcrypt_f "$SRC/libxcrypt-4.4.38.tar.xz" bash -c "
 
 pkg shadow_f "$SRC/shadow-4.18.0.tar.xz" bash -c "
   sed -i 's/groups\$(EXEEXT) //' src/Makefile.in
-  find man -name 'groups.1' -delete; find man -name 'getspnam.3' -delete; find man -name 'passwd.5' -delete
+  find man -name Makefile.in -exec sed -i 's/groups\\.1 / /'   {} \\;
+  find man -name Makefile.in -exec sed -i 's/getspnam\\.3 / /' {} \\;
+  find man -name Makefile.in -exec sed -i 's/passwd\\.5 / /'   {} \\;
   sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' \
       -e 's:/var/spool/mail:/var/mail:'                   \
       -e '/PATH=/{s@/sbin:@@;s@/bin:@@}'                 \
       -i etc/login.defs
+  touch /usr/bin/passwd
   ./configure --sysconfdir=/etc --disable-static \
     --with-{b,yes}crypt --without-libbsd --with-group-name-max-length=32
   make \$MAKEFLAGS && make exec_prefix=/usr install && make -C man install-man
@@ -921,9 +987,6 @@ pkg shadow_f "$SRC/shadow-4.18.0.tar.xz" bash -c "
 
 pkg gcc_f "$SRC/gcc-15.2.0.tar.xz" bash -c "
   sed -e '/m64=/s/lib64/lib/' -i.orig gcc/config/i386/t-linux64
-  tar -xf \$SRC/mpfr-4.2.2.tar.xz && mv mpfr-4.2.2 mpfr
-  tar -xf \$SRC/gmp-6.3.0.tar.xz  && mv gmp-6.3.0  gmp
-  tar -xf \$SRC/mpc-1.3.1.tar.gz  && mv mpc-1.3.1  mpc
   mkdir build && cd build
   ../configure --prefix=/usr LD=ld --enable-languages=c,c++ \
     --enable-default-pie --enable-default-ssp --enable-host-pie \
@@ -940,7 +1003,14 @@ pkg ncurses_f "$SRC/ncurses-6.5-20250809.tgz" bash -c "
   ./configure --prefix=/usr --mandir=/usr/share/man --with-shared \
     --without-debug --without-normal --with-cxx-shared --enable-pc-files \
     --with-pkg-config-libdir=/usr/lib/pkgconfig
-  make \$MAKEFLAGS && make install
+  make \$MAKEFLAGS
+  # LFS 8.30: stage the install so the running shell's libncursesw is not
+  # overwritten in place, and fix curses.h for non-XOPEN builds
+  make DESTDIR=\$PWD/dest install
+  install -vm755 dest/usr/lib/libncursesw.so.6.5 /usr/lib
+  rm -v dest/usr/lib/libncursesw.so.6.5
+  sed -e 's/^#if.*XOPEN.*$/#if 1/' -i dest/usr/include/curses.h
+  cp -av dest/* /
   for lib in ncurses form panel menu; do
     ln -sfv lib\${lib}w.so /usr/lib/lib\${lib}.so
     ln -sfv \${lib}w.pc /usr/lib/pkgconfig/\${lib}.pc
@@ -951,6 +1021,7 @@ pkg ncurses_f "$SRC/ncurses-6.5-20250809.tgz" bash -c "
 pkg sed_f       "$SRC/sed-4.9.tar.xz"           bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg psmisc_f    "$SRC/psmisc-23.7.tar.xz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg gettext_f   "$SRC/gettext-0.26.tar.xz"    bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install; chmod -v 0755 /usr/lib/preloadable_libintl.so"
+pkg bison_f     "$SRC/bison-3.8.2.tar.xz"       bash -c "./configure --prefix=/usr --docdir=/usr/share/doc/bison-3.8.2; make \$MAKEFLAGS; make install"
 pkg grep_f      "$SRC/grep-3.12.tar.xz"         bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg bash_f      "$SRC/bash-5.3.tar.gz"       bash -c "./configure --prefix=/usr --without-bash-malloc --with-installed-readline bash_cv_strtold_broken=no; make \$MAKEFLAGS; make install"
 pkg libtool_f   "$SRC/libtool-2.5.4.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libltdl.a"
@@ -958,6 +1029,7 @@ pkg gdbm_f      "$SRC/gdbm-1.26.tar.gz"         bash -c "./configure --prefix=/u
 pkg gperf_f     "$SRC/gperf-3.3.tar.gz"         bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg expat_f     "$SRC/expat-2.7.1.tar.xz"       bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
 pkg inetutils_f "$SRC/inetutils-2.6.tar.xz"    bash -c "
+  sed -i 's/def HAVE_TERMCAP_TGETENT/ 1/' telnet/telnet.c
   ./configure --prefix=/usr --bindir=/usr/bin --localstatedir=/var \
     --disable-logger --disable-whois --disable-rcp --disable-rexec \
     --disable-rlogin --disable-rsh --disable-servers
@@ -965,25 +1037,27 @@ pkg inetutils_f "$SRC/inetutils-2.6.tar.xz"    bash -c "
   mv -v /usr/{,s}bin/ifconfig
 "
 pkg less_f      "$SRC/less-679.tar.gz"          bash -c "./configure --prefix=/usr --sysconfdir=/etc; make \$MAKEFLAGS; make install"
+pkg perl_f      "$SRC/perl-5.42.0.tar.xz"       bash -c "
+  export BUILD_ZLIB=False BUILD_BZIP2=0
+  sh Configure -des -Dprefix=/usr -Dvendorprefix=/usr \
+    -Dprivlib=/usr/lib/perl5/5.42/core_perl -Darchlib=/usr/lib/perl5/5.42/core_perl \
+    -Dsitelib=/usr/lib/perl5/5.42/site_perl -Dsitearch=/usr/lib/perl5/5.42/site_perl \
+    -Dvendorlib=/usr/lib/perl5/5.42/vendor_perl -Dvendorarch=/usr/lib/perl5/5.42/vendor_perl \
+    -Dman1dir=/usr/share/man/man1 -Dman3dir=/usr/share/man/man3 \
+    -Dpager='/usr/bin/less -isR' -Duseshrplib -Dusethreads
+  make \$MAKEFLAGS; make install
+"
 pkg xml_parser  "$SRC/XML-Parser-2.47.tar.gz"   bash -c "perl Makefile.PL; make \$MAKEFLAGS; make install"
 pkg intltool_f  "$SRC/intltool-0.51.0.tar.gz"  bash -c "sed -i 's:\\\${:\\\$\\{:' intltool-update.in; ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg autoconf_f  "$SRC/autoconf-2.72.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg automake_f  "$SRC/automake-1.18.1.tar.xz"    bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
-pkg openssl_f   "$SRC/openssl-3.5.2.tar.gz"    bash -c "./config --prefix=/usr --openssldir=/etc/ssl --libdir=lib shared zlib-dynamic; make \$MAKEFLAGS; make install; rm -fv /usr/lib/libssl.a /usr/lib/libcrypto.a"
-
-pkg kmod_f "$SRC/kmod-34.2.tar.xz" bash -c "
-  ./configure --prefix=/usr --sysconfdir=/etc --with-openssl --with-xz \
-    --with-zstd --with-zlib --disable-manpages
-  make \$MAKEFLAGS && make install
-  for t in depmod insmod modinfo modprobe rmmod; do ln -sfv ../bin/kmod /usr/sbin/\$t; done
-  ln -sfv kmod /usr/bin/lsmod
-"
+pkg openssl_f   "$SRC/openssl-3.5.2.tar.gz"    bash -c "./config --prefix=/usr --openssldir=/etc/ssl --libdir=lib shared zlib-dynamic; make \$MAKEFLAGS; sed -i '/INSTALL_LIBS/s/libcrypto.a libssl.a//' Makefile; make MANSUFFIX=ssl install"
 
 pkg elfutils_f  "$SRC/elfutils-0.193.tar.bz2" bash -c "./configure --prefix=/usr --disable-debuginfod --enable-libdebuginfod=dummy; make \$MAKEFLAGS; make install; rm -fv /usr/lib/lib{asm,dw,elf}.a"
 pkg libffi_f    "$SRC/libffi-3.5.2.tar.gz"    bash -c "./configure --prefix=/usr --disable-static --with-gcc-arch=native; make \$MAKEFLAGS; make install"
 
 pkg python3_f "$SRC/Python-3.13.7.tar.xz" bash -c "
-  ./configure --prefix=/usr --enable-shared --with-system-expat --with-ensurepip=yes --enable-optimizations
+  ./configure --prefix=/usr --enable-shared --with-system-expat --with-ensurepip=yes --enable-optimizations --without-static-libpython
   make \$MAKEFLAGS && make install
   cat > /etc/pip.conf << 'EOF2'
 [global]
@@ -1024,6 +1098,12 @@ pkg setuptools_f "$SRC/setuptools-80.9.0.tar.gz" bash -c "
 
 pkg ninja_f "$SRC/ninja-1.13.1.tar.gz" bash -c "
   export NINJAJOBS=3
+  sed -i '/int Guess/a \\
+  int   j = 0;\\
+  char* jobs = getenv( \"NINJAJOBS\" );\\
+  if ( jobs != NULL ) j = atoi( jobs );\\
+  if ( j > 0 ) return j;\\
+' src/ninja.cc
   python3 configure.py --bootstrap
   install -vm755 ninja /usr/bin/
 "
@@ -1033,8 +1113,18 @@ pkg meson_f "$SRC/meson-1.8.3.tar.gz" bash -c "
   pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist meson
 "
 
+pkg kmod_f "$SRC/kmod-34.2.tar.xz" bash -c "
+  mkdir -p build; cd build
+  meson setup --prefix=/usr .. --buildtype=release -D manpages=false
+  ninja; ninja install
+  for t in depmod insmod modinfo modprobe rmmod; do ln -sfv ../bin/kmod /usr/sbin/\$t; done
+  ln -sfv kmod /usr/bin/lsmod
+"
+
 pkg coreutils_f "$SRC/coreutils-9.7.tar.xz" bash -c "
-  autoreconf -fiv
+  patch -Np1 -i \$SRC/coreutils-9.7-upstream_fix-1.patch
+  patch -Np1 -i \$SRC/coreutils-9.7-i18n-1.patch
+  autoreconf -fv; automake -af
   FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr --enable-no-install-program=kill,uptime
   make \$MAKEFLAGS && make install
   mv -v /usr/bin/chroot /usr/sbin
@@ -1044,7 +1134,7 @@ pkg coreutils_f "$SRC/coreutils-9.7.tar.xz" bash -c "
 
 pkg check_f    "$SRC/check-0.15.2.tar.gz"     bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install"
 pkg diffutils_f "$SRC/diffutils-3.12.tar.xz"  bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
-pkg gawk_f     "$SRC/gawk-5.3.2.tar.xz"       bash -c "sed -i 's/extras//' Makefile.in; ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+pkg gawk_f     "$SRC/gawk-5.3.2.tar.xz"       bash -c "sed -i 's/extras//' Makefile.in; ./configure --prefix=/usr; make \$MAKEFLAGS; rm -f /usr/bin/gawk-5.3.2; make install"
 pkg findutils_f "$SRC/findutils-4.10.0.tar.xz" bash -c "./configure --prefix=/usr --localstatedir=/var/lib/locate; make \$MAKEFLAGS; make install"
 pkg groff_f    "$SRC/groff-1.23.0.tar.gz"     bash -c "PAGE=A4 ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg gzip_f     "$SRC/gzip-1.14.tar.xz"        bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
@@ -1067,6 +1157,13 @@ pkg libpipeline_f "$SRC/libpipeline-1.5.8.tar.gz" bash -c "./configure --prefix=
 pkg make_f     "$SRC/make-4.4.1.tar.gz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg patch_f    "$SRC/patch-2.8.tar.xz"      bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
 pkg tar_f      "$SRC/tar-1.35.tar.xz"         bash -c "FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr; make \$MAKEFLAGS; make install"
+
+pkg texinfo_f "$SRC/texinfo-7.2.tar.xz" bash -c "
+  sed 's/! \$output_file eq/\$output_file ne/' -i tp/Texinfo/Convert/*.pm
+  ./configure --prefix=/usr
+  make \$MAKEFLAGS; make install
+  make TEXMF=/usr/share/texmf install-tex
+"
 
 pkg vim_f "$SRC/vim-9.1.1629.tar.gz" bash -c "
   echo '#define SYS_VIMRC_FILE \"/etc/vimrc\"' >> src/feature.h
@@ -1095,7 +1192,15 @@ pkg man_db_f "$SRC/man-db-2.13.1.tar.xz" bash -c "
   make \$MAKEFLAGS && make install
 "
 
-pkg procps_f  "$SRC/procps-ng-4.0.5.tar.xz"  bash -c "./configure --prefix=/usr --disable-static --disable-kill; make \$MAKEFLAGS; make install"
+pkg procps_f  "$SRC/procps-ng-4.0.5.tar.xz"  bash -c "./configure --prefix=/usr --disable-static --disable-kill --enable-watch8bit; make \$MAKEFLAGS; make install"
+pkg util_linux_f "$SRC/util-linux-2.41.1.tar.xz" bash -c "
+  ./configure --bindir=/usr/bin --libdir=/usr/lib --runstatedir=/run --sbindir=/usr/sbin \
+    --disable-chfn-chsh --disable-login --disable-nologin --disable-su \
+    --disable-setpriv --disable-runuser --disable-pylibmount --disable-liblastlog2 \
+    --disable-static --without-python --without-systemd --without-systemdsystemunitdir \
+    ADJTIME_PATH=/var/lib/hwclock/adjtime --docdir=/usr/share/doc/util-linux-2.41.1
+  make \$MAKEFLAGS; make install
+"
 pkg e2fsprogs_f "$SRC/e2fsprogs-1.47.3.tar.gz" bash -c "
   mkdir build && cd build
   ../configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs \
@@ -1392,11 +1497,15 @@ bpkg() {
   local bdir; bdir=$(mktemp -d "$SOURCES/build.XXXXXX")
   tar -xf "$archive" -C "$bdir" --strip-components=1
   pushd "$bdir" >/dev/null
-  "$@"
-  local rc=$?
+  # Fail fast like the LFS phases: without -e a failed make inside a
+  # "bash -c 'a; b; c'" snippet fell through and the step got marked done.
+  if [[ "${1:-}" == bash && "${2:-}" == -c ]]; then shift; set -- bash -e -o pipefail "$@"; fi
+  local rc=0
+  "$@" || rc=$?
   popd >/dev/null
+  if (( rc != 0 )); then warn "build failed (exit $rc), build dir kept: $bdir"; return $rc; fi
   rm -rf "$bdir"
-  return $rc
+  return 0
 }
 
 # =============================================================================
@@ -1427,6 +1536,11 @@ XKEYBOARD_CONFIG_VER="2.43"
 LIBINPUT_VER="1.26.1"
 LIBEVDEV_VER="1.13.3"
 MTDEV_VER="1.1.7"
+LIBDRM_VER="2.4.125"     # BLFS 12.4
+MAKO_VER="1.3.10"        # BLFS 12.4
+XKBCOMP_VER="1.4.7"      # BLFS 12.4
+XAUTH_VER="1.1.4"        # BLFS 12.4
+XRDB_VER="1.2.2"         # BLFS 12.4
 LLVM_VER="18.1.8"
 MESA_VER="24.3.4"
 XORG_SERVER_VER="21.1.14"
@@ -1683,6 +1797,20 @@ fi
 # 6. LLVM + Mesa — software/virtio GL for the X server and apps
 #    (virtio-gpu via virgl; llvmpipe software fallback. All free.)
 # =============================================================================
+# BLFS: libdrm (required by Mesa and the Xorg server's modesetting/glamor)
+if ! step_done libdrm; then
+  header "libdrm ${LIBDRM_VER}"
+  a=$(fetch "https://dri.freedesktop.org/libdrm/libdrm-${LIBDRM_VER}.tar.xz")
+  bpkg "$a" bash -c "mkdir b; cd b; meson setup --prefix=$XORG_PREFIX --buildtype=release -Dudev=true -Dvalgrind=disabled ..; ninja; ninja install"
+  mark_step libdrm
+fi
+# BLFS: Mako (Python module, required to build Mesa)
+if ! step_done mako; then
+  header "Mako ${MAKO_VER}"
+  a=$(fetch "https://files.pythonhosted.org/packages/source/m/mako/mako-${MAKO_VER}.tar.gz")
+  bpkg "$a" bash -c "pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD; pip3 install --no-index --find-links dist Mako"
+  mark_step mako
+fi
 if ! step_done llvm; then
   header "LLVM ${LLVM_VER} (this is the long one — hours)"
   a=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-${LLVM_VER}.src.tar.xz")
@@ -1727,6 +1855,14 @@ fi
 # =============================================================================
 # 7. Xorg server (modesetting + fbdev built in) + xinit
 # =============================================================================
+# BLFS: font-util is a build dependency of xorg-server (font root path)
+if ! step_done xorg_fonts; then
+  header "Xorg font infrastructure"
+  a=$(xfetch font "font-util-${FONT_UTIL_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make; make install"
+  a=$(xfetch font "encodings-${ENCODINGS_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
+  a=$(xfetch data "xbitmaps-${XBITMAPS_VER}.tar.xz");    bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
+  mark_step xorg_fonts
+fi
 if ! step_done xorg_server; then
   header "xorg-server ${XORG_SERVER_VER}"
   a=$(xfetch xserver "xorg-server-${XORG_SERVER_VER}.tar.xz")
@@ -1750,17 +1886,16 @@ if ! step_done xinit; then
   xbuild app "xinit-${XINIT_VER}.tar.xz" "--with-xinitdir=/etc/X11/app-defaults"
   mark_step xinit
 fi
+# BLFS Xorg Applications, minimal subset: xkbcomp (the X server needs it to
+# compile the keymap at startup), xauth (startx), xrdb (.xinitrc)
+for xa in "xkbcomp-${XKBCOMP_VER}" "xauth-${XAUTH_VER}" "xrdb-${XRDB_VER}"; do
+  st="xapp_${xa%%-*}"
+  if ! step_done "$st"; then header "$xa"; xbuild app "$xa.tar.xz"; mark_step "$st"; fi
+done
 
 # =============================================================================
 # 8. Fonts (all free / libre)
 # =============================================================================
-if ! step_done xorg_fonts; then
-  header "Xorg font infrastructure"
-  a=$(xfetch font "font-util-${FONT_UTIL_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make; make install"
-  a=$(xfetch font "encodings-${ENCODINGS_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
-  a=$(xfetch data "xbitmaps-${XBITMAPS_VER}.tar.xz");    bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
-  mark_step xorg_fonts
-fi
 if ! step_done free_fonts; then
   header "DejaVu + GNU FreeFont"
   mkdir -pv /usr/share/fonts/dejavu /usr/share/fonts/freefont
@@ -1781,8 +1916,8 @@ if ! step_done xterm; then
   bpkg "$a" bash -c "
     sed -i '/v0/{n;s/new:/new:kb=^?:/}' termcap
     printf '\tkbs=\\\\177,\\n' >> terminfo
-    TERMINFO=/usr/share/terminfo ./configure --prefix=/usr --with-app-defaults=/etc/X11/app-defaults
-    make -j${NPROC}; make install
+    TERMINFO=/usr/share/terminfo ./configure $XORG_CONFIG --with-app-defaults=/etc/X11/app-defaults
+    make -j${NPROC}; make install; make install-ti
   "
   mark_step xterm
 fi
