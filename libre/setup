@@ -340,13 +340,19 @@ chown lfs /home/lfs/.bash_profile /home/lfs/.bashrc
 if [[ -d /run/current-system/profile/bin ]]; then
   GP=/run/current-system/profile
   mkdir -p /home/lfs/guix-host-cc
+  # Guix's gcc is newer than the book's (16.x vs 15.x) and defaults C++ to
+  # C++20, where u8"" literals are char8_t — GCC 15's libcody then fails with
+  # "no matching function for call to 'S2C(const char8_t [2])'". Pin the HOST
+  # C++ compiler to the dialect GCC 15 itself defaults to; later -std= flags
+  # from a package's own build still override it.
   for t in gcc:gcc cc:gcc g++:g++ c++:g++ cpp:cpp; do
+    case "${t%%:*}" in g++|c++) std=-std=gnu++17 ;; *) std= ;; esac
     cat > "/home/lfs/guix-host-cc/${t%%:*}" << EOF
 #!$GP/bin/bash
 export C_INCLUDE_PATH="$GP/include\${C_INCLUDE_PATH:+:\$C_INCLUDE_PATH}"
 export CPLUS_INCLUDE_PATH="$GP/include/c++:$GP/include\${CPLUS_INCLUDE_PATH:+:\$CPLUS_INCLUDE_PATH}"
 export LIBRARY_PATH="$GP/lib\${LIBRARY_PATH:+:\$LIBRARY_PATH}"
-exec $GP/bin/${t#*:} "\$@"
+exec $GP/bin/${t#*:} $std "\$@"
 EOF
     chmod 755 "/home/lfs/guix-host-cc/${t%%:*}"
   done

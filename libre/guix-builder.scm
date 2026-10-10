@@ -131,6 +131,13 @@
 
   (packages (append build-tools optional-tools %base-packages))
 
+  ;; Autoconf/libtool configure scripts (GCC's lto-plugin, zlib,
+  ;; libbacktrace…) hardcode /usr/bin/file; Guix only provides /bin/sh and
+  ;; /usr/bin/env, so link it in.
   (services (append (list libre-build-service
-                          %dhcp-client-service)
+                          %dhcp-client-service
+                          (extra-special-file
+                           "/usr/bin/file"
+                           (file-append (specification->package "file")
+                                        "/bin/file")))
                     %base-services)))
