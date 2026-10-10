@@ -432,10 +432,22 @@ if ! is_done gcc_p1; then
     make \$MAKEFLAGS; make install
     cd ..
     command -v \$LFS_TGT-gcc >/dev/null || { echo \"\$LFS_TGT-gcc not installed\" >&2; exit 1; }
-    cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
-      \$(\$LFS_TGT-gcc -print-libgcc-file-name | sed 's/libgcc/limits/')
   "
   mark gcc_p1
+fi
+
+# LFS 5.3: install the full internal limits.h into the cross gcc (gcc pass 1
+# only gets the stub, and later builds die with '#error "Assumed value of
+# MB_LEN_MAX wrong"'). Own step so a resume fixes an older, broken run: the
+# old code wrote it to .../limits.a (sed on libgcc.a) instead of
+# include/limits.h.
+if ! is_done gcc_p1_limits; then
+  echo "==> GCC (pass 1): full limits.h"
+  bpkg "$SRC/gcc-15.2.0.tar.xz" bash -c "
+    cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
+      \$(dirname \$(\$LFS_TGT-gcc -print-libgcc-file-name))/include/limits.h
+  "
+  mark gcc_p1_limits
 fi
 
 if ! is_done linux_headers; then
