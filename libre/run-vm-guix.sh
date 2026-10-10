@@ -150,8 +150,9 @@ ensure_kvm_access() {
 # Guix writes its qcow2 with zstd compression ("compression type: zstd"), which
 # a QEMU built without zstd can't open ("qcow2: unknown compression type: 2").
 # So the builder is always rewritten as a plain, uncompressed qcow2 with
-# qemu-img; if qemu-img can't read zstd either, Guix builds a raw image (same
-# MBR-hybrid layout, root label Guix_image) and that gets converted instead.
+# qemu-img — the host's if it has zstd, else Guix's own (guix shell
+# qemu-minimal). Only if both fail does Guix build a raw image (same MBR-hybrid
+# layout, root label Guix_image), which needs ~2x BUILDER_SIZE free disk.
 # Read the qcow2 header ourselves: a qemu-img without zstd can't even 'info' it.
 # (qcow2 v3: magic QFI\xfb, version @4, header_length @100, compression_type @104;
 #  1 = zstd, 0 = zlib — same as `qemu-img info` "compression type: zstd")
@@ -166,14 +167,34 @@ image_is_zstd() {
   (( b[104] == 1 ))
 }
 
-write_builder() {   # write_builder <src> <raw|qcow2>: uncompressed qcow2 -> $BUILDER
-  local tmp="$BUILDER.tmp"
+# Guix's own qemu-img is built with zstd, so it can always read Guix's images.
+# Fetched as a substitute (qemu-minimal: no GUI/audio deps), never installed.
+guix_qemu_img() { guix shell qemu-minimal -- qemu-img "$@"; }
+
+convert_to_builder() {   # convert_to_builder <qemu-img cmd...> -- <src> <fmt>
+  local tmp="$BUILDER.tmp" cmd=()
+  while [[ "$1" != -- ]]; do cmd+=("$1"); shift; done; shift
   rm -f "$tmp"
-  if qemu-img convert -f "$2" -O qcow2 "$1" "$tmp" && ! image_is_zstd "$tmp"; then
-    mv -f "$tmp" "$BUILDER"; chmod u+w "$BUILDER"
-  else
-    rm -f "$tmp"; return 1
+  if "${cmd[@]}" convert -f "$2" -O qcow2 -o compression_type=zlib "$1" "$tmp" 2>/dev/null \
+     || "${cmd[@]}" convert -f "$2" -O qcow2 "$1" "$tmp"; then
+    if ! image_is_zstd "$tmp"; then mv -f "$tmp" "$BUILDER"; chmod u+w "$BUILDER"; return 0; fi
   fi
+  rm -f "$tmp"; return 1
+}
+
+write_builder() {   # write_builder <src> <raw|qcow2>: uncompressed qcow2 -> $BUILDER
+  convert_to_builder qemu-img -- "$1" "$2" && return 0
+  [[ "$2" == qcow2 ]] || return 1
+  warn "host qemu-img can't read Guix's zstd qcow2 (QEMU built without zstd) — using Guix's qemu-img instead"
+  convert_to_builder guix_qemu_img -- "$1" "$2"
+}
+
+# The raw fallback writes a full $BUILDER_SIZE file into the store: check room.
+raw_fits() {
+  local need_kb have_kb
+  need_kb=$(( $(numfmt --from=iec "$BUILDER_SIZE") / 1024 * 2 ))   # store copy + qcow2
+  have_kb=$(df -Pk /gnu/store | awk 'NR==2{print $4}')
+  (( have_kb >= need_kb )) || { warn "raw fallback needs ~$((need_kb/1048576))G free on /gnu/store, only $((have_kb/1048576))G — free space or set BUILDER_SIZE smaller"; return 1; }
 }
 
 guix_image() {      # guix_image <image type>: prints the store path of the image
@@ -199,8 +220,9 @@ build_guix_image() {
     || die "guix system image failed — fix guix-builder.scm (module/package names), or use ./run-vm.sh"
   header "Writing it out as an uncompressed qcow2 -> $BUILDER"
   if ! write_builder "$out" qcow2; then
-    warn "qemu-img can't read Guix's zstd-compressed qcow2 (QEMU built without zstd) — building a raw image instead"
-    out="$(guix_image mbr-hybrid-raw)" || die "guix system image -t mbr-hybrid-raw failed"
+    warn "couldn't convert Guix's qcow2 (even with Guix's qemu-img) — building a raw image instead"
+    raw_fits || die "not enough disk for the raw fallback"
+    out="$(guix_image mbr-hybrid-raw)" || die "guix system image -t mbr-hybrid-raw failed (out of disk? check df /gnu/store /tmp)"
     write_builder "$out" raw || die "qemu-img convert of $out failed"
     guix gc -D "$out" >/dev/null 2>&1 || true   # the raw image is a full-size store file
   fi
