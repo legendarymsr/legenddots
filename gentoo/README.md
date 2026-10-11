@@ -532,7 +532,7 @@ Reboot now: umount -R /mnt/gentoo && reboot
 ```
 COMMON_FLAGS="-march=haswell -O2 -pipe"
 MAKEOPTS="-j3"
-VIDEO_CARDS="intel iris"
+VIDEO_CARDS="intel"
 LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
 PYTHON_TARGETS="python3_13"
@@ -572,7 +572,7 @@ don't add compile parallelism:
   packages offer; nothing here links anything statically.
 - `media-libs/mesa -llvm` — mesa defaults this on for its gallium llvmpipe
   software rasterizer / AMD radeonsi / rusticl backends, none of which apply
-  with `VIDEO_CARDS="intel iris"` — the native Intel driver never touches
+  with `VIDEO_CARDS="intel"` — the native Intel driver never touches
   LLVM. One of the larger individual per-package savings here.
 
 ### WD-40 (de-rust the profile)
