@@ -38,7 +38,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 [[ $EUID -eq 0 ]] || exit 1
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 INSTALL_SH="${SCRIPT_DIR}/install.sh"
 
 if [[ ! -e /dev/sda3 ]]; then
@@ -168,7 +168,12 @@ portage_fixups /mnt/gentoo
 
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
 header "Chrooting back in to resume install..."
-chroot /mnt/gentoo /tmp/inside.sh
+rc=0
+chroot /mnt/gentoo /tmp/inside.sh || rc=$?
 portage_fixups /mnt/gentoo
 sync
+if [[ $rc -ne 0 ]]; then
+  echo -e "${RED}Chroot install exited with status $rc${NC}" >&2
+  exit "$rc"
+fi
 echo -e "${GREEN}Reboot now: umount -R /mnt/gentoo && reboot${NC}"

@@ -194,6 +194,9 @@ if ! step_done overlays; then
   mark_step overlays
 fi
 
+# Overlays may have been created/synced above — fix their metadata now too.
+portage_fixups
+
 # 6. WD-40
 if ! step_done wd40; then
   if [[ "$ENABLE_WD40" == "true" ]]; then
@@ -353,7 +356,7 @@ if ! step_done editor_integration; then
   header "Wiring editors system-wide (nvim + emacs)..."
   # Find the repo (cloned to legend's home by the dotfiles step; fall back to root's).
   EDSRC=""
-  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
+  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"; do
     [[ -f "$d/scripts/edit" && -f "$d/scripts/editor" ]] && { EDSRC="$d"; break; }
   done
   if [[ -n "$EDSRC" ]]; then
@@ -389,7 +392,7 @@ fi
 if ! step_done nvim_desktop; then
   header "Making neovim the desktop default for text files..."
   DSRC=""
-  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
+  for d in /home/legend/legenddots /root/legenddots "$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"; do
     [[ -f "$d/niri/applications/nvim.desktop" ]] && { DSRC="$d"; break; }
   done
   if [[ -n "$DSRC" ]]; then
