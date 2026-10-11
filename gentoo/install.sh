@@ -319,6 +319,7 @@ echo "dev-cpp/atkmm X" >> /etc/portage/package.use/xlibs
 # and gtkmm[X=] must match. Miss these and `--changed-use @world` slot-conflicts.
 echo "x11-libs/gtk+:3 X" >> /etc/portage/package.use/xlibs
 echo "dev-cpp/gtkmm X" >> /etc/portage/package.use/xlibs
+echo "dev-python/pyqt6 webchannel" >> /etc/portage/package.use/xlibs
 
 # 4. OVERLAYS
 if ! step_done overlays; then
