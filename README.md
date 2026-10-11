@@ -376,3 +376,15 @@ any later version. Full text in [`LICENSE`](LICENSE).
 Vendored/third-party files keep their own upstream licenses — notably the
 suckless `config.h` files (ISC/MIT), `termux/wlr-layer-shell-unstable-v1.xml`
 (MIT), and the IceCat branding assets.
+
+### Installed packages
+
+The GPL-3.0 licence covers only the scripts and configs in this repository.
+The software they download, build, or install (kernels, toolchains, desktop
+environments, browsers, fonts, firmware, overlays, and so on) is not part of
+legenddots. Each package is distributed under its own licence by its upstream
+authors, and you must follow those terms. Some of it, such as Brave, Broadcom
+`wl`/`broadcom-sta`, Apple/Intel firmware, and Nerd Fonts, is under non-GPL or
+non-free terms. Check each project's licence before redistributing it, or use
+your distro's tools to list them (for example `ACCEPT_LICENSE` and
+`equery`/`portageq` on Gentoo, `meta.license` on Nix, `license` fields in Guix).
