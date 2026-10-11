@@ -730,7 +730,8 @@ blacklist b43legacy
 blacklist ssb
 blacklist bcma
 EOF
-  echo 'modules="wl"' >> /etc/conf.d/modules
+  grep -q 'modules="wl"' /etc/conf.d/modules 2>/dev/null || \
+    echo 'modules="wl"' >> /etc/conf.d/modules
 
   # Apple keyboard fn-mode
   echo "options hid_apple fnmode=2" > /etc/modprobe.d/hid_apple.conf
@@ -738,7 +739,8 @@ EOF
   # usbmouse can race bcm5974 and claim the trackpad interface first — blacklist it.
   # Standard USB mice are handled by usbhid, not usbmouse.
   echo "blacklist usbmouse" > /etc/modprobe.d/blacklist-usbmouse.conf
-  echo 'modules="${modules} bcm5974"' >> /etc/conf.d/modules
+  grep -q bcm5974 /etc/conf.d/modules 2>/dev/null || \
+    echo 'modules="${modules} bcm5974"' >> /etc/conf.d/modules
 
   # Backlight permissions
   mkdir -p /etc/udev/rules.d
