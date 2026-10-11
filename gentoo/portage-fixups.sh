@@ -18,7 +18,7 @@ portage_fixups() {
       && mv "$p/package.use/llvm.new" "$p/package.use/llvm"
   fi
   if [[ -f $p/package.use/xlibs ]]; then
-    sed -i '/^dev-qt\/qtbase .*-opengl/d' "$p/package.use/xlibs"
+    sed -i '/^[<>=~]*dev-qt\/qtbase[-0-9.a-z_]*[[:space:]].*-opengl/d' "$p/package.use/xlibs"
     grep -q '^dev-python/pyqt6 .*webchannel' "$p/package.use/xlibs" \
       || echo 'dev-python/pyqt6 webchannel' >> "$p/package.use/xlibs"
   fi
