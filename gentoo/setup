@@ -119,28 +119,6 @@ EOF
   mark_step make_conf
 fi
 
-# Hand-applied fixes, kept idempotent for existing installs:
-# VIDEO_CARDS "intel" only (Haswell uses crocus, not iris); dedupe the llvm
-# package.use; pyqt6 webchannel in xlibs (never qtbase -opengl, qtwebengine
-# needs opengl); overlay metadata so portage stops warning about masters.
-portage_fixups() {
-  local root="${1:-}" p="${1:-}/etc/portage" r
-  [[ -f $p/make.conf ]] && sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"intel\"/" "$p/make.conf"
-  if [[ -f $p/package.use/llvm ]]; then
-    awk "!seen[\$0]++ || /^\$/" "$p/package.use/llvm" > "$p/package.use/llvm.new" && mv "$p/package.use/llvm.new" "$p/package.use/llvm"
-  fi
-  if [[ -f $p/package.use/xlibs ]]; then
-    sed -i "/^dev-qt\/qtbase .*-opengl/d" "$p/package.use/xlibs"
-    grep -q "^dev-python/pyqt6 .*webchannel" "$p/package.use/xlibs" || echo "dev-python/pyqt6 webchannel" >> "$p/package.use/xlibs"
-  fi
-  for r in icecat parona-overlay; do
-    [[ -d $root/var/db/repos/$r ]] || continue
-    mkdir -p "$root/var/db/repos/$r/metadata" "$root/var/db/repos/$r/profiles"
-    grep -qx "masters = gentoo" "$root/var/db/repos/$r/metadata/layout.conf" 2>/dev/null || echo "masters = gentoo" >> "$root/var/db/repos/$r/metadata/layout.conf"
-    echo "$r" > "$root/var/db/repos/$r/profiles/repo_name"
-  done
-}
-portage_fixups
 
 # 4. PACKAGE USE FLAGS
 if ! step_done package_use; then
@@ -181,6 +159,7 @@ if ! step_done package_use; then
     echo "x11-libs/gtk+:3 introspection X"
     echo "dev-cpp/gtkmm X"
     echo "dev-libs/atk introspection"
+    echo "dev-python/pyqt6 webchannel"
   } > /etc/portage/package.use/xlibs
   echo "gnome-base/librsvg -introspection -vala" > /etc/portage/package.use/librsvg
 
@@ -195,6 +174,10 @@ if ! step_done package_use; then
 
   mark_step package_use
 fi
+
+# Idempotent fix-ups for existing installs (after step 4, which rewrites llvm/xlibs).
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/portage-fixups.sh"
+portage_fixups
 
 # 5. OVERLAYS
 if ! step_done overlays; then
