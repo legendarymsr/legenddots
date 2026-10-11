@@ -117,6 +117,29 @@ if [[ -f /mnt/gentoo/etc/gentoo-install.state ]] && grep -qx kernel /mnt/gentoo/
   fi
 fi
 
+# Hand-applied fixes, kept idempotent for existing installs:
+# VIDEO_CARDS "intel" only (Haswell uses crocus, not iris); dedupe the llvm
+# package.use; pyqt6 webchannel in xlibs (never qtbase -opengl, qtwebengine
+# needs opengl); overlay metadata so portage stops warning about masters.
+portage_fixups() {
+  local root="${1:-}" p="${1:-}/etc/portage" r
+  [[ -f $p/make.conf ]] && sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"intel\"/" "$p/make.conf"
+  if [[ -f $p/package.use/llvm ]]; then
+    awk "!seen[\$0]++ || /^\$/" "$p/package.use/llvm" > "$p/package.use/llvm.new" && mv "$p/package.use/llvm.new" "$p/package.use/llvm"
+  fi
+  if [[ -f $p/package.use/xlibs ]]; then
+    sed -i "/^dev-qt\/qtbase .*-opengl/d" "$p/package.use/xlibs"
+    grep -q "^dev-python/pyqt6 .*webchannel" "$p/package.use/xlibs" || echo "dev-python/pyqt6 webchannel" >> "$p/package.use/xlibs"
+  fi
+  for r in icecat parona-overlay; do
+    [[ -d $root/var/db/repos/$r ]] || continue
+    mkdir -p "$root/var/db/repos/$r/metadata" "$root/var/db/repos/$r/profiles"
+    grep -qx "masters = gentoo" "$root/var/db/repos/$r/metadata/layout.conf" 2>/dev/null || echo "masters = gentoo" >> "$root/var/db/repos/$r/metadata/layout.conf"
+    echo "$r" > "$root/var/db/repos/$r/profiles/repo_name"
+  done
+}
+portage_fixups /mnt/gentoo
+
 # An earlier version of WD-40 only unmasked x11-terms/alacritty, but
 # gnome-base/librsvg hits the same wall (every Rust-based version is masked,
 # and the one pre-Rust version was never keyworded for amd64) -- it's pulled

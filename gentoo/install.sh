@@ -152,7 +152,7 @@ MAKEOPTS="-j3"
 # rerun -- this script runs unattended, nothing's there to do that.
 EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100 --autounmask-write=y --autounmask-continue=y"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
-VIDEO_CARDS="intel iris"
+VIDEO_CARDS="intel"
 ABI_X86="64"
 LLVM_TARGETS="X86"
 # -cuda/-rocm/-vdpau: Intel-only hardware, no Nvidia/AMD GPU stack needed
@@ -297,7 +297,7 @@ echo "media-fonts/nerdfonts jetbrainsmono" > /etc/portage/package.use/nerdfonts
 echo "media-libs/libglvnd X" > /etc/portage/package.use/libglvnd
 
 # mesa defaults USE="llvm" on (gallium llvmpipe software rasterizer, AMD
-# radeonsi, rusticl). VIDEO_CARDS is "intel iris" only -- the native Intel
+# radeonsi, rusticl). VIDEO_CARDS is "intel" only (Haswell uses crocus) -- the native Intel
 # driver doesn't touch the LLVM gallium backend, so this is pure waste here,
 # and it's one of the bigger individual mesa build-time costs.
 echo "media-libs/mesa -llvm" > /etc/portage/package.use/mesa

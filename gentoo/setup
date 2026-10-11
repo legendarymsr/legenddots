@@ -101,7 +101,7 @@ CXXFLAGS="${COMMON_FLAGS}"
 MAKEOPTS="-j3"
 EMERGE_DEFAULT_OPTS="--jobs=1 --load-average=3 --quiet-build=y --usepkg=y --getbinpkg=n --backtrack=100 --autounmask-write=y --autounmask-continue=y"
 CPU_FLAGS_X86="aes avx avx2 bmi bmi2 f16c fma3 mmx mmxext pclmul popcnt sse sse2 sse3 sse4_1 sse4_2 ssse3"
-VIDEO_CARDS="intel iris"
+VIDEO_CARDS="intel"
 ABI_X86="64"
 LLVM_TARGETS="X86"
 USE="udev elogind dbus wayland alsa seccomp -systemd -gnome -kde -qt5 -cups -pulseaudio -cuda -rocm -vdpau -nls -introspection -gtk-doc -doc -static-libs"
@@ -118,6 +118,29 @@ EOF
   chown -R portage:portage /var/cache/ccache /var/cache/binpkgs
   mark_step make_conf
 fi
+
+# Hand-applied fixes, kept idempotent for existing installs:
+# VIDEO_CARDS "intel" only (Haswell uses crocus, not iris); dedupe the llvm
+# package.use; pyqt6 webchannel in xlibs (never qtbase -opengl, qtwebengine
+# needs opengl); overlay metadata so portage stops warning about masters.
+portage_fixups() {
+  local root="${1:-}" p="${1:-}/etc/portage" r
+  [[ -f $p/make.conf ]] && sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"intel\"/" "$p/make.conf"
+  if [[ -f $p/package.use/llvm ]]; then
+    awk "!seen[\$0]++ || /^\$/" "$p/package.use/llvm" > "$p/package.use/llvm.new" && mv "$p/package.use/llvm.new" "$p/package.use/llvm"
+  fi
+  if [[ -f $p/package.use/xlibs ]]; then
+    sed -i "/^dev-qt\/qtbase .*-opengl/d" "$p/package.use/xlibs"
+    grep -q "^dev-python/pyqt6 .*webchannel" "$p/package.use/xlibs" || echo "dev-python/pyqt6 webchannel" >> "$p/package.use/xlibs"
+  fi
+  for r in icecat parona-overlay; do
+    [[ -d $root/var/db/repos/$r ]] || continue
+    mkdir -p "$root/var/db/repos/$r/metadata" "$root/var/db/repos/$r/profiles"
+    grep -qx "masters = gentoo" "$root/var/db/repos/$r/metadata/layout.conf" 2>/dev/null || echo "masters = gentoo" >> "$root/var/db/repos/$r/metadata/layout.conf"
+    echo "$r" > "$root/var/db/repos/$r/profiles/repo_name"
+  done
+}
+portage_fixups
 
 # 4. PACKAGE USE FLAGS
 if ! step_done package_use; then
