@@ -842,7 +842,7 @@ fi
 
 pkg man_pages "$SRC/man-pages-6.15.tar.xz" bash -c "
   rm -v man3/crypt*.3 2>/dev/null || true
-  make prefix=/usr install
+  make -R GIT=false prefix=/usr install
 "
 
 pkg iana_etc "$SRC/iana-etc-20250807.tar.gz" bash -c "
