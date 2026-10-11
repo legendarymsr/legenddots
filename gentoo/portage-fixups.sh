@@ -5,7 +5,7 @@
 # package.use; pyqt6 webchannel in xlibs (never qtbase -opengl, qtwebengine
 # needs opengl); overlay metadata so portage stops warning about masters.
 portage_fixups() {
-  local root="${1:-}" p="${1:-}/etc/portage" r d f
+  local root="${1:-}" p="${1:-}/etc/portage" r d f name path
   if [[ -f $p/make.conf ]]; then
     if grep -q '^VIDEO_CARDS=' "$p/make.conf"; then
       sed -i 's/^VIDEO_CARDS=.*/VIDEO_CARDS="intel"/' "$p/make.conf"
@@ -31,18 +31,35 @@ portage_fixups() {
       [[ -f $f ]] && sed -i '/^masters[[:space:]]*=/d' "$f"
       echo 'masters = gentoo' >> "$f"
     fi
-    [[ -s $d/profiles/repo_name ]] || echo "$r" > "$d/profiles/repo_name"
+    if [[ ! -s $d/profiles/repo_name ]]; then
+      name="$r"
+      if [[ -f $f ]]; then
+        name=$(sed -n 's/^repo-name[[:space:]]*=[[:space:]]*//p' "$f" | head -n1)
+        name=${name%%[[:space:]]*}
+        [[ -n $name ]] || name="$r"
+      fi
+      echo "$name" > "$d/profiles/repo_name"
+    fi
     # Sync resets the checkout, so also pin masters in repos.conf (survives sync).
     # Only touch a repos.conf entry that already exists for this location.
+    # Match location by fixed string (escape overlay name out of the regex).
     for f in "$p"/repos.conf "$p"/repos.conf/*.conf; do
       [[ -f $f ]] || continue
-      grep -q "^location[[:space:]]*=[[:space:]]*/var/db/repos/$r/*$" "$f" || continue
-      # Simple, idempotent: if that section lacks a masters line, add one after its location line.
+      # Fixed-string: does this file mention this overlay location at all?
+      grep -Fq "/var/db/repos/$r" "$f" || continue
       awk -v loc="/var/db/repos/$r" '
         /^\[/ { sec++ }
-        { line[NR]=$0; s[NR]=sec
-          if ($0 ~ "^location[[:space:]]*=[[:space:]]*" loc "/*$") { tgt=sec; at=NR }
-          if ($0 ~ /^masters[[:space:]]*=/) hasm[sec]=1 }
+        {
+          line[NR]=$0; s[NR]=sec
+          if ($0 ~ /^location[[:space:]]*=/) {
+            path=$0
+            sub(/^location[[:space:]]*=[[:space:]]*/, "", path)
+            sub(/[[:space:]]+$/, "", path)
+            sub(/\/+$/, "", path)
+            if (path == loc) { tgt=sec; at=NR }
+          }
+          if ($0 ~ /^masters[[:space:]]*=/) hasm[sec]=1
+        }
         END { for (i=1;i<=NR;i++) { print line[i]; if (i==at && !hasm[tgt]) print "masters = gentoo" } }
       ' "$f" > "$f.new" && mv "$f.new" "$f"
     done
