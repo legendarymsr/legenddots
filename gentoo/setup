@@ -176,7 +176,7 @@ if ! step_done package_use; then
 fi
 
 # Idempotent fix-ups for existing installs (after step 4, which rewrites llvm/xlibs).
-source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/portage-fixups.sh"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/troubleshooting/portage-fixups.sh"
 portage_fixups
 
 # 5. OVERLAYS

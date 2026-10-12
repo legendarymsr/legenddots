@@ -163,7 +163,7 @@ else
 fi
 
 # Idempotent fix-ups; run again after the chroot since inside.sh rewrites llvm/xlibs.
-source "${SCRIPT_DIR}/portage-fixups.sh"
+source "${SCRIPT_DIR}/troubleshooting/portage-fixups.sh"
 portage_fixups /mnt/gentoo
 
 header() { echo -e "\n\033[1m\033[36m── $* \033[0m"; }
