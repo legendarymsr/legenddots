@@ -41,7 +41,7 @@ No prompts. No binary packages. No Microsoft. No Apple. No compromises.
 | Component | Detail                                          |
 |-----------|-------------------------------------------------|
 | CPU       | Intel Core i5-4250U (Haswell, 4T, up to 2.6GHz)|
-| iGPU      | Intel HD Graphics 5000 (iris driver)            |
+| iGPU      | Intel HD Graphics 5000 (Mesa crocus; kernel i915)            |
 | WiFi      | Broadcom BCM4360 (proprietary `wl` driver)      |
 | Audio     | Cirrus Logic CS4208 (Intel HDA)                 |
 | Storage   | Apple PCIe SSD (AHCI, `/dev/sda`)               |
@@ -804,7 +804,7 @@ version> legend` (the kernel-rebuild step keeps the version current):
 
 | Option                        | Reason                                  |
 |-------------------------------|-----------------------------------------|
-| `CONFIG_DRM_I915`             | Intel HD 5000 (iris)                    |
+| `CONFIG_DRM_I915`             | Intel HD 5000 (i915; Mesa crocus)                    |
 | `CONFIG_SND_HDA_CODEC_CIRRUS` | Cirrus Logic CS4208 audio               |
 | `CONFIG_HID_APPLE`            | Apple keyboard / trackpad               |
 | `CONFIG_BT_HCIBTUSB`         | Broadcom Bluetooth                      |
