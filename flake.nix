@@ -109,10 +109,7 @@
         modules = [
           "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
           ./hosts/iso
-          brave-origin.nixosModules.brave-origin
-          { programs.brave-origin.enable = true; }
           home-manager.nixosModules.home-manager
-          (hmFor ./hosts/legend-box/home.nix)
         ];
       };
 
@@ -122,8 +119,16 @@
         inherit system;
         modules = [
           "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
-          home-manager.nixosModules.home-manager
           ./suckless/iso.nix
+        ];
+      };
+
+      # Installable suckless host (what `legenddots-install suckless` installs).
+      nixosConfigurations.suckless = lib.nixosSystem {
+        inherit system;
+        modules = [
+          ./hosts/suckless
+          home-manager.nixosModules.home-manager
         ];
       };
 

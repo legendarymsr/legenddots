@@ -220,19 +220,27 @@ nix build .#suckless-iso                        # suckless/iso.nix
 guix system image -t iso9660 suckless/iso.scm   # loads suckless/config.scm
 ```
 
-The NixOS live ISO autologins `legend` straight into Hyprland (greetd, no
-GNOME/GDM). `hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
+The NixOS live ISO autologins `legend` straight into Hyprland (greetd +
+`start-hyprland`, no GNOME/GDM). `hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
 out the disk layout and bootloader. Write to USB with
 `sudo dd if=<iso> of=/dev/sdX bs=4M status=progress oflag=sync`.
 Prebuilt: [main ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-2026-10-13),
 [suckless ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-suckless-2026-10-13).
-ISOs over 2 GiB come as a split zip (`.zip` + `.z01`); keep both together and
-open the `.zip` with 7-Zip / any unzip tool, or on Linux:
+Each ISO is one `.zip`: `unzip X.iso.zip && sha256sum -c X.iso.sha256`.
+
+The live ISOs are lightweight (a working Hyprland or dwm session only). Install
+the full config from git + the binary cache with:
 
 ```bash
-zip -s 0 legenddots-nixos.iso.zip --out full.zip && unzip full.zip
-sha256sum -c legenddots-nixos.iso.sha256
+sudo legenddots-install legend-box /dev/sdX   # wipes sdX (UEFI: ESP+root, BIOS: bios_grub+root)
+sudo legenddots-install suckless              # or: mount root at /mnt (+ ESP at /mnt/boot) yourself first
 ```
+
+It clones this repo to `/etc/nixos/legenddots`, writes
+`hosts/<host>/hardware-configuration.nix` (GRUB on legacy BIOS, systemd-boot on
+UEFI), runs `nixos-install --flake`, then asks for legend's password. Defined in
+`modules/nixos/legenddots-install.nix`; hosts: `legend-box`, `suckless`
+(`hosts/suckless`), `nixosbtw`.
 
 Tagging `iso-v*` runs `.github/workflows/isos.yml`, which builds both and
 attaches them to a GitHub release.

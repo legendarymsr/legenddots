@@ -1,32 +1,40 @@
 { lib, pkgs, ... }:
 
-# Live + installer ISO built from legend-box: same system config (Hyprland,
-# PipeWire, hardening, zsh) and the same home-manager setup, minus the
-# placeholder hardware/bootloader bits the ISO module provides itself.
-# Boots on legacy BIOS (syslinux/isolinux) and UEFI (GRUB); hybrid so it can
-# be dd'd to a USB stick.
+# Lightweight live ISO for the main setup: Hyprland with the repo's
+# hyprland.lua / waybar / hyprpaper (modules/home/hyprland.nix), alacritty,
+# fuzzel, dunst. The full legend-box (Brave Origin, pentest tools, libvirt,
+# nixvim, …) is installed from git + the binary cache by `legenddots-install`.
+# Hybrid: syslinux (legacy BIOS) + GRUB (UEFI).
 
 {
-  imports = [ ../legend-box ];
+  imports = [ ../../modules/nixos/legenddots-install.nix ];
 
-  isoImage.makeBiosBootable = true;
-  isoImage.makeEfiBootable  = true;
-  isoImage.makeUsbBootable  = true;
-  image.baseName            = lib.mkForce "legenddots-nixos";
-  isoImage.squashfsCompression = "zstd -Xcompression-level 15";
+  isoImage.makeBiosBootable    = true;
+  isoImage.makeEfiBootable     = true;
+  isoImage.makeUsbBootable     = true;
+  isoImage.squashfsCompression = "zstd -Xcompression-level 19";
+  image.baseName               = lib.mkForce "legenddots-nixos";
+  networking.hostName          = "legend-iso";
 
-  # legend-box boots with systemd-boot; the ISO brings its own bootloaders.
-  boot.loader.systemd-boot.enable      = lib.mkForce false;
-  boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
+  documentation.enable = lib.mkForce false;
+  # Keep the image small: no speech synth (mbrola/flite), no nixpkgs channel
+  # copy (the installer uses the flake), firmware stays.
+  services.speechd.enable        = lib.mkForce false;
+  system.installer.channel.enable = false;
+  documentation.nixos.enable = lib.mkForce false;
 
-  # Use the ISO's default kernel so ZFS etc. from the installer base still build.
-  boot.kernelPackages = lib.mkForce pkgs.linuxPackages;
+  users.users.legend = {
+    isNormalUser    = true;
+    extraGroups     = [ "wheel" "networkmanager" "video" ];
+    initialPassword = "legend";
+  };
+  security.sudo.wheelNeedsPassword = false;
 
-  # Log in as legend (password "legend") on the live system.
-  users.users.legend.initialPassword = "legend";
+  programs.hyprland.enable = true;
+  services.pipewire = { enable = true; pulse.enable = true; };
+  fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
 
-  # Boot straight into Hyprland (via its start-hyprland wrapper) as legend: greetd runs it once on tty1 with
-  # no prompt; logging out drops to tuigreet. No GNOME / GDM.
+  # Boot straight into Hyprland (via its start-hyprland wrapper) as legend.
   services.greetd = {
     enable = true;
     settings = {
@@ -37,9 +45,19 @@
   };
   services.getty.autologinUser = lib.mkForce null;
 
-  # The minimal CD enables wpa_supplicant; legend-box uses NetworkManager.
   networking.wireless.enable       = lib.mkForce false;
   networking.networkmanager.enable = true;
 
-  networking.hostName = lib.mkForce "legend-iso";
+  home-manager.useGlobalPkgs   = true;
+  home-manager.useUserPackages = true;
+  home-manager.users.legend = {
+    imports = [ ../../modules/home/hyprland.nix ];
+    home.packages = with pkgs; [
+      alacritty fuzzel dunst hyprpaper hyprlock waybar
+      grim slurp wl-clipboard brightnessctl
+    ];
+    home.stateVersion = "25.11";
+  };
+
+  system.stateVersion = "25.11";
 }

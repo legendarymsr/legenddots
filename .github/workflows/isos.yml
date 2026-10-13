@@ -25,7 +25,7 @@ jobs:
           cp -L result/iso/legenddots-nixos.iso out/
           cd out
           sha256sum legenddots-nixos.iso > legenddots-nixos.iso.sha256
-          zip -9 -s 1900m legenddots-nixos.iso.zip legenddots-nixos.iso
+          zip -9 legenddots-nixos.iso.zip legenddots-nixos.iso
           rm legenddots-nixos.iso
       - uses: actions/upload-artifact@v4
         with: { name: nixos-iso, path: out/* }
@@ -60,4 +60,4 @@ jobs:
           files: out/*
           body: |
             Hybrid live ISOs, legacy BIOS + UEFI. Login: legend / legend.
-            Split zips: `zip -s 0 X.iso.zip --out full.zip && unzip full.zip`, or open the .zip with 7-Zip.
+            `unzip X.iso.zip`, then `sudo legenddots-install <host> /dev/sdX` on the live system.
