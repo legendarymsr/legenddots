@@ -54,7 +54,12 @@
     imports = [ ../../modules/home/hyprland.nix ];
     home.packages = with pkgs; [
       alacritty fuzzel dunst hyprpaper hyprlock waybar
-      grim slurp wl-clipboard brightnessctl
+      grim slurp wl-clipboard brightnessctl lynx
+      # Live-only: hyprland.lua's Super+B runs `brave-origin-nightly`; on the
+      # ISO that opens lynx in alacritty (installed legend-box gets Brave Origin).
+      (writeShellScriptBin "brave-origin-nightly" ''
+        exec alacritty -e lynx "''${@:-https://lite.duckduckgo.com/lite/}"
+      '')
     ];
     home.stateVersion = "25.11";
   };

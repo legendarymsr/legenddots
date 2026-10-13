@@ -21,9 +21,9 @@
 
           ;; security tools (libre only)
           "nmap"
-          "john"
+          ;; "john" — not packaged in Guix
           "wireshark"
-          "sqlmap"
+          ;; "sqlmap" — not packaged in Guix
           "radare2"
           "aircrack-ng"
           "hashcat"
@@ -50,7 +50,7 @@
   (services
    (list
     ;; ── Environment ────────────────────────────────────────────────────────
-    (service home-environment-variables-service-type
+    (simple-service 'legend-env home-environment-variables-service-type
              '(("EDITOR"          . "emacs")
                ("VISUAL"          . "emacs")
                ("PAGER"           . "less")
@@ -64,9 +64,9 @@
     (service home-zsh-service-type
              (home-zsh-configuration
               (zshenv
-               (list "export ZDOTDIR=\"$HOME/.config/zsh\""))
+               (list (plain-file "zshenv" "export ZDOTDIR=\"$HOME/.config/zsh\"")))
               (zshrc
-               (list "
+               (list (plain-file "zshrc" "
 # history
 export HISTFILE=\"$XDG_CACHE_HOME/.zsh_history\"
 export HISTSIZE=100000
@@ -111,7 +111,7 @@ alias gl='git log --oneline --graph'
 alias myip='curl -s ifconfig.me'
 alias ports='ss -tuln'
 alias pst='ps aux | grep'
-"))))
+")))))
 
     ;; ── Ratpoison ──────────────────────────────────────────────────────────
     (simple-service 'ratpoison-config
