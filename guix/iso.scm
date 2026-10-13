@@ -10,10 +10,14 @@
 (use-modules (gnu)
              (gnu system)
              (gnu system file-systems)
+             (gnu services guix)          ; guix-home-service-type
              (srfi srfi-1))
 
-(define legend-os
-  (load (string-append (dirname (current-filename)) "/config.scm")))
+(define here (dirname (current-filename)))
+(define legend-os (load (string-append here "/config.scm")))
+;; legend's Guix Home (IceCat, Emacs, zsh, CLI/pentest tools, dotfiles),
+;; activated for legend at boot so the live system matches an installed one.
+(define legend-home (load (string-append here "/home-configuration.scm")))
 
 (operating-system
   (inherit legend-os)
@@ -34,16 +38,23 @@
 
   ;; The image builder provides the root file system; drop the labelled
   ;; /home, /data and EFI partitions and the swap that only exist on the
-  ;; installed machine. Keep the tmpfs /tmp.
+  ;; installed machine. Also drop config.scm's tmpfs /tmp: with it the live
+  ;; system hangs right after SSH host-key generation and never reaches a
+  ;; login (bisected in QEMU; openssh/nftables/fail2ban/libvirt/GDM and the
+  ;; hardening kernel args are not the cause). /tmp stays on the live root.
+  ;; (The "init[1]: segfault … in guile" line is the initrd's static Guile and
+  ;; harmless; the suckless ISO prints it too.)
   (file-systems
    (cons* (file-system
            (device (file-system-label "Guix_image"))
            (mount-point "/")
            (type "ext4"))
-          (filter (lambda (fs)
-                    (string=? (file-system-mount-point fs) "/tmp"))
-                  (operating-system-file-systems legend-os))))
+          %base-file-systems))
   (swap-devices '())
+
+  (services
+   (cons (service guix-home-service-type `(("legend" ,legend-home)))
+         (operating-system-user-services legend-os)))
 
   (users
    (map (lambda (user)
