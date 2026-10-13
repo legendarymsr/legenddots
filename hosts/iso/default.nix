@@ -25,14 +25,14 @@
   # Log in as legend (password "legend") on the live system.
   users.users.legend.initialPassword = "legend";
 
-  # Boot straight into Hyprland as legend: greetd runs it once on tty1 with
+  # Boot straight into Hyprland (via its start-hyprland wrapper) as legend: greetd runs it once on tty1 with
   # no prompt; logging out drops to tuigreet. No GNOME / GDM.
   services.greetd = {
     enable = true;
     settings = {
-      initial_session = { user = "legend"; command = "Hyprland"; };
+      initial_session = { user = "legend"; command = "start-hyprland"; };
       default_session.command =
-        "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd Hyprland";
+        "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd start-hyprland";
     };
   };
   services.getty.autologinUser = lib.mkForce null;
