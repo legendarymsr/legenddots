@@ -1,0 +1,62 @@
+name: Live ISOs (NixOS + Guix)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'iso-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  nixos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+      - uses: cachix/install-nix-action@v31
+      - name: Build NixOS ISO
+        run: nix build .#legend-iso -L --max-jobs 1 --cores 2
+      - name: Split for release (2 GiB asset limit)
+        run: |
+          mkdir out
+          cp -L result/iso/legenddots-nixos.iso out/
+          cd out
+          sha256sum legenddots-nixos.iso > legenddots-nixos.iso.sha256
+          split -b 1900M -d legenddots-nixos.iso legenddots-nixos.iso.part
+          rm legenddots-nixos.iso
+      - uses: actions/upload-artifact@v4
+        with: { name: nixos-iso, path: out/* }
+
+  guix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Guix
+        run: |
+          sudo apt-get update && sudo apt-get install -y guix
+          sudo systemctl start guix-daemon || sudo guix-daemon --build-users-group=_guixbuild &
+      - name: Build Guix ISO
+        run: |
+          iso=$(guix system image -t iso9660 --max-jobs=1 --cores=2 guix/iso.scm)
+          mkdir out
+          cp "$iso" out/legenddots-guix.iso
+          cd out && sha256sum legenddots-guix.iso > legenddots-guix.iso.sha256
+      - uses: actions/upload-artifact@v4
+        with: { name: guix-iso, path: out/* }
+
+  release:
+    needs: [nixos, guix]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          body: |
+            Hybrid live ISOs, legacy BIOS + UEFI. Login: legend / legend.
+            NixOS ISO is split: `cat legenddots-nixos.iso.part* > legenddots-nixos.iso && sha256sum -c legenddots-nixos.iso.sha256`

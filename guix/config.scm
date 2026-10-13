@@ -7,6 +7,7 @@
              (gnu packages suckless)      ; st, slock, dmenu
              (gnu system setuid)          ; setuid slock so it can lock
              (guix packages)              ; package / inherit
+             (guix utils)                 ; substitute-keyword-arguments
              (guix gexp))                 ; local-file, gexps
 
 ;; st (suckless terminal) built from our custom, trimmed config.h
@@ -79,7 +80,7 @@
            (type "ext4")
            (options "noatime,nodiratime"))
           (file-system
-           (device (uuid "YOUR-EFI-UUID" 'fat))
+           (device (file-system-label "EFI")) ; or (uuid "XXXX-XXXX" 'fat)
            (mount-point "/boot/efi")
            (type "vfat"))
           (file-system
@@ -102,7 +103,13 @@
 
   (swap-devices
    (list (swap-space
-          (target (uuid "YOUR-SWAP-UUID")))))
+          ;; or (uuid "...") for a swap partition without a label
+          (target (file-system-label "swap")))))
+
+  ;; libvirt and kvm come from %base-groups / libvirt-service; wireshark doesn't.
+  (groups
+   (cons (user-group (name "wireshark") (system? #t))
+         %base-groups))
 
   (users
    (cons (user-account
@@ -117,8 +124,7 @@
 
   ;; X desktop: ratpoison WM + st terminal (custom build) + slock lock + dmenu.
   (packages
-   (cons* (specification->package "nss-certs")
-          (specification->package "ratpoison")
+   (cons* (specification->package "ratpoison")   ; nss-certs is in %base-packages
           st-tokyonight                          ; st + suckless/st/config.h
           slock-tokyonight                       ; screen locker (setuid below)
           dmenu-tokyonight                        ; launcher (ratpoison `bind d`)
@@ -173,7 +179,7 @@ table inet filter {
 }"))))
 
      (service fail2ban-service-type)
-     (service apparmor-service-type)
+     ;; Guix has no AppArmor service (apparmor-service-type doesn't exist).
      (service libvirt-service-type))
 
     (modify-services %desktop-services
