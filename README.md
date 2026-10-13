@@ -8,7 +8,7 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 
 | Config | Browser |
 |--------|---------|
-| NixOS | `brave` (nixpkgs, stable — nightly not in nixpkgs) |
+| NixOS | `brave-origin` (Brave Origin nightly, from [brave-origin-nix](https://github.com/legendarymsr/brave-origin-nix)) |
 | Guix | `icecat` (GNU, fully libre) |
 | Arch rices | `brave-origin-nightly-bin` (AUR), installed by each `install.sh` |
 | Gentoo phone chroot | `dillo` (FLTK, no JS) under niri via xwayland-satellite, `dillo/` |
@@ -199,6 +199,28 @@ Home-manager is integrated into the flake. NixVim handles Neovim declaratively �
 
 ---
 
+## Live ISOs (legacy BIOS + UEFI)
+
+Both main setups build into hybrid live ISOs that boot on **legacy BIOS** and
+**UEFI**, from a DVD or `dd`'d to a USB stick. Log in as `legend` / `legend`.
+
+```bash
+# NixOS (Hyprland + Brave Origin, = legend-box). isolinux for BIOS, GRUB for UEFI.
+nix build .#legend-iso            # same as .#nixosConfigurations.legend-iso.config.system.build.isoImage
+ls result/iso/legenddots-nixos.iso
+
+# Guix (ratpoison + st/slock/dmenu + IceCat). grub-mkrescue: GRUB i386-pc + EFI.
+guix system image -t iso9660 guix/iso.scm
+```
+
+`hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
+out the disk layout and bootloader. Write to USB with
+`sudo dd if=<iso> of=/dev/sdX bs=4M status=progress oflag=sync`.
+Tagging `iso-v*` runs `.github/workflows/isos.yml`, which builds both and
+attaches them to a GitHub release.
+
+---
+
 ## Guix
 
 The Guix setup is the most minimal and principled of the three. GNU Guix enforces libre software by policy — no proprietary blobs, no non-free firmware, no nonfree package channels by default. The entire system is reproducible and rollback-able, similar to NixOS but with Scheme (Guile) instead of Nix expressions.
@@ -208,7 +230,7 @@ The Guix setup is the most minimal and principled of the three. GNU Guix enforce
 - **Browser**: Icecat — GNU's fully libre Firefox fork, no telemetry, no proprietary codecs
 - **Shell**: Zsh
 - **Lock**: slock (suckless, zero UI — screen goes black, type password)
-- **Security**: Hardened kernel args, AppArmor, nftables firewall, fail2ban, noexec mounts on `/tmp` and `/run`
+- **Security**: Hardened kernel args, nftables firewall, fail2ban, noexec mounts on `/tmp` and `/run`
 - **Theme**: Tokyo Night (Emacs theme, terminal colors)
 
 ```bash

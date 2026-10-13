@@ -75,7 +75,7 @@
     plugins.cmp-buffer.enable   = true;
     plugins.cmp_luasnip.enable  = true;
 
-    extraLuaConfig = ''
+    extraConfigLua = ''
       vim.diagnostic.config({
         virtual_text    = { prefix = "●" },
         signs           = true,

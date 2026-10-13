@@ -38,6 +38,9 @@ guix home reconfigure guix/home-configuration.scm
 
 ## Notes
 
-- Fill in `YOUR-EFI-UUID` and `YOUR-SWAP-UUID` in `config.scm` before applying.
+- `config.scm` mounts the ESP and swap by label (`EFI`, `swap`); label them that
+  way, or swap in `(uuid ...)` before applying.
+- `iso.scm` is the live ISO: `guix system image -t iso9660 guix/iso.scm`
+  (hybrid legacy BIOS + UEFI, login `legend` / `legend`).
 - Ratpoison keybinds: prefix `C-t`, then `c` (st), `d` (dmenu), `e` (emacs),
   `b` (icecat), `Escape` (slock). See `ratpoisonrc` for the full list.

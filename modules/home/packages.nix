@@ -6,8 +6,12 @@
     # Core utilities
     git tmux htop btop ripgrep fd fzf fastfetch figlet microfetch
 
-    # Browser
-    brave
+    # Browser — Brave Origin comes from the brave-origin-nix flake (system-wide,
+    # with its setuid chrome-sandbox). hyprland.lua's Super+B runs
+    # `brave-origin-nightly` (the Gentoo binary name), so alias it here.
+    (writeShellScriptBin "brave-origin-nightly" ''
+      exec brave-origin --ozone-platform=wayland "$@"
+    '')
 
     # Terminal
     alacritty
