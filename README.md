@@ -11,6 +11,7 @@ Personal dotfiles for NixOS, Guix, and Arch Linux. Theme: **Tokyo Night** throug
 | NixOS | `brave` (nixpkgs, stable — nightly not in nixpkgs) |
 | Guix | `icecat` (GNU, fully libre) |
 | Arch rices | `brave-origin-nightly-bin` (AUR), installed by each `install.sh` |
+| Gentoo phone chroot | `dillo` (FLTK, no JS) under niri via xwayland-satellite, `dillo/` |
 
 ---
 
@@ -94,6 +95,16 @@ legenddots/
     ├── waybar/
     └── install.sh
 ```
+
+---
+
+## Gentoo phone chroot
+
+The Gentoo arm64 chroot on the phone clones this repo to `~/legenddots` and runs
+`gentoo/chroot/dotfiles.sh`, which symlinks `init.lua`, `tmux.conf` (to both
+`~/.config/tmux/tmux.conf` and `~/.tmux.conf`), `foot/foot.ini`, `niri/fuzzel`,
+`fastfetch` and `dillo/` (`dillorc` + vi-ish `keysrc`, into `~/.dillo`). Safe to re-run.
+niri's own config stays generated on the phone, since it runs nested.
 
 ---
 
