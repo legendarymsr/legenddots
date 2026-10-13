@@ -11,6 +11,7 @@
 
 (use-modules (guix packages)
              (guix gexp)
+             (guix utils)              ; substitute-keyword-arguments
              (guix profiles)
              (gnu packages suckless)   ; st, slock, dmenu, dwm
              (gnu packages wm)         ; dwl

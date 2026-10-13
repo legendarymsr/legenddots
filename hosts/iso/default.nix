@@ -24,7 +24,22 @@
 
   # Log in as legend (password "legend") on the live system.
   users.users.legend.initialPassword = "legend";
-  services.getty.autologinUser       = lib.mkForce "legend";
+
+  # Boot straight into Hyprland as legend: greetd runs it once on tty1 with
+  # no prompt; logging out drops to tuigreet. No GNOME / GDM.
+  services.greetd = {
+    enable = true;
+    settings = {
+      initial_session = { user = "legend"; command = "Hyprland"; };
+      default_session.command =
+        "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd Hyprland";
+    };
+  };
+  services.getty.autologinUser = lib.mkForce null;
+
+  # The minimal CD enables wpa_supplicant; legend-box uses NetworkManager.
+  networking.wireless.enable       = lib.mkForce false;
+  networking.networkmanager.enable = true;
 
   networking.hostName = lib.mkForce "legend-iso";
 }

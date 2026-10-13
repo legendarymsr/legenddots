@@ -107,7 +107,7 @@
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
-          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-base.nix"
+          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
           ./hosts/iso
           brave-origin.nixosModules.brave-origin
           { programs.brave-origin.enable = true; }
@@ -116,8 +116,21 @@
         ];
       };
 
-      packages.${system}.legend-iso =
-        self.nixosConfigurations.legend-iso.config.system.build.isoImage;
+      # Suckless live ISO (dwm + st/dmenu/slock/dwl/surf with our config.h).
+      #   nix build .#suckless-iso
+      nixosConfigurations.suckless-iso = lib.nixosSystem {
+        inherit system;
+        modules = [
+          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+          home-manager.nixosModules.home-manager
+          ./suckless/iso.nix
+        ];
+      };
+
+      packages.${system} = {
+        legend-iso   = self.nixosConfigurations.legend-iso.config.system.build.isoImage;
+        suckless-iso = self.nixosConfigurations.suckless-iso.config.system.build.isoImage;
+      };
 
       homeConfigurations."legend@legend-box" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;

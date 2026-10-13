@@ -213,7 +213,15 @@ ls result/iso/legenddots-nixos.iso
 guix system image -t iso9660 guix/iso.scm
 ```
 
-`hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
+Suckless ISOs (dwm + st/dmenu/slock/dwl/surf, autologin into dwm):
+
+```bash
+nix build .#suckless-iso                        # suckless/iso.nix
+guix system image -t iso9660 suckless/iso.scm   # loads suckless/config.scm
+```
+
+The NixOS live ISO autologins `legend` straight into Hyprland (greetd, no
+GNOME/GDM). `hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
 out the disk layout and bootloader. Write to USB with
 `sudo dd if=<iso> of=/dev/sdX bs=4M status=progress oflag=sync`.
 Tagging `iso-v*` runs `.github/workflows/isos.yml`, which builds both and
