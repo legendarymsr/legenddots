@@ -226,7 +226,10 @@ out the disk layout and bootloader. Write to USB with
 `sudo dd if=<iso> of=/dev/sdX bs=4M status=progress oflag=sync`.
 Prebuilt: [main ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-2026-10-13),
 [suckless ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-suckless-2026-10-13).
-Each ISO is one `.zip`: `unzip X.iso.zip && sha256sum -c X.iso.sha256`.
+Each ISO is one `.zip`: `unzip X.iso.zip && sha256sum -c X.iso.sha256`. The main
+Guix ISO (it includes legend's Guix Home: IceCat, Emacs, tools) is a split zip
+(`.zip` + `.z01`): `zip -s 0 legenddots-guix.iso.zip --out full.zip && unzip full.zip`.
+On the NixOS live ISO, Super+B opens lynx (the installed legend-box gets Brave Origin).
 
 The live ISOs are lightweight (a working Hyprland or dwm session only). Install
 the full config from git + the binary cache with:
