@@ -1,5 +1,6 @@
 static const unsigned int borderpx = 2;
 static const unsigned int snap = 32;
+static const int refreshrate = 120; /* refresh rate (per second) for client move/resize (dwm >= 6.5) */
 static const int showbar = 1;
 static const int topbar = 1;
 static const char *fonts[] = { "JetBrainsMono Nerd Font:size=11" };

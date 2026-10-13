@@ -5,6 +5,7 @@
 static const int sloppyfocus = 1;
 static const int bypass_surface_visibility = 0;
 static const unsigned int borderpx = 2;
+static const unsigned int snap = 32; /* snap pixel (dwl >= 0.8) */
 static const float rootcolor[] = COLOR(0x1a1b26ff);
 static const float bordercolor[] = COLOR(0x414868ff);
 static const float focuscolor[] = COLOR(0x7aa2f7ff);
