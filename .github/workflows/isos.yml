@@ -19,13 +19,13 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - name: Build NixOS ISO
         run: nix build .#legend-iso -L --max-jobs 1 --cores 2
-      - name: Split for release (2 GiB asset limit)
+      - name: Zip for release (2 GiB asset limit)
         run: |
           mkdir out
           cp -L result/iso/legenddots-nixos.iso out/
           cd out
           sha256sum legenddots-nixos.iso > legenddots-nixos.iso.sha256
-          split -b 1900M -d legenddots-nixos.iso legenddots-nixos.iso.part
+          zip -9 -s 1900m legenddots-nixos.iso.zip legenddots-nixos.iso
           rm legenddots-nixos.iso
       - uses: actions/upload-artifact@v4
         with: { name: nixos-iso, path: out/* }
@@ -44,6 +44,7 @@ jobs:
           mkdir out
           cp "$iso" out/legenddots-guix.iso
           cd out && sha256sum legenddots-guix.iso > legenddots-guix.iso.sha256
+          zip -9 legenddots-guix.iso.zip legenddots-guix.iso && rm legenddots-guix.iso
       - uses: actions/upload-artifact@v4
         with: { name: guix-iso, path: out/* }
 
@@ -59,4 +60,4 @@ jobs:
           files: out/*
           body: |
             Hybrid live ISOs, legacy BIOS + UEFI. Login: legend / legend.
-            NixOS ISO is split: `cat legenddots-nixos.iso.part* > legenddots-nixos.iso && sha256sum -c legenddots-nixos.iso.sha256`
+            Split zips: `zip -s 0 X.iso.zip --out full.zip && unzip full.zip`, or open the .zip with 7-Zip.

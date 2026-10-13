@@ -224,6 +224,16 @@ The NixOS live ISO autologins `legend` straight into Hyprland (greetd, no
 GNOME/GDM). `hosts/iso/default.nix` and `guix/iso.scm` reuse the real configs and only swap
 out the disk layout and bootloader. Write to USB with
 `sudo dd if=<iso> of=/dev/sdX bs=4M status=progress oflag=sync`.
+Prebuilt: [main ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-2026-10-13),
+[suckless ISOs](https://github.com/legendarymsr/legenddots/releases/tag/isos-suckless-2026-10-13).
+ISOs over 2 GiB come as a split zip (`.zip` + `.z01`); keep both together and
+open the `.zip` with 7-Zip / any unzip tool, or on Linux:
+
+```bash
+zip -s 0 legenddots-nixos.iso.zip --out full.zip && unzip full.zip
+sha256sum -c legenddots-nixos.iso.sha256
+```
+
 Tagging `iso-v*` runs `.github/workflows/isos.yml`, which builds both and
 attaches them to a GitHub release.
 
