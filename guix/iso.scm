@@ -38,18 +38,19 @@
 
   ;; The image builder provides the root file system; drop the labelled
   ;; /home, /data and EFI partitions and the swap that only exist on the
-  ;; installed machine. Also drop config.scm's tmpfs /tmp: with it the live
-  ;; system hangs right after SSH host-key generation and never reaches a
-  ;; login (bisected in QEMU; openssh/nftables/fail2ban/libvirt/GDM and the
-  ;; hardening kernel args are not the cause). /tmp stays on the live root.
-  ;; (The "init[1]: segfault … in guile" line is the initrd's static Guile and
-  ;; harmless; the suckless ISO prints it too.)
+  ;; installed machine. (config.scm's tmpfs /tmp is dropped here too.)
+  ;; The boot hang was debugfs=off vs the /sys/kernel/debug mount (bisected
+  ;; in QEMU), fixed in config.scm. The "init[1]: segfault … in guile" line
+  ;; is the initrd's static Guile and harmless.
   (file-systems
    (cons* (file-system
            (device (file-system-label "Guix_image"))
            (mount-point "/")
            (type "ext4"))
-          %base-file-systems))
+          ;; see config.scm: no debugfs mount, since debugfs=off
+          (remove (lambda (fs)
+                    (string=? (file-system-mount-point fs) "/sys/kernel/debug"))
+                  %base-file-systems)))
   (swap-devices '())
 
   (services

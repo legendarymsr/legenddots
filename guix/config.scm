@@ -1,4 +1,5 @@
 (use-modules (gnu)
+             (srfi srfi-1)                ; remove
              (gnu services desktop)
              (gnu services networking)
              (gnu services security)
@@ -99,7 +100,12 @@
            (type "tmpfs")
            (check? #f)
            (options "mode=1777,noexec,nosuid,nodev,size=2G"))
-          %base-file-systems))
+          ;; `debugfs=off` (kernel-arguments) makes the /sys/kernel/debug
+          ;; mount in %base-file-systems fail, and shepherd then never gets
+          ;; to a login. Drop that mount and keep debugfs off.
+          (remove (lambda (fs)
+                    (string=? (file-system-mount-point fs) "/sys/kernel/debug"))
+                  %base-file-systems)))
 
   (swap-devices
    (list (swap-space
