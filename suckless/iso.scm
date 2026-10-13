@@ -52,18 +52,20 @@
    (cons (setuid-program (program (file-append slock-legend "/bin/slock")))
          %setuid-programs))
 
-  (services
-   (cons*
-    (simple-service 'legend-xinitrc etc-service-type
-                    `(("skel/.xinitrc" ,xinitrc)))
-    (simple-service 'legend-startx-profile etc-service-type
-                    `(("profile.d/startx.sh"
-                       ,(mixed-text-file "startx.sh" "\
+  ;; legend's login shell: tty1 -> startx -> dwm.
+  (skeletons
+   (cons* `(".xinitrc" ,xinitrc)
+          `(".bash_profile"
+            ,(mixed-text-file "bash_profile" "\
+[ -f ~/.bashrc ] && . ~/.bashrc
 if [ \"$(tty)\" = /dev/tty1 ] && [ -z \"$DISPLAY\" ]; then
-  [ -f ~/.xinitrc ] || cp /etc/skel/.xinitrc ~/
   exec " (xorg-start-command-xinit) "
 fi
-"))))
+"))
+          (alist-delete ".bash_profile" (default-skeletons))))
+
+  (services
+   (cons*
     (modify-services %base-services
       (mingetty-service-type config =>
         (if (string=? (mingetty-configuration-tty config) "tty1")
