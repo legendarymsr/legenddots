@@ -3,6 +3,10 @@
 # (Larry Launcher). Idempotent; run as often as you like:
 #
 #   sh ~/legenddots/gentoo/chroot/dotfiles.sh
+#   HOME=/home/legend sh /opt/legenddots/gentoo/chroot/dotfiles.sh --no-pull
+#
+# Run as root for another HOME, the links and the dirs made for them are
+# chowned to the owner of that HOME.
 #
 #   init.lua              -> ~/.config/nvim/init.lua
 #   tmux.conf             -> ~/.config/tmux/tmux.conf and ~/.tmux.conf
@@ -23,17 +27,27 @@ if [ -d "$REPO/.git" ] && [ "${1:-}" != "--no-pull" ]; then
   git -C "$REPO" pull --ff-only -q 2>/dev/null || warn "git pull failed (offline?), linking what is checked out"
 fi
 
+# Who owns $HOME: links made as root for another user's home are given to them.
+OWNER="$(stat -c %u:%g "$HOME" 2>/dev/null || echo)"
+own() { [ "$(id -u)" = 0 ] && [ -n "$OWNER" ] && [ "$OWNER" != "0:0" ] && chown -h "$OWNER" "$@" 2>/dev/null; true; }
+
 link() {
   src="$1" dst="$2"
   [ -e "$src" ] || { warn "missing in repo: $src, skipping"; return; }
   [ "$(readlink "$dst" 2>/dev/null)" = "$src" ] && return
-  mkdir -p "$(dirname "$dst")"
+  dir="$(dirname "$dst")"
+  [ -d "$dir" ] || { mkdir -p "$dir" && own "$dir"; }
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
-    warn "backing up $dst -> $dst.bak"
-    mv "$dst" "$dst.bak"
+    # Never move a real dir into an older backup: number the backup instead.
+    bak="$dst.bak"; n=1
+    while [ -e "$bak" ] || [ -L "$bak" ]; do bak="$dst.bak.$n"; n=$((n + 1)); done
+    warn "backing up $dst -> $bak"
+    mv "$dst" "$bak" || { warn "could not move $dst aside, skipping"; return; }
   fi
-  ln -sfn "$src" "$dst" && say "linked $dst"
+  ln -sfn "$src" "$dst" && own "$dst" && say "linked $dst"
 }
+
+[ -d "$HOME/.config" ] || { mkdir -p "$HOME/.config" && own "$HOME/.config"; }
 
 link "$REPO/init.lua"          "$HOME/.config/nvim/init.lua"
 link "$REPO/tmux.conf"         "$HOME/.config/tmux/tmux.conf"
