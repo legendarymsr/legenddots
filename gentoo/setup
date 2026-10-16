@@ -4,6 +4,9 @@
 # Installs all packages and configures the system on an already-installed
 # Gentoo. Does NOT touch disks, partitions, bootloader, or kernel image.
 # Run as root.
+#
+# Subcommand: `doas bash gentoo/setup fastfetch` installs + links just the
+# fastfetch config, skipping everything else.
 # =============================================================================
 set -euo pipefail
 
@@ -16,6 +19,24 @@ success() { echo -e "${GREEN}  ✓ $*${NC}"; }
 ok()      { echo -e "${GREEN}  ✓ $*${NC}"; }
 info()    { echo -e "${CYAN}  → $*${NC}"; }
 die()     { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+
+# ── Subcommands: run just one piece, e.g. `doas bash gentoo/setup fastfetch` ───
+# Short-circuits before the full setup (no prompts, no other steps).
+if [[ "${1:-}" == "fastfetch" ]]; then
+  header "fastfetch (install + config only)"
+  emerge --noreplace app-misc/fastfetch || die "emerge app-misc/fastfetch failed"
+  if id legend &>/dev/null; then
+    su - legend -c '
+      [[ -d ~/legenddots ]] || git clone https://github.com/legendarymsr/legenddots ~/legenddots || true
+      mkdir -p ~/.config/fastfetch
+      ln -sfn ~/legenddots/fastfetch/config.jsonc ~/.config/fastfetch/config.jsonc
+    ' && success "fastfetch config linked for user legend (~/.config/fastfetch/config.jsonc)"
+  else
+    warn "user 'legend' not found — fastfetch installed; link the config manually:"
+    warn "  ln -sfn ~/legenddots/fastfetch/config.jsonc ~/.config/fastfetch/config.jsonc"
+  fi
+  exit 0
+fi
 
 # ── Options ──────────────────────────────────────────────────────────────────
 if [[ -z "${ENABLE_WD40:-}" ]]; then
