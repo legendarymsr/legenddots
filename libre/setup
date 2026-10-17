@@ -1286,7 +1286,7 @@ if is_done guile_f && [ -z "$(find /usr/lib /usr/lib64 /usr/share -name guile-3.
 fi
 # shepherd 0.10's configure stops with "Fibers is missing" without Guile Fibers.
 pkg fibers_f "$SRC/fibers-1.3.1.tar.gz" bash -c "
-  ./configure --prefix=/usr --disable-Werror
+  CFLAGS=\"-O2 -std=gnu17\" ./configure --prefix=/usr --disable-Werror
   make \$MAKEFLAGS && make install
 "
 pkg shepherd_f "$SRC/shepherd-0.10.5.tar.gz" bash -c "
