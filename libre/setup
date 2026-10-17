@@ -1986,7 +1986,7 @@ fi
 if ! step_done ratpoison; then
   header "ratpoison ${RATPOISON_VER} (GNU window manager)"
   a=$(fetch "https://download.savannah.gnu.org/releases/ratpoison/ratpoison-${RATPOISON_VER}.tar.xz")
-  bpkg "$a" bash -c "./configure --prefix=/usr --sysconfdir=/etc; make -j${NPROC}; make install"
+  bpkg "$a" bash -c "CFLAGS=\"\$CFLAGS -std=gnu17\" ./configure --prefix=/usr --sysconfdir=/etc; make -j${NPROC}; make install"
   mark_step ratpoison
 fi
 # xwallpaper (+ its xcb-util deps) so ratpoison can show an image wallpaper.
