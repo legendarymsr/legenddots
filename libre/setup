@@ -2062,14 +2062,46 @@ if ! step_done icecat; then
     mark_step icecat
   else
     header "GNU IceCat (Firefox-class build — several hours)"
-    warn "IceCat needs a Rust + Node.js + cbindgen + nasm toolchain. Building those"
-    warn "from source is itself enormous; see libre/README.md for the toolchain notes."
     # GNU publishes no IceCat source tarballs any more (ftp.gnu.org/gnu/gnuzilla
-    # stops at 60.7.0); upstream ships only the makeicecat scripts
-    # (git.savannah.gnu.org/cgit/gnuzilla.git), which generate one from the
-    # Firefox ESR source. So build only from a tarball you put in $SOURCES.
+    # stops at 60.7.0). Generate one like upstream does: gnuzilla's makeicecat
+    # (pinned tag) applies the IceCat changes to the Firefox ESR source.
+    # A ready icecat-*.tar.bz2 in $SOURCES is used as-is instead.
+    ICECAT_TAG="v140.17.0-gnu1"   # gnuzilla commit d7ffa7cbb29e7047b491ebbf5e50549548d480cb
+    FF_ESR="140.17.0"
+    FF_SHA256="4d6ed3b18b2069c55bab12d8ba95da6013ac0b036d8a031df8b9f39a25d05c33"  # = makeicecat's SOURCEBALL_CHECKSUM
+    # Firefox 140's own build deps, which libre doesn't build (yet): check
+    # first so a missing toolchain doesn't cost a 600 MB download.
+    missing=()
+    for t in rustc cargo cbindgen node nasm clang zip unzip git; do command -v "$t" >/dev/null 2>&1 || missing+=("$t"); done
+    pkg-config --exists gtk+-3.0 2>/dev/null || missing+=("gtk+-3.0")
     a=$(ls "$SOURCES"/icecat-*.tar.bz2 2>/dev/null | tail -n1 || true)
-    [[ -n "$a" ]] || warn "IceCat skipped: no official source tarball exists. Make one with gnuzilla's ./makeicecat, put icecat-*.tar.bz2 in $SOURCES, delete the 'icecat' line from $STATE_FILE and re-run."
+    if (( ${#missing[@]} )); then
+      warn "IceCat skipped: missing build deps: ${missing[*]}"
+      warn "  Install them, delete the 'icecat' line from $STATE_FILE and re-run."
+      a=""
+    elif [[ -z "$a" ]]; then
+      ff=$(fetch "https://archive.mozilla.org/pub/firefox/releases/${FF_ESR}esr/source/firefox-${FF_ESR}esr.source.tar.xz") || ff=""
+      gz="$SOURCES/gnuzilla-${ICECAT_TAG}"
+      rm -rf "$gz"
+      if [[ -n "$ff" ]] && echo "${FF_SHA256}  $ff" | sha256sum -c --quiet - \
+         && git clone -q --depth=1 --branch "$ICECAT_TAG" https://https.git.savannah.gnu.org/git/gnuzilla.git "$gz"; then
+        # No gpg in libre: drop makeicecat's gpg env check and signature check
+        # (the tarball is sha256-pinned above, and makeicecat re-checks it).
+        # No python jsonschema either: its only use is validating the search
+        # config, so skip that validation when the module is missing.
+        mkdir -p "$gz/output" && ln -sf "$ff" "$gz/output/"
+        sed -e 's/^validate_env || exit 1$/:/' -e 's/^verify_sources$/:/' -i "$gz/makeicecat"
+        sed -e 's/^from jsonschema import validate$/try:\n    from jsonschema import validate\nexcept ImportError:\n    def validate(*a, **k): pass/' -i "$gz/tools/process-json-files.py"
+        if ( cd "$gz" && bash ./makeicecat ); then
+          a=$(ls "$gz"/output/icecat-*.tar.bz2 2>/dev/null | tail -n1 || true)
+          [[ -n "$a" ]] && mv -f "$a" "$SOURCES/" && a="$SOURCES/$(basename "$a")"
+        else
+          warn "makeicecat failed — IceCat skipped (re-run after fixing to retry)"
+        fi
+      else
+        warn "Firefox ESR source or gnuzilla checkout failed — IceCat skipped"
+      fi
+    fi
     if [[ -n "$a" ]]; then
       bpkg "$a" bash -c "
         cat > .mozconfig << 'MOZ'
