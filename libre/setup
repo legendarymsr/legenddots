@@ -936,7 +936,9 @@ pkg readline_f "$SRC/readline-8.3.tar.gz" bash -c "
 "
 
 pkg m4_f     "$SRC/m4-1.4.20.tar.xz"       bash -c "./configure --prefix=/usr; make \$MAKEFLAGS; make install"
-pkg bc_f     "$SRC/bc-7.0.3.tar.xz"        bash -c "CC=gcc ./configure --prefix=/usr -G -O3 -r; make \$MAKEFLAGS; make install"
+# GCC 15 defaults to C23 (true/false are keywords), which breaks bc's
+# token-pasting macros (falseUL/trueUL). LFS 12.4 builds it as C99.
+pkg bc_f     "$SRC/bc-7.0.3.tar.xz"        bash -c "CC=\"gcc -std=c99\" ./configure --prefix=/usr -G -O3 -r; make \$MAKEFLAGS; make install"
 pkg flex_f   "$SRC/flex-2.6.4.tar.gz"      bash -c "./configure --prefix=/usr --disable-static; make \$MAKEFLAGS; make install; ln -sv flex /usr/bin/lex"
 
 pkg tcl_f    "$SRC/tcl8.6.16-src.tar.gz"   bash -c "
