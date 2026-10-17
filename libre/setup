@@ -2011,6 +2011,10 @@ if ! step_done xwallpaper; then
 fi
 if ! step_done ncurses_gnutls_dep; then
   header "GnuTLS ${GNUTLS_VER} (for Emacs network security)"
+  # GnuTLS needs Nettle (BLFS); without it GnuTLS fails and Emacs' configure
+  # then stops on the missing gnutls.
+  a=$(fetch "https://ftp.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz")
+  bpkg "$a" bash -c "./configure --prefix=/usr --disable-static; make -j${NPROC}; make install" || warn "nettle failed — gnutls will fail too"
   a=$(fetch "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-${GNUTLS_VER}.tar.xz")
   bpkg "$a" bash -c "./configure --prefix=/usr --disable-static --without-p11-kit --with-included-libtasn1 --with-included-unistring; make -j${NPROC}; make install" || warn "gnutls failed — Emacs will build without TLS"
   mark_step ncurses_gnutls_dep
@@ -2020,7 +2024,7 @@ if ! step_done emacs; then
   a=$(fetch "https://ftp.gnu.org/gnu/emacs/emacs-${EMACS_VER}.tar.xz")
   bpkg "$a" bash -c "
     ./configure --prefix=/usr --with-x-toolkit=lucid --with-gif=no \
-      --without-selinux --with-modules
+      --without-selinux --with-modules --with-gnutls=ifavailable
     make -j${NPROC}
     make install
   "
