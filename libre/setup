@@ -1443,7 +1443,7 @@ pkg curl_f    "$SRC/curl-8.9.1.tar.xz"        bash -c "./configure --prefix=/usr
 pkg git_f     "$SRC/git-2.46.0.tar.xz"        bash -c "./configure --prefix=/usr --with-gitconfig=/etc/gitconfig --with-python=python3; make \$MAKEFLAGS all; make install"
 pkg zsh_f     "$SRC/zsh-5.9.tar.xz"           bash -c "sed -e 's/^main/int &/' -e 's/exit(/return(/' -i aczsh.m4 configure.ac; sed -e 's/test = /&(char**)/' -i configure.ac; autoconf; ./configure --prefix=/usr --sysconfdir=/etc/zsh --enable-multibyte --enable-pcre --enable-cap; make \$MAKEFLAGS; make install; echo '/usr/bin/zsh' >> /etc/shells"
 pkg cmake_f   "$SRC/cmake-3.30.2.tar.gz"      bash -c "./configure --prefix=/usr --parallel=3 -- -DCMAKE_USE_OPENSSL=ON; make \$MAKEFLAGS; make install"
-pkg doas_f    "$SRC/opendoas-6.8.2.tar.gz"    bash -c "./configure --prefix=/usr --sysconfdir=/etc --with-timestamp; make \$MAKEFLAGS; make install"
+pkg doas_f    "$SRC/opendoas-6.8.2.tar.gz"    bash -c "export CFLAGS=\"-O2 -std=gnu17\"; ./configure --prefix=/usr --sysconfdir=/etc --with-timestamp; make \$MAKEFLAGS; make install"
 
 echo "==> LFS chroot build complete."
 CHROOT
