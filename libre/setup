@@ -1263,7 +1263,7 @@ pkg libunistring_f "$SRC/libunistring-1.3.tar.xz" bash -c "
   make \$MAKEFLAGS && make install
 "
 pkg guile_f "$SRC/guile-3.0.10.tar.xz" bash -c "
-  ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
+  CFLAGS="-O2 -std=gnu17" ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
     --docdir=/usr/share/doc/guile-3.0.10
   make \$MAKEFLAGS && make install
   find /usr/lib /usr/libexec -name '*.la' -delete 2>/dev/null || true
@@ -1276,7 +1276,7 @@ if is_done guile_f && [ -z "$(find /usr/lib /usr/lib64 /usr/share -name guile-3.
   echo "==> guile-3.0.pc missing, rebuilding guile_f"
   sed -i '/^guile_f$/d' "$STATE"
   pkg guile_f "$SRC/guile-3.0.10.tar.xz" bash -c "
-    ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
+    CFLAGS="-O2 -std=gnu17" ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
       --docdir=/usr/share/doc/guile-3.0.10
     make \$MAKEFLAGS && make install
     find /usr/lib /usr/libexec -name '*.la' -delete 2>/dev/null || true
