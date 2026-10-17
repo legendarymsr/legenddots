@@ -2,7 +2,7 @@
 
 A fully [FSDG](https://www.gnu.org/distros/free-system-distribution-guidelines.html)-compliant
 GNU/Linux built entirely from source: **Linux-libre** kernel, **GNU Shepherd**
-init, **Xorg + ratpoison**, **GNU IceCat**, **GNU Emacs**. No nonfree firmware,
+init, **Xorg + ratpoison**, **GNU Emacs** (EWW as the browser), optional **GNU IceCat**. No nonfree firmware,
 no binary blobs, no proprietary software anywhere in the stack.
 
 One script, two phases — the same shape as `../blfs/setup`, but every choice is
@@ -32,7 +32,7 @@ without KVM instead of exiting — very slow).
 
 Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
 host the guest hands idle RAM back instead of pinning all 8 GB. Below 16 GB IceCat
-is auto-skipped (use Emacs `eww`), and at 4 GB the heavy links page to the
+is auto-skipped (EWW is the default browser anyway), and at 4 GB the heavy links page to the
 target's swap; pass **`MEM=8G ./libre/run-vm.sh`** for no swapping.
 
 ### Libre all the way down — build it from Guix System (experimental)
@@ -111,7 +111,8 @@ first, VM-only.
 | libc | **glibc** | GNU C Library |
 | Display | **Xorg** | X.Org server — free; ratpoison/IceCat/Emacs are X11 |
 | WM | **GNU ratpoison** | GNU keyboard-driven, screen-style window manager |
-| Browser | **GNU IceCat** | FSF's fully-free Firefox derivative (no nonfree addons/telemetry) |
+| Browser | **EWW** (default) | Emacs's built-in web browser; https through GnuTLS |
+| Browser | **GNU IceCat** (16 GB+) | FSF's fully-free Firefox derivative (no nonfree addons/telemetry) |
 | Editor | **GNU Emacs** | The GNU editor, Lucid/Athena X toolkit build |
 | Terminal | **xterm** | X.Org terminal emulator |
 | Audio | **ALSA** | Free; no PulseAudio required |
@@ -203,9 +204,18 @@ you can build across several sessions. Force one step to rerun with
    Firefox 140 ESR source, applies the IceCat changes with gnuzilla's
    `makeicecat` (pinned tag) and runs `./mach build`.
 
-If you just want a working libre desktop without the Firefox ordeal, everything
-up to IceCat gives you Xorg + ratpoison + Emacs + xterm, and Emacs's `eww` is a
-perfectly usable built-in libre web browser for light browsing.
+Without IceCat you still get Xorg + ratpoison + Emacs + xterm, and EWW, Emacs's
+built-in browser, is the default browser:
+
+- `C-t b` opens EWW and asks for a URL.
+- `/usr/bin/eww-open URL` opens a URL in EWW. `$BROWSER` is set to it, and
+  `/etc/xdg/mimeapps.list` makes it the handler for http, https and HTML files.
+- Emacs is built with GnuTLS (Nettle + GnuTLS are built just before it), so
+  https works. If GnuTLS failed to build, the Emacs step warns and builds
+  without TLS, and EWW can then only open http:// pages.
+
+EWW shows text and images but doesn't run JavaScript, so it's for reading
+pages, not web apps.
 
 ---
 
@@ -219,7 +229,8 @@ is **C-t** (Control-t), screen-style:
 |-----|--------|
 | `C-t c` | new xterm |
 | `C-t e` | GNU Emacs |
-| `C-t b` | GNU IceCat |
+| `C-t b` | EWW (Emacs web browser) |
+| `C-t B` | GNU IceCat (if it was built) |
 | `C-t w` | list windows |
 | `C-t n` / `C-t p` | next / previous window |
 | `C-t ?` | help |
@@ -263,7 +274,7 @@ qemu-system-x86_64 \
 `-m 4G` runs the finished desktop comfortably and leaves your 8 GB host room; the
 balloon gives idle guest RAM back. `-display gtk,gl=on` gives Mesa's virgl real
 host GL; without it Mesa falls back to `swrast` (llvmpipe), which works but is
-slow. (Building IceCat earlier needs `MEM=8G`; running the desktop doesn't.)
+slow. (Building IceCat needs 16 GB; running the desktop doesn't.)
 
 ### How the automated build drives QEMU
 
@@ -288,7 +299,7 @@ you just didn't have to sit through two phases by hand.
 | Init | SysVinit | **GNU Shepherd** |
 | Display | Wayland | **Xorg** |
 | Compositor/WM | niri | **ratpoison** |
-| Browser | Brave (nonfree) | **GNU IceCat** |
+| Browser | Brave (nonfree) | **EWW** (GNU IceCat on 16 GB+) |
 | Editor | Neovim | **GNU Emacs** |
 | Firmware | uses nonfree blobs for WiFi | **none — 100% free** |
 | Philosophy | pragmatic (working laptop) | freedom-first (FSDG) |
