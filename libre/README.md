@@ -2,7 +2,7 @@
 
 A fully [FSDG](https://www.gnu.org/distros/free-system-distribution-guidelines.html)-compliant
 GNU/Linux built entirely from source: **Linux-libre** kernel, **GNU Shepherd**
-init, **Xorg + ratpoison**, **NetSurf**, **GNU Emacs**. No nonfree firmware,
+init, **Xorg + ratpoison**, **GNU IceCat**, **GNU Emacs**. No nonfree firmware,
 no binary blobs, no proprietary software anywhere in the stack.
 
 One script, two phases — the same shape as `../blfs/setup`, but every choice is
@@ -109,9 +109,9 @@ first, VM-only.
 | Kernel | **Linux-libre 6.16** | Deblobbed by the FSF/FSFLA; no nonfree firmware |
 | Init | **GNU Shepherd** | The GNU project's own init (Guile Scheme), as used by Guix |
 | libc | **glibc** | GNU C Library |
-| Display | **Xorg** | X.Org server — free; ratpoison/NetSurf/Emacs are X11 |
+| Display | **Xorg** | X.Org server — free; ratpoison/IceCat/Emacs are X11 |
 | WM | **GNU ratpoison** | GNU keyboard-driven, screen-style window manager |
-| Browser | **NetSurf** | Small free browser, framebuffer frontend on X (no GTK). GNU IceCat is built too if you have 16 GB RAM |
+| Browser | **GNU IceCat** | FSF's fully-free Firefox derivative (no nonfree addons/telemetry) |
 | Editor | **GNU Emacs** | The GNU editor, Lucid/Athena X toolkit build |
 | Terminal | **xterm** | X.Org terminal emulator |
 | Audio | **ALSA** | Free; no PulseAudio required |
@@ -165,7 +165,6 @@ virtio disk is what stretches the 4 GB times.
 | xterm, **ratpoison**, GnuTLS | ~20 min | ~20 min |
 | **GNU Emacs** | ~45–60 min | ~30–45 min |
 | ALSA | ~10 min | ~10 min |
-| **NetSurf** (+ xcb-util-wm/keysyms) | ~20–30 min | ~15–25 min |
 | **GNU IceCat** | **skipped** (needs 16 GB — see below) | **skipped** |
 | xdm, user + dotfiles | ~15 min | ~15 min |
 | fastfetch 2.67.1 (SLFS 13.1) + config | ~5 min | ~5 min |
@@ -174,9 +173,9 @@ virtio disk is what stretches the 4 GB times.
 
 | Configuration | Total wall-clock | Browser? |
 |---------------|-----------------:|----------|
-| **4 GB VM** | **~32–44 h** | NetSurf (IceCat auto-skipped) |
-| **8 GB VM** | **~26–36 h** | NetSurf (IceCat auto-skipped, needs 16 GB) |
-| **16 GB+ VM, fast multi-core CPU** | longer, IceCat alone is many hours | NetSurf + GNU IceCat |
+| **4 GB VM** | **~32–44 h** | IceCat auto-skipped; use Emacs `eww` |
+| **8 GB VM** | **~26–36 h** | IceCat auto-skipped (needs 16 GB) |
+| **16 GB+ VM, fast multi-core CPU** | longer, IceCat alone is many hours | full GNU IceCat |
 
 LLVM alone is roughly a third to a half of the whole build; if you only have one
 long unattended window, that's the step to expect to sit through. The 8 GB
@@ -204,10 +203,9 @@ you can build across several sessions. Force one step to rerun with
    Firefox 140 ESR source, applies the IceCat changes with gnuzilla's
    `makeicecat` (pinned tag) and runs `./mach build`.
 
-Without IceCat you still get a browser: **NetSurf** is the default (`C-t b`,
-`$BROWSER`, `/etc/xdg/mimeapps.list`). It runs as `netsurf`, a wrapper for
-`netsurf-fb -f x`, and uses the DejaVu fonts. It handles most sites but runs
-little JavaScript. Emacs's `eww` works too for light browsing.
+If you just want a working libre desktop without the Firefox ordeal, everything
+up to IceCat gives you Xorg + ratpoison + Emacs + xterm, and Emacs's `eww` is a
+perfectly usable built-in libre web browser for light browsing.
 
 ---
 
@@ -221,8 +219,7 @@ is **C-t** (Control-t), screen-style:
 |-----|--------|
 | `C-t c` | new xterm |
 | `C-t e` | GNU Emacs |
-| `C-t b` | NetSurf (default browser) |
-| `C-t B` | GNU IceCat (if built) |
+| `C-t b` | GNU IceCat |
 | `C-t w` | list windows |
 | `C-t n` / `C-t p` | next / previous window |
 | `C-t ?` | help |
@@ -266,7 +263,7 @@ qemu-system-x86_64 \
 `-m 4G` runs the finished desktop comfortably and leaves your 8 GB host room; the
 balloon gives idle guest RAM back. `-display gtk,gl=on` gives Mesa's virgl real
 host GL; without it Mesa falls back to `swrast` (llvmpipe), which works but is
-slow. (Building IceCat needs 16 GB RAM; running the desktop doesn't.)
+slow. (Building IceCat earlier needs `MEM=8G`; running the desktop doesn't.)
 
 ### How the automated build drives QEMU
 
@@ -291,7 +288,7 @@ you just didn't have to sit through two phases by hand.
 | Init | SysVinit | **GNU Shepherd** |
 | Display | Wayland | **Xorg** |
 | Compositor/WM | niri | **ratpoison** |
-| Browser | Brave (nonfree) | **NetSurf** (GNU IceCat on 16 GB) |
+| Browser | Brave (nonfree) | **GNU IceCat** |
 | Editor | Neovim | **GNU Emacs** |
 | Firmware | uses nonfree blobs for WiFi | **none — 100% free** |
 | Philosophy | pragmatic (working laptop) | freedom-first (FSDG) |
