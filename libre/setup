@@ -2021,10 +2021,18 @@ if ! step_done ncurses_gnutls_dep; then
 fi
 if ! step_done emacs; then
   header "GNU Emacs ${EMACS_VER}"
+  # EWW needs GnuTLS for https. Require it when it was built, so a broken
+  # GnuTLS detection fails here instead of giving an Emacs without TLS.
+  if pkg-config --exists gnutls; then
+    EMACS_TLS="--with-gnutls=yes"
+  else
+    EMACS_TLS="--with-gnutls=no"
+    warn "GnuTLS not found: Emacs builds without TLS, EWW can't open https:// pages"
+  fi
   a=$(fetch "https://ftp.gnu.org/gnu/emacs/emacs-${EMACS_VER}.tar.xz")
   bpkg "$a" bash -c "
     ./configure --prefix=/usr --with-x-toolkit=lucid --with-gif=no \
-      --without-selinux --with-modules --with-gnutls=ifavailable
+      --without-selinux --with-modules ${EMACS_TLS}
     make -j${NPROC}
     make install
   "
