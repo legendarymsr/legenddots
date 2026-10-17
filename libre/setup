@@ -1894,7 +1894,7 @@ if ! step_done llvm; then
 fi
 if ! step_done mesa; then
   header "Mesa ${MESA_VER} (virgl + swrast, no proprietary drivers)"
-  a=$(fetch "https://mesa.freedesktop.org/archive/mesa-${MESA_VER}.tar.xz")
+  a=$(fetch "https://archive.mesa3d.org/mesa-${MESA_VER}.tar.xz")
   bpkg "$a" bash -c "
     meson setup build --prefix=/usr --buildtype=release \
       -Dgallium-drivers=virgl,swrast -Dvulkan-drivers= \
