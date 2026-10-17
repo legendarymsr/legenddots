@@ -1912,6 +1912,8 @@ fi
 if ! step_done xorg_fonts; then
   header "Xorg font infrastructure"
   a=$(xfetch font "font-util-${FONT_UTIL_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make; make install"
+  # encodings' configure requires mkfontscale (BLFS Xorg Applications)
+  a=$(xfetch app "mkfontscale-1.2.3.tar.xz");            bpkg "$a" bash -c "./configure $XORG_CONFIG; make; make install"
   a=$(xfetch font "encodings-${ENCODINGS_VER}.tar.xz");  bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
   a=$(xfetch data "xbitmaps-${XBITMAPS_VER}.tar.xz");    bpkg "$a" bash -c "./configure $XORG_CONFIG; make install"
   mark_step xorg_fonts
