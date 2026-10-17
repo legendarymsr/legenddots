@@ -2054,11 +2054,13 @@ fi
 #     thrash to death; bump the VM to 8 GB (or add swap) to build it.
 # =============================================================================
 if ! step_done icecat; then
-  MEM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
-  if (( MEM_GB < 7 )); then
-    warn "IceCat skipped: only ${MEM_GB} GB RAM detected; the libxul link needs ~8 GB."
-    warn "  Give the VM 8 GB (or a big swapfile) and re-run to build IceCat, or"
-    warn "  install a lighter libre browser. Marking as skipped so setup continues."
+  # Rounded: a 16 GB machine reports ~15.5 GB in MemTotal.
+  MEM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024 + 0.5}' /proc/meminfo)
+  if (( MEM_GB < 16 )); then
+    warn "IceCat skipped: only ${MEM_GB} GB RAM detected."
+    warn "  Building Firefox ESR plus IceCat is very heavy: use at least 16 GB RAM"
+    warn "  and a powerful multi-core CPU, then delete the 'icecat' line from"
+    warn "  $STATE_FILE and re-run. Marking as skipped so setup continues."
     mark_step icecat
   else
     header "GNU IceCat (Firefox-class build — several hours)"
