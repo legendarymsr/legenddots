@@ -76,7 +76,7 @@ JOBS="${JOBS:-}"
 MEM="${MEM:-4G}"                           # 4G fits an 8G host; virtio-balloon
                                            # (free-page-reporting) hands idle RAM
                                            # back to the host. IceCat auto-skips
-                                           # under ~7G — set MEM=8G to build it.
+                                           # under 16G (NetSurf is the default browser).
 CPUS="${CPUS:-$(nproc)}"
 CLOUD_IMG="$VM_DIR/debian-builder-base.qcow2"
 CLOUD_IMG_URL="${CLOUD_IMG_URL:-https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2}"
