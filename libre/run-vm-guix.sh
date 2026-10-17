@@ -48,7 +48,7 @@ DONE="$WORK/done"
 DONE_TAG="LIBRE-BUILD-DONE"                 # copy mode: guest prints this line instead
 REPO_TAR="$VM_DIR/repo.tar"                 # copy mode: repo snapshot, attached ro
 SHARE="${SHARE:-auto}"                      # auto | 9p | copy (see run-vm.sh)
-MEM="${MEM:-4G}"                           # 4G + balloon fits an 8G host; MEM=8G builds IceCat
+MEM="${MEM:-4G}"                           # 4G + balloon fits an 8G host; IceCat needs 16G
 CPUS="${CPUS:-$(nproc)}"
 export FHS="${FHS:-0}"                      # passed through to guest-build-guix.sh
 
