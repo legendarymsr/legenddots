@@ -2074,6 +2074,7 @@ if ! step_done icecat; then
     missing=()
     for t in rustc cargo cbindgen node nasm clang zip unzip git; do command -v "$t" >/dev/null 2>&1 || missing+=("$t"); done
     pkg-config --exists gtk+-3.0 2>/dev/null || missing+=("gtk+-3.0")
+    python3 -c 'import sqlite3' 2>/dev/null || missing+=("python3-sqlite3 (needs SQLite before Python)")
     a=$(ls "$SOURCES"/icecat-*.tar.bz2 2>/dev/null | tail -n1 || true)
     if (( ${#missing[@]} )); then
       warn "IceCat skipped: missing build deps: ${missing[*]}"
