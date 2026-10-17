@@ -1779,12 +1779,17 @@ if ! step_done xorg_libs; then
     libXdamage-1.1.6 libXi-1.8.2 libXinerama-1.1.5 libXrandr-1.5.4
     libXres-1.2.2 libXtst-1.2.5 libXv-1.0.13 libXxf86vm-1.1.6
     libpciaccess-0.18.1 libxkbfile-1.1.3 libxshmfence-1.3.3
-    libXfont2-2.0.7 libxcvt-0.1.3
+    libfontenc-1.1.8 libXfont2-2.0.7 libxcvt-0.1.3
   )
   for p in "${XLIBS[@]}"; do
     echo "==> $p"
     a=$(xfetch lib "${p}.tar.xz")
-    bpkg "$a" bash -c "./configure $XORG_CONFIG; make -j${NPROC}; make install"
+    # libpciaccess and libxcvt ship only meson.build (no configure)
+    if [[ $p == libpciaccess-* || $p == libxcvt-* ]]; then
+      bpkg "$a" bash -c "meson setup build --prefix=$XORG_PREFIX --buildtype=release; ninja -C build; ninja -C build install"
+    else
+      bpkg "$a" bash -c "./configure $XORG_CONFIG; make -j${NPROC}; make install"
+    fi
   done
   ldconfig
   mark_step xorg_libs
