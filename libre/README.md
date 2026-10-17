@@ -31,9 +31,9 @@ fine. Tunables: `MEM`, `CPUS`, `JOBS` (make -j in the guest), `SHARE`
 without KVM instead of exiting — very slow).
 
 Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
-host the guest hands idle RAM back instead of pinning all 8 GB. At 4 GB IceCat is
-auto-skipped (use Emacs `eww`) and the heavy links page to the target's swap —
-pass **`MEM=8G ./libre/run-vm.sh`** if you want IceCat and no swapping.
+host the guest hands idle RAM back instead of pinning all 8 GB. Below 16 GB IceCat
+is auto-skipped (use Emacs `eww`), and at 4 GB the heavy links page to the
+target's swap; pass **`MEM=8G ./libre/run-vm.sh`** for no swapping.
 
 ### Libre all the way down — build it from Guix System (experimental)
 
@@ -165,7 +165,7 @@ virtio disk is what stretches the 4 GB times.
 | xterm, **ratpoison**, GnuTLS | ~20 min | ~20 min |
 | **GNU Emacs** | ~45–60 min | ~30–45 min |
 | ALSA | ~10 min | ~10 min |
-| **GNU IceCat** | **skipped** (needs ~8 GB — see below) | **~4–7 h** |
+| **GNU IceCat** | **skipped** (needs 16 GB — see below) | **skipped** |
 | xdm, user + dotfiles | ~15 min | ~15 min |
 | fastfetch 2.67.1 (SLFS 13.1) + config | ~5 min | ~5 min |
 
@@ -174,13 +174,13 @@ virtio disk is what stretches the 4 GB times.
 | Configuration | Total wall-clock | Browser? |
 |---------------|-----------------:|----------|
 | **4 GB VM** | **~32–44 h** | IceCat auto-skipped; use Emacs `eww` |
-| **8 GB VM** (no IceCat) | **~26–36 h** | IceCat auto-skipped only if you have <7 GB |
-| **8 GB VM** (with IceCat) | **~30–43 h** | full GNU IceCat |
+| **8 GB VM** | **~26–36 h** | IceCat auto-skipped (needs 16 GB) |
+| **16 GB+ VM, fast multi-core CPU** | longer, IceCat alone is many hours | full GNU IceCat |
 
 LLVM alone is roughly a third to a half of the whole build; if you only have one
 long unattended window, that's the step to expect to sit through. The 8 GB
-figures are lower *despite* also building IceCat because nothing swaps — on
-4 GB, LLVM/Mesa/Emacs each lose time paging to the virtio disk.
+figures are lower because nothing swaps — on 4 GB, LLVM/Mesa/Emacs each lose
+time paging to the virtio disk.
 
 Checkpointed to `/etc/libre-setup.state`; re-running resumes where it stopped, so
 you can build across several sessions. Force one step to rerun with
@@ -192,10 +192,10 @@ you can build across several sessions. Force one step to rerun with
 
 **IceCat is a Firefox-class build.** Two honest problems on a small VM:
 
-1. **RAM.** Linking `libxul` wants roughly **8 GB**. The script detects total
-   memory and *skips* IceCat with a warning if you have less than ~7 GB, so a
-   4 GB VM finishes the rest of the desktop instead of thrashing to death.
-   Give the VM 8 GB (or a large swapfile) and re-run to actually build it.
+1. **RAM and CPU.** Building Firefox ESR plus the IceCat changes is very heavy.
+   Use at least **16 GB RAM** and a powerful multi-core CPU. The script detects
+   total memory and *skips* IceCat with a warning below 16 GB, so a smaller VM
+   finishes the rest of the desktop instead of thrashing to death.
 2. **Toolchain.** IceCat needs Rust (`rustc`/`cargo`), Node.js, `cbindgen`, and
    `nasm` — none of which are in the base system, and all of which are large
    builds in their own right. The script writes a working `.mozconfig` and runs
