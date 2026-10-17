@@ -1963,8 +1963,8 @@ if ! step_done free_fonts; then
   mkdir -pv /usr/share/fonts/dejavu /usr/share/fonts/freefont
   a=$(fetch "https://downloads.sourceforge.net/dejavu/dejavu-fonts-ttf-${DEJAVU_VER}.tar.bz2")
   bpkg "$a" bash -c "cp -v ttf/*.ttf /usr/share/fonts/dejavu/"
-  a=$(fetch "https://ftp.gnu.org/gnu/freefont/freefont-ttf-${FREEFONT_VER}.tar.gz")
-  bpkg "$a" bash -c "cp -v *.ttf /usr/share/fonts/freefont/ 2>/dev/null || cp -rv . /usr/share/fonts/freefont/"
+  a=$(fetch "https://ftp.gnu.org/gnu/freefont/freefont-otf-${FREEFONT_VER}.tar.gz")
+  bpkg "$a" bash -c "cp -v *.otf /usr/share/fonts/freefont/ 2>/dev/null || cp -rv . /usr/share/fonts/freefont/"
   fc-cache -f
   mark_step free_fonts
 fi
