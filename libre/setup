@@ -2019,6 +2019,50 @@ for xu in "xcb-util-wm-0.4.2" "xcb-util-keysyms-0.4.1"; do
       && mark_step "$st" || warn "$xu failed — NetSurf will be skipped"
   fi
 done
+# NetSurf — the default browser: small, libre, and quick to build (IceCat
+# below needs 16 GB RAM). The framebuffer frontend draws through libnsfb's X
+# (xcb) surface, so it runs under ratpoison with no GTK. netsurf-all bundles
+# its own libraries (libcss, libdom, hubbub, libnsfb, ...) and links them in.
+# Installed as netsurf-fb; /usr/bin/netsurf wraps it as "netsurf-fb -f x".
+NETSURF_VER="3.11"
+if ! step_done netsurf; then
+  header "NetSurf ${NETSURF_VER} (framebuffer frontend on X)"
+  a=$(fetch "https://download.netsurf-browser.org/netsurf/releases/source-full/netsurf-all-${NETSURF_VER}.tar.gz") \
+    && bpkg "$a" bash -c "
+      pkg-config --exists xcb xcb-icccm xcb-image xcb-keysyms xcb-atom \
+        || { echo 'xcb-util libs missing: libnsfb would build without its X surface'; exit 1; }
+      # the shipped psl.inc is current; never regenerate it (needs extra perl modules)
+      touch libnspsl/src/psl.inc
+      export CFLAGS=\"\$CFLAGS -std=gnu17\"
+      NS='TARGET=framebuffer PREFIX=/usr NETSURF_FB_FRONTEND=x NETSURF_FB_FONTLIB=freetype NETSURF_FB_FONTPATH=/usr/share/fonts/dejavu NETSURF_USE_WEBP=NO NETSURF_USE_JPEGXL=NO'
+      make -j${NPROC} \$NS
+      make install \$NS
+      cat > /usr/bin/netsurf << 'EOF2'
+#!/bin/sh
+exec netsurf-fb -f x \"\$@\"
+EOF2
+      chmod 755 /usr/bin/netsurf
+      mkdir -p /usr/share/applications /etc/xdg
+      cat > /usr/share/applications/netsurf.desktop << 'EOF2'
+[Desktop Entry]
+Type=Application
+Name=NetSurf
+GenericName=Web Browser
+Exec=netsurf %u
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+EOF2
+      cat > /etc/xdg/mimeapps.list << 'EOF2'
+[Default Applications]
+text/html=netsurf.desktop
+application/xhtml+xml=netsurf.desktop
+x-scheme-handler/http=netsurf.desktop
+x-scheme-handler/https=netsurf.desktop
+EOF2
+    " \
+    && mark_step netsurf || warn "NetSurf failed — re-run to retry (Emacs eww still works)"
+fi
 if ! step_done ncurses_gnutls_dep; then
   header "GnuTLS ${GNUTLS_VER} (for Emacs network security)"
   # GnuTLS needs Nettle (BLFS); without it GnuTLS fails and Emacs' configure
