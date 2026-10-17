@@ -2005,7 +2005,7 @@ if ! step_done xcb_util_image; then
 fi
 if ! step_done xwallpaper; then
   header "xwallpaper ${XWALLPAPER_VER} (root-window wallpaper setter)"
-  a=$(fetch "https://github.com/stwa/xwallpaper/archive/refs/tags/v${XWALLPAPER_VER}.tar.gz") \
+  a=$(fetch "https://github.com/stoeckmann/xwallpaper/releases/download/v${XWALLPAPER_VER}/xwallpaper-${XWALLPAPER_VER}.tar.xz") \
     && bpkg "$a" bash -c "./autogen.sh --prefix=/usr || ./configure --prefix=/usr; make -j${NPROC}; make install" \
     && mark_step xwallpaper || warn "xwallpaper failed — ratpoison will start without a wallpaper"
 fi
