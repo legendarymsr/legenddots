@@ -196,12 +196,12 @@ you can build across several sessions. Force one step to rerun with
    Use at least **16 GB RAM** and a powerful multi-core CPU. The script detects
    total memory and *skips* IceCat with a warning below 16 GB, so a smaller VM
    finishes the rest of the desktop instead of thrashing to death.
-2. **Toolchain.** IceCat needs Rust (`rustc`/`cargo`), Node.js, `cbindgen`, and
-   `nasm` — none of which are in the base system, and all of which are large
-   builds in their own right. The script writes a working `.mozconfig` and runs
-   `./mach build`, but you must have that toolchain present first. Building it
-   from source is a project unto itself; the pragmatic path is to add Rust/Node
-   before the IceCat step (or build IceCat on a beefier host and copy it in).
+2. **Toolchain.** IceCat 140 needs Rust (`rustc`/`cargo`), `cbindgen`, Node.js,
+   `nasm`, clang, `zip`/`unzip`, GTK 3 and Python's `sqlite3` module — none of
+   which are in the base system yet. The script checks for them first and skips
+   IceCat with a list of what is missing. When they are there, it downloads the
+   Firefox 140 ESR source, applies the IceCat changes with gnuzilla's
+   `makeicecat` (pinned tag) and runs `./mach build`.
 
 If you just want a working libre desktop without the Firefox ordeal, everything
 up to IceCat gives you Xorg + ratpoison + Emacs + xterm, and Emacs's `eww` is a

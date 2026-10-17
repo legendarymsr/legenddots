@@ -2049,9 +2049,9 @@ fi
 
 # =============================================================================
 # 11. GNU IceCat — the FSF's fully-free Firefox derivative
-#     HEAVY: Firefox-class build. Needs a Rust/Node/clang toolchain and, most
-#     of all, RAM — linking libxul wants ~8 GB. Guarded so a 4 GB VM doesn't
-#     thrash to death; bump the VM to 8 GB (or add swap) to build it.
+#     HEAVY: Firefox-class build. Needs a Rust/Node/clang toolchain, at least
+#     16 GB RAM and a powerful multi-core CPU. Guarded so a smaller VM doesn't
+#     thrash to death.
 # =============================================================================
 if ! step_done icecat; then
   # Rounded: a 16 GB machine reports ~15.5 GB in MemTotal.
