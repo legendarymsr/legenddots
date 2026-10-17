@@ -2009,6 +2009,16 @@ if ! step_done xwallpaper; then
     && bpkg "$a" bash -c "./autogen.sh --prefix=/usr || ./configure --prefix=/usr; make -j${NPROC}; make install" \
     && mark_step xwallpaper || warn "xwallpaper failed — ratpoison will start without a wallpaper"
 fi
+# xcb-util-wm (xcb-icccm) + xcb-util-keysyms: libnsfb's X surface (NetSurf) needs them.
+for xu in "xcb-util-wm-0.4.2" "xcb-util-keysyms-0.4.1"; do
+  st="${xu%-*}"; st="${st//-/_}"
+  if ! step_done "$st"; then
+    header "$xu"
+    a=$(fetch "https://xorg.freedesktop.org/archive/individual/xcb/${xu}.tar.xz") \
+      && bpkg "$a" bash -c "./configure --prefix=/usr; make -j${NPROC}; make install" \
+      && mark_step "$st" || warn "$xu failed — NetSurf will be skipped"
+  fi
+done
 if ! step_done ncurses_gnutls_dep; then
   header "GnuTLS ${GNUTLS_VER} (for Emacs network security)"
   # GnuTLS needs Nettle (BLFS); without it GnuTLS fails and Emacs' configure
