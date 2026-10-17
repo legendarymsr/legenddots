@@ -2064,9 +2064,12 @@ if ! step_done icecat; then
     header "GNU IceCat (Firefox-class build — several hours)"
     warn "IceCat needs a Rust + Node.js + cbindgen + nasm toolchain. Building those"
     warn "from source is itself enormous; see libre/README.md for the toolchain notes."
-    ICECAT_VER="115.19.0"
-    a=$(fetch "https://ftp.gnu.org/gnu/gnuzilla/${ICECAT_VER}/icecat-${ICECAT_VER}-gnu1.tar.bz2") || \
-      { warn "IceCat source fetch failed — see README for mirrors"; a=""; }
+    # GNU publishes no IceCat source tarballs any more (ftp.gnu.org/gnu/gnuzilla
+    # stops at 60.7.0); upstream ships only the makeicecat scripts
+    # (git.savannah.gnu.org/cgit/gnuzilla.git), which generate one from the
+    # Firefox ESR source. So build only from a tarball you put in $SOURCES.
+    a=$(ls "$SOURCES"/icecat-*.tar.bz2 2>/dev/null | tail -n1 || true)
+    [[ -n "$a" ]] || warn "IceCat skipped: no official source tarball exists. Make one with gnuzilla's ./makeicecat, put icecat-*.tar.bz2 in $SOURCES, delete the 'icecat' line from $STATE_FILE and re-run."
     if [[ -n "$a" ]]; then
       bpkg "$a" bash -c "
         cat > .mozconfig << 'MOZ'
