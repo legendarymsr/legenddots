@@ -1815,7 +1815,7 @@ fi
 if ! step_done libxkbcommon; then
   header "libxkbcommon ${LIBXKBCOMMON_VER}"
   a=$(fetch "https://xkbcommon.org/download/libxkbcommon-${LIBXKBCOMMON_VER}.tar.xz")
-  bpkg "$a" bash -c "meson setup build --prefix=/usr --buildtype=release -Denable-docs=false; ninja -C build; ninja -C build install"
+  bpkg "$a" bash -c "meson setup build --prefix=/usr --buildtype=release -Denable-docs=false -Denable-wayland=false -Denable-xkbregistry=false; ninja -C build; ninja -C build install"
   mark_step libxkbcommon
 fi
 
