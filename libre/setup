@@ -1907,7 +1907,7 @@ if ! step_done mesa; then
 fi
 if ! step_done libepoxy; then
   header "libepoxy ${LIBEPOXY_VER}"
-  a=$(fetch "https://github.com/anholt/libepoxy/releases/download/${LIBEPOXY_VER}/libepoxy-${LIBEPOXY_VER}.tar.xz")
+  a=$(fetch "https://download.gnome.org/sources/libepoxy/${LIBEPOXY_VER%.*}/libepoxy-${LIBEPOXY_VER}.tar.xz")
   bpkg "$a" bash -c "meson setup build --prefix=/usr --buildtype=release; ninja -C build; ninja -C build install"
   mark_step libepoxy
 fi
