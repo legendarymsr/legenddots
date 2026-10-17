@@ -1104,6 +1104,12 @@ pkg wheel_f "$SRC/wheel-0.46.1.tar.gz" bash -c "
   pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist wheel
 "
 
+# markupsafe builds with setuptools, so build setuptools first.
+pkg setuptools_f "$SRC/setuptools-80.9.0.tar.gz" bash -c "
+  pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
+  pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist setuptools
+"
+
 pkg markupsafe_f "$SRC/markupsafe-3.0.2.tar.gz" bash -c "
   pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
   pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist MarkupSafe
@@ -1112,11 +1118,6 @@ pkg markupsafe_f "$SRC/markupsafe-3.0.2.tar.gz" bash -c "
 pkg jinja2_f "$SRC/jinja2-3.1.6.tar.gz" bash -c "
   pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
   pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist Jinja2
-"
-
-pkg setuptools_f "$SRC/setuptools-80.9.0.tar.gz" bash -c "
-  pip3 wheel -w dist --no-cache-dir --no-build-isolation --no-deps \$PWD
-  pip3 install --no-cache-dir --no-build-isolation --no-index --find-links dist setuptools
 "
 
 pkg ninja_f "$SRC/ninja-1.13.1.tar.gz" bash -c "
