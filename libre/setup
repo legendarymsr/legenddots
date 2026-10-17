@@ -1924,7 +1924,7 @@ if ! step_done xorg_server; then
   bpkg "$a" bash -c "
     meson setup build --prefix=$XORG_PREFIX --localstatedir=/var \
       -Dglamor=true -Dxkb_output_dir=/var/lib/xkb \
-      -Dsuid_wrapper=true -Dxorg=true -Dsystemd_logind=false -Dudev=true
+      -Dsuid_wrapper=true -Dxorg=true -Dsystemd_logind=false -Dudev=true -Dsecure-rpc=false
     ninja -C build -j${NPROC}
     ninja -C build install
     mkdir -pv /etc/X11/xorg.conf.d
