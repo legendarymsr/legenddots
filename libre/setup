@@ -2,7 +2,7 @@
 # =============================================================================
 # GNU/Linux-libre From Scratch — KVM/QEMU (x86_64, 2 vCPU, 4+ GB RAM)
 # A fully FSDG-compliant free system: Linux-libre kernel, GNU Shepherd init,
-# Xorg + ratpoison WM, GNU IceCat browser, GNU Emacs. No nonfree firmware,
+# Xorg + ratpoison WM, NetSurf (GNU IceCat on 16 GB), GNU Emacs. No nonfree firmware,
 # no binary blobs, no proprietary software anywhere in the stack.
 #
 # VM-ONLY by design: the deblobbed Linux-libre kernel drops the nonfree
@@ -15,7 +15,7 @@
 #
 # Phase 2 (booted into the new system, as root):
 #   bash ~/legenddots/libre/setup
-#   Builds the full Xorg + ratpoison + IceCat + Emacs desktop from source.
+#   Builds the full Xorg + ratpoison + NetSurf + Emacs desktop from source.
 #
 # Checkpoint files:
 #   /var/log/lfs-host.state   — Phase 1 host steps (on the build host)
@@ -2205,7 +2205,7 @@ if ! step_done user_setup; then
     echo 'gnu:libre' | chpasswd
   }
 
-  # Session: startx runs ratpoison. IceCat + xterm launched from ratpoison.
+  # Session: startx runs ratpoison. NetSurf/IceCat + xterm launched from ratpoison.
   cat > /home/gnu/.xinitrc << 'EOF'
 #!/bin/sh
 # Free desktop session: ratpoison window manager.
@@ -2223,7 +2223,8 @@ set fgcolor green
 # Launchers
 bind c exec xterm
 bind e exec emacs
-bind b exec icecat
+bind b exec netsurf
+bind B exec icecat
 bind w exec ratpoison -c "windows"
 escape C-t
 # wallpaper (harmless no-op if xwallpaper wasn't built)
@@ -2242,6 +2243,7 @@ EOF
   # Auto-startx on login to tty1 (append to bash profile).
   cat > /home/gnu/.bash_profile << 'EOF'
 [ -f ~/.bashrc ] && . ~/.bashrc
+export BROWSER=netsurf
 # Start the X session automatically on the first console.
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
   exec startx
@@ -2317,7 +2319,7 @@ fi
 echo ""
 echo -e "${GREEN}── GNU/Linux-libre desktop complete ──${NC}"
 echo "Reboot, log in as 'gnu' (password: libre) on tty1 — X starts automatically"
-echo "into ratpoison. Prefix is C-t:  C-t c = xterm, C-t e = emacs, C-t b = icecat."
+echo "into ratpoison. Prefix is C-t:  C-t c = xterm, C-t e = emacs, C-t b = netsurf (C-t B = icecat)."
 echo ""
 echo "100% free software: Linux-libre kernel, GNU Shepherd init, Xorg, ratpoison,"
-echo "GNU Emacs, GNU IceCat. No nonfree firmware or blobs anywhere."
+echo "GNU Emacs, NetSurf (GNU IceCat on 16 GB). No nonfree firmware or blobs anywhere."
