@@ -1842,7 +1842,7 @@ fi
 if ! step_done libinput; then
   header "libinput ${LIBINPUT_VER}"
   a=$(fetch "https://gitlab.freedesktop.org/libinput/libinput/-/archive/${LIBINPUT_VER}/libinput-${LIBINPUT_VER}.tar.bz2")
-  bpkg "$a" bash -c "meson setup build --prefix=/usr --buildtype=release -Ddebug-gui=false -Dtests=false -Ddocumentation=false; ninja -C build; ninja -C build install"
+  bpkg "$a" bash -c "meson setup build --prefix=/usr --buildtype=release -Ddebug-gui=false -Dtests=false -Ddocumentation=false -Dlibwacom=false; ninja -C build; ninja -C build install"
   mark_step libinput
 fi
 
