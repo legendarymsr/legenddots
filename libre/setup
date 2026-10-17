@@ -159,7 +159,7 @@ source /var/log/lfs-parts.env 2>/dev/null || true
 mountpoint -q "$LFS" || { mount "${ROOT}" "$LFS"; mount "${EFI}" "$LFS/boot/efi"; }
 
 # ── Sources ──────────────────────────────────────────────────────────────────
-if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" ]]; then
+if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" || ! -s "$LFS/sources/fibers-1.3.1.tar.gz" ]]; then
   header "Downloading GNU/Linux-libre sources"
   # On the Guix builder the 'networking' service is up before DHCP has a lease,
   # so the first fetches fail instantly. Wait (up to ~2 min) until a mirror answers.
@@ -256,6 +256,7 @@ if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || !
     ["gc-8.2.8.tar.gz"]="https://github.com/ivmai/bdwgc/releases/download/v8.2.8/gc-8.2.8.tar.gz"
     ["libunistring-1.3.tar.xz"]="https://ftp.gnu.org/gnu/libunistring/libunistring-1.3.tar.xz"
     ["guile-3.0.10.tar.xz"]="https://ftp.gnu.org/gnu/guile/guile-3.0.10.tar.xz"
+    ["fibers-1.3.1.tar.gz"]="https://github.com/wingo/fibers/releases/download/v1.3.1/fibers-1.3.1.tar.gz"  # shepherd 0.10 needs Guile Fibers
     ["shepherd-0.10.5.tar.gz"]="https://ftp.gnu.org/gnu/shepherd/shepherd-0.10.5.tar.gz"  # 0.10.7 never existed; last 0.10.x (keeps the GOOPS <service> API init.scm uses)
     ["iana-etc-20250807.tar.gz"]="https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
     ["cmake-3.30.2.tar.gz"]="https://cmake.org/files/v3.30/cmake-3.30.2.tar.gz"
@@ -1283,6 +1284,11 @@ if is_done guile_f && [ -z "$(find /usr/lib /usr/lib64 /usr/share -name guile-3.
     test -f /usr/lib/pkgconfig/guile-3.0.pc
   "
 fi
+# shepherd 0.10's configure stops with "Fibers is missing" without Guile Fibers.
+pkg fibers_f "$SRC/fibers-1.3.1.tar.gz" bash -c "
+  ./configure --prefix=/usr --disable-Werror
+  make \$MAKEFLAGS && make install
+"
 pkg shepherd_f "$SRC/shepherd-0.10.5.tar.gz" bash -c "
   pc=\$(find /usr/lib /usr/lib64 /usr/share -name guile-3.0.pc 2>/dev/null | head -n1)
   [ -n \"\$pc\" ] || { echo 'guile-3.0.pc not found; guile_f did not install'; exit 1; }
