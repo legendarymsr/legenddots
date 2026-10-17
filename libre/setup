@@ -1263,12 +1263,30 @@ pkg libunistring_f "$SRC/libunistring-1.3.tar.xz" bash -c "
   make \$MAKEFLAGS && make install
 "
 pkg guile_f "$SRC/guile-3.0.10.tar.xz" bash -c "
-  ./configure --prefix=/usr --disable-static \
+  ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
     --docdir=/usr/share/doc/guile-3.0.10
   make \$MAKEFLAGS && make install
   find /usr/lib /usr/libexec -name '*.la' -delete 2>/dev/null || true
+  test -f /usr/lib/pkgconfig/guile-3.0.pc
 "
+# shepherd's configure finds Guile only through guile-3.0.pc. If an earlier run
+# marked guile_f done but that file isn't there, rebuild Guile rather than
+# failing in shepherd's configure.
+if is_done guile_f && [ -z "$(find /usr/lib /usr/lib64 /usr/share -name guile-3.0.pc 2>/dev/null | head -n1)" ]; then
+  echo "==> guile-3.0.pc missing, rebuilding guile_f"
+  sed -i '/^guile_f$/d' "$STATE"
+  pkg guile_f "$SRC/guile-3.0.10.tar.xz" bash -c "
+    ./configure --prefix=/usr --libdir=/usr/lib --disable-static \
+      --docdir=/usr/share/doc/guile-3.0.10
+    make \$MAKEFLAGS && make install
+    find /usr/lib /usr/libexec -name '*.la' -delete 2>/dev/null || true
+    test -f /usr/lib/pkgconfig/guile-3.0.pc
+  "
+fi
 pkg shepherd_f "$SRC/shepherd-0.10.5.tar.gz" bash -c "
+  pc=\$(find /usr/lib /usr/lib64 /usr/share -name guile-3.0.pc 2>/dev/null | head -n1)
+  [ -n \"\$pc\" ] || { echo 'guile-3.0.pc not found; guile_f did not install'; exit 1; }
+  export PKG_CONFIG_PATH=\$(dirname \"\$pc\"):/usr/lib/pkgconfig:/usr/share/pkgconfig
   ./configure --prefix=/usr --localstatedir=/var
   make \$MAKEFLAGS && make install
 "
