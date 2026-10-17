@@ -118,7 +118,7 @@ first, VM-only.
 | Audio | **ALSA** | Free; no PulseAudio required |
 | GL | **Mesa** (virgl + swrast) | Free OpenGL; virtio-gpu 3D via the host, llvmpipe fallback |
 | Fonts | **DejaVu + GNU FreeFont** | Freely licensed font families |
-| Bootloader | rEFInd | (the one pragmatic non-GNU piece; swap for GRUB if you want full GNU) |
+| Bootloader | **GNU GRUB 2.14** | UEFI (x86_64-efi) build, installed to the ESP's fallback path `EFI/BOOT/BOOTX64.EFI` |
 
 ---
 
@@ -255,6 +255,12 @@ Change both immediately: `passwd gnu`, `passwd root`.
 ---
 
 ## QEMU launch
+
+The VM boots with UEFI (OVMF). The base build compiles GNU GRUB 2.14 for
+x86_64-efi in the chroot and runs `grub-install --removable --no-nvram`, which
+puts GRUB at `EFI/BOOT/BOOTX64.EFI` on the ESP. OVMF boots that path without a
+boot entry, so efibootmgr isn't needed. `/boot/grub/grub.cfg` boots
+`/boot/vmlinuz-6.16-libre` with `root=UUID=<root partition>`.
 
 `./run-vm.sh boot` does this for you (finds OVMF, makes writable NVRAM, picks a
 display). It runs, in effect:

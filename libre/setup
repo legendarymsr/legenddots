@@ -159,7 +159,7 @@ source /var/log/lfs-parts.env 2>/dev/null || true
 mountpoint -q "$LFS" || { mount "${ROOT}" "$LFS"; mount "${EFI}" "$LFS/boot/efi"; }
 
 # ── Sources ──────────────────────────────────────────────────────────────────
-if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" || ! -s "$LFS/sources/fibers-1.3.1.tar.gz" ]]; then
+if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || ! -s "$LFS/sources/expect-5.45.4-gcc15-1.patch" || ! -s "$LFS/sources/tzdata2025b.tar.gz" || ! -s "$LFS/sources/fibers-1.3.1.tar.gz" || ! -s "$LFS/sources/grub-2.14.tar.xz" ]]; then
   header "Downloading GNU/Linux-libre sources"
   # On the Guix builder the 'networking' service is up before DHCP has a lease,
   # so the first fetches fail instantly. Wait (up to ~2 min) until a mirror answers.
@@ -258,6 +258,7 @@ if ! step_done sources || [[ ! -s "$LFS/sources/coreutils-9.7-i18n-1.patch" || !
     ["guile-3.0.10.tar.xz"]="https://ftp.gnu.org/gnu/guile/guile-3.0.10.tar.xz"
     ["fibers-1.3.1.tar.gz"]="https://github.com/wingo/fibers/releases/download/v1.3.1/fibers-1.3.1.tar.gz"  # shepherd 0.10 needs Guile Fibers
     ["shepherd-0.10.5.tar.gz"]="https://ftp.gnu.org/gnu/shepherd/shepherd-0.10.5.tar.gz"  # 0.10.7 never existed; last 0.10.x (keeps the GOOPS <service> API init.scm uses)
+    ["grub-2.14.tar.xz"]="https://ftp.gnu.org/gnu/grub/grub-2.14.tar.xz"  # GNU GRUB, UEFI bootloader (the VM boots OVMF)
     ["iana-etc-20250807.tar.gz"]="https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
     ["cmake-3.30.2.tar.gz"]="https://cmake.org/files/v3.30/cmake-3.30.2.tar.gz"
     ["git-2.46.0.tar.xz"]="https://www.kernel.org/pub/software/scm/git/git-2.46.0.tar.xz"
@@ -1437,6 +1438,46 @@ if ! is_done kernel; then
   mark kernel
 fi
 
+# ── GNU GRUB (UEFI) ───────────────────────────────────────────────────────────
+# The VM boots with OVMF (UEFI), so GRUB is built for x86_64-efi (LFS 8.65).
+# GRUB 2.14 compiles with -std=gnu99 itself, so GCC 15's C23 default doesn't
+# affect it, and it generates grub-core/extra_deps.lst (the 2.12 tarball bug
+# LFS works around). Don't pass custom CFLAGS to a bootloader.
+pkg grub_f "$SRC/grub-2.14.tar.xz" bash -c "
+  unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+  ./configure --prefix=/usr --sysconfdir=/etc --target=x86_64 --with-platform=efi \
+    --disable-efiemu --disable-werror
+  make \$MAKEFLAGS
+  make install
+"
+# grub-install --removable puts GRUB at the fallback path EFI/BOOT/BOOTX64.EFI,
+# which OVMF boots without a boot entry, so --no-nvram is fine and efibootmgr
+# (and its popt/efivar deps) isn't needed. /boot is on the root partition.
+if ! is_done grub_install; then
+  echo "==> Installing GNU GRUB"
+  mountpoint -q /boot/efi || mount "$EFI" /boot/efi
+  ROOT_UUID=$(blkid -s UUID -o value "$ROOT" 2>/dev/null || true)
+  [ -n "$ROOT_UUID" ] || { echo "!!! no UUID for root partition $ROOT"; exit 1; }
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot \
+    --removable --no-nvram
+  rm -f /boot/efi/EFI/BOOT/refind_linux.conf /boot/efi/EFI/BOOT/refind.conf
+  cat > /boot/grub/grub.cfg << EOF2
+# GNU GRUB configuration — GNU/Linux-libre From Scratch
+set default=0
+set timeout=5
+
+insmod part_gpt
+insmod ext2
+insmod efi_gop
+search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
+
+menuentry "GNU/Linux-libre 6.16" {
+  linux /boot/vmlinuz-6.16-libre root=UUID=${ROOT_UUID} ro quiet
+}
+EOF2
+  mark grub_install
+fi
+
 # ── BLFS prerequisites ────────────────────────────────────────────────────────
 pkg wget_f    "$SRC/wget-1.24.5.tar.gz"       bash -c "./configure --prefix=/usr --sysconfdir=/etc --with-ssl=openssl; make \$MAKEFLAGS; make install"
 pkg curl_f    "$SRC/curl-8.9.1.tar.xz"        bash -c "./configure --prefix=/usr --disable-static --with-openssl --enable-threaded-resolver; make \$MAKEFLAGS; make install"
@@ -1450,7 +1491,8 @@ CHROOT
 
 chmod +x "$LFS/tmp/lfs-chroot.sh"
 
-if ! step_done chroot_build; then
+# Also re-enter the chroot if an earlier run finished it before GRUB was added.
+if ! step_done chroot_build || ! grep -qx grub_install "$LFS/tmp/lfs-chroot.state" 2>/dev/null; then
   header "Phase 3 — base system in chroot"
   source /var/log/lfs-parts.env
   chroot "$LFS" /usr/bin/env -i \
@@ -1460,24 +1502,6 @@ if ! step_done chroot_build; then
     ROOT="$ROOT" EFI="$EFI" SWAP="$SWAP" \
     /bin/bash /tmp/lfs-chroot.sh
   mark_step chroot_build
-fi
-
-# ── rEFInd ───────────────────────────────────────────────────────────────────
-if ! step_done refind; then
-  header "Installing rEFInd"
-  if ! command -v refind-install &>/dev/null; then
-    warn "refind-install not found on host — install sys-boot/refind on Gentoo first"
-    warn "  emerge sys-boot/refind"
-    warn "Re-run this script after installing rEFInd to complete the bootloader step."
-  else
-    source /var/log/lfs-parts.env
-    ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
-    refind-install --usedefault "$EFI" --root "$LFS"
-    cat > "$LFS/boot/efi/EFI/BOOT/refind_linux.conf" << EOF
-"GNU/Linux-libre" "ro root=UUID=${ROOT_UUID} quiet"
-EOF
-    mark_step refind
-  fi
 fi
 
 # ── Mark base complete and unmount ────────────────────────────────────────────
@@ -1491,7 +1515,7 @@ umount "$LFS/boot/efi" 2>/dev/null || true
 umount "$LFS"          2>/dev/null || true
 
 echo -e "\n${GREEN}── GNU/Linux-libre base system complete ──${NC}"
-echo "1. Boot from $LFS_DISK (select GNU/Linux-libre in rEFInd)"
+echo "1. Boot from $LFS_DISK (GNU GRUB starts GNU/Linux-libre)"
 echo "2. Log in as root (password: legendary123)"
 echo "3. Clone legenddots and rerun this script to build the desktop:"
 echo "   git clone https://github.com/legendarymsr/legenddots ~/legenddots"

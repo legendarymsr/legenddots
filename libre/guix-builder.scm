@@ -63,14 +63,6 @@
          "which" "bash" "guix")))   ; no "binutils": gcc-toolchain ships
                                     ; them (+ the ld-wrapper) already
 
-;; Optional extras, only if this Guix has them (no "unknown package" error on
-;; older Guix): refind provides refind-install for libre/setup's bootloader step.
-(define optional-tools
-  (append-map (lambda (name)
-                (let ((found (find-packages-by-name name)))
-                  (if (null? found) '() (list (car found)))))
-              '("refind")))
-
 ;; Run the build at boot (backgrounded, not one-shot so the console stays free),
 ;; then power the VM off when it finishes. Logs land on the 9p work share, or
 ;; stream to the host over virtio-serial when the host QEMU has no 9p.
@@ -129,7 +121,7 @@
                 (shell (file-append (specification->package "bash") "/bin/bash")))
                %base-user-accounts))
 
-  (packages (append build-tools optional-tools %base-packages))
+  (packages (append build-tools %base-packages))
 
   ;; Autoconf/libtool configure scripts (GCC's lto-plugin, zlib,
   ;; libbacktrace…) hardcode /usr/bin/file; Guix only provides /bin/sh and
