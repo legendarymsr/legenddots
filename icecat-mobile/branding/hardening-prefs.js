@@ -128,3 +128,15 @@ pref("webgl.disabled", true);
 // Sites can't observe copy/cut/paste events (a small fingerprint/behaviour
 // signal). May break paste handling in a few web editors; flip to true there.
 pref("dom.event.clipboardevents.enabled", false);
+
+// --- No MP4 / H.264 (IceCat-style, free formats only) ------------------------
+// Refuse the MP4 container for both plain <video> and MediaSource streaming,
+// so sites fall back to WebM (VP9/AV1 + Opus/Vorbis) where they offer it.
+// OpenH264 plugin and EME/DRM stay off (GNU IceCat ships the same two).
+// Trade-off: MP4-only sites/videos won't play. Flip to true in about:config.
+pref("media.mp4.enabled", false);
+pref("media.mediasource.mp4.enabled", false);
+pref("media.gmp-gmpopenh264.enabled", false);
+pref("media.gmp-gmpopenh264.autoupdate", false);
+pref("media.gmp-provider.enabled", false);
+pref("media.eme.enabled", false);
