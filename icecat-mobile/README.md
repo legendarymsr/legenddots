@@ -117,6 +117,9 @@ up-to-date list):
 - Web content forced to `prefers-color-scheme: dark` — sites with a dark
   theme use it regardless of system theme (a built-in, prefs-only
   approximation of "Dark Reader" for sites that support it)
+- MP4 refused (`media.mp4.enabled` and `media.mediasource.mp4.enabled`
+  off), OpenH264 plugin and EME/DRM kept off: only free formats such as
+  WebM (VP9/AV1 + Opus) play, like GNU IceCat
 
 **Trade-offs to know about:**
 
@@ -138,6 +141,9 @@ up-to-date list):
   that implement a dark theme via CSS — it doesn't recolor sites that don't.
   Set it to `3` in `about:config` to follow the browser theme instead, or
   install the Dark Reader extension (below) for force-dark on any site.
+- With MP4 off, videos only offered as MP4/H.264 won't play; sites that
+  also serve WebM switch to it. Set `media.mp4.enabled=true` and
+  `media.mediasource.mp4.enabled=true` in `about:config` to allow MP4 again.
 - None of these prefs are `locked` — anything here can be changed at runtime
   in `about:config` if it causes problems on a site.
 - Set `ENABLE_HARDENING="false"` in `config/branding.env` for a pure rebrand
