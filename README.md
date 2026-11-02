@@ -450,3 +450,4 @@ authors, and you must follow those terms. Some of it, such as Brave, Broadcom
 non-free terms. Check each project's licence before redistributing it, or use
 your distro's tools to list them (for example `ACCEPT_LICENSE` and
 `equery`/`portageq` on Gentoo, `meta.license` on Nix, `license` fields in Guix).
+
