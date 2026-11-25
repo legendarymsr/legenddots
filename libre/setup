@@ -2,8 +2,9 @@
 # =============================================================================
 # GNU/Linux-libre From Scratch — KVM/QEMU (x86_64, 2 vCPU, 4+ GB RAM)
 # A fully FSDG-compliant free system: Linux-libre kernel, GNU Shepherd init,
-# Xorg + ratpoison WM, GNU Emacs (EWW browser; GNU IceCat on 16 GB). No nonfree firmware,
-# no binary blobs, no proprietary software anywhere in the stack.
+# Xorg + ratpoison WM, GNU Emacs (EWW default browser; Dillo graphical browser;
+# GNU IceCat on 16 GB). No nonfree firmware, no binary blobs, no proprietary
+# software anywhere in the stack.
 #
 # VM-ONLY by design: the deblobbed Linux-libre kernel drops the nonfree
 # firmware that real hardware (Broadcom WiFi, Intel microcode/GPU firmware)
@@ -15,7 +16,7 @@
 #
 # Phase 2 (booted into the new system, as root):
 #   bash ~/legenddots/libre/setup
-#   Builds the full Xorg + ratpoison + Emacs (+ IceCat) desktop from source.
+#   Builds the full Xorg + ratpoison + Emacs + Dillo (+ IceCat on 16 GB) desktop from source.
 #
 # Checkpoint files:
 #   /var/log/lfs-host.state   — Phase 1 host steps (on the build host)
@@ -1564,6 +1565,15 @@ fetch() {
   echo "$out"
 }
 
+# Fetch a tarball and require a SHA-256 pin (FLTK and Dillo; most other
+# phase-2 fetches are not pinned).
+fetch_sha() {
+  local url="$1" sha="$2" a
+  a=$(fetch "$url")
+  echo "${sha}  $a" | sha256sum -c --quiet - || die "SHA-256 mismatch for $(basename "$a")"
+  echo "$a"
+}
+
 bpkg() {
   local archive="$1"; shift
   local bdir; bdir=$(mktemp -d "$SOURCES/build.XXXXXX")
@@ -1631,6 +1641,10 @@ XDM_VER="1.1.16"
 GNUTLS_VER="3.8.5"
 NCURSES_VER="6.5"
 FASTFETCH_VER="2.67.1"   # SLFS 13.1
+FLTK_VER="1.3.11"        # last 1.3.x; Dillo 3.3 needs 1.3 (1.4 is experimental)
+FLTK_SHA256="92805abc84505e3e7e27aec775ab0754ecb4182fe2d8ff2a9d568ccdcb2811ac"
+DILLO_VER="3.3.0"        # 2026-04-26; graphical browser that fits in 4 GB
+DILLO_SHA256="db1863261d5efbd27b090e430c88064082b891cea1edf7a14e234cca51754f60"
 
 # Xorg mirror + a build helper: fetch a package from x.org/pub/individual/<sect>
 # and build it with the standard autotools incantation shared by nearly all
@@ -2111,7 +2125,143 @@ if ! step_done alsa_utils; then
 fi
 
 # =============================================================================
-# 11. GNU IceCat — the FSF's fully-free Firefox derivative
+# 11. Dillo + FLTK — graphical browser that fits in 4 GB
+#     IceCat (section 12) needs 16 GB, so smaller VMs would otherwise only
+#     have EWW. Dillo is GPL, has no JavaScript, and uses the OpenSSL already
+#     built in phase 1 (it does not support GnuTLS). FLTK 1.3 is the supported
+#     toolkit; 1.4 needs --enable-experimental-fltk and is not used here.
+# =============================================================================
+if ! step_done fltk; then
+  header "FLTK ${FLTK_VER} (Dillo's GUI toolkit)"
+  a=$(fetch_sha "https://github.com/fltk/fltk/releases/download/release-${FLTK_VER}/fltk-${FLTK_VER}-source.tar.gz" "$FLTK_SHA256") \
+    && bpkg "$a" bash -c "
+      ./configure --prefix=/usr --enable-shared --enable-threads --enable-xft --enable-xdbe
+      make -j${NPROC}
+      make install
+    " \
+    && mark_step fltk || warn "FLTK ${FLTK_VER} failed — Dillo will be skipped; re-run to retry"
+fi
+if ! step_done dillo; then
+  if ! command -v fltk-config >/dev/null 2>&1 && ! command -v fltk-config1.3 >/dev/null 2>&1; then
+    warn "Dillo skipped: FLTK is not installed (no fltk-config). Delete the fltk line from $STATE_FILE and re-run."
+  else
+    header "Dillo ${DILLO_VER} (graphical browser, OpenSSL TLS)"
+    a=$(fetch_sha "https://dillo-browser.org/release/${DILLO_VER}/dillo-${DILLO_VER}.tar.gz" "$DILLO_SHA256") \
+      && bpkg "$a" bash -c "
+        # Default page text is black (color 0) and links are CSS blue/purple.
+        # Point them at Tokyo Night so a dark bg_color stays readable; sites
+        # that set their own colours are left alone (allow_white_bg=YES).
+        sed -i 's/style_attrs.color = Color::create (layout, 0);/style_attrs.color = Color::create (layout, 0xc0caf5);/' src/styleengine.cc
+        sed -i -e 's/:link {color: blue;/:link {color: #7aa2f7;/' \
+               -e 's/:visited {color: #800080;/:visited {color: #bb9af7;/' \
+               src/styleengine.cc
+        # --sysconfdir=/etc becomes /etc/dillo (configure.ac appends the package name).
+        ./configure --prefix=/usr --sysconfdir=/etc --enable-tls --disable-mbedtls
+        make -j${NPROC}
+        make install
+      " \
+      && { sed -i '/^dillo_config$/d' "$STATE_FILE"; mark_step dillo; } || warn "Dillo ${DILLO_VER} failed — re-run to retry"
+  fi
+fi
+# System-wide dillorc / keysrc / cookiesrc. Dillo reads ~/.dillo/ first, then
+# /etc/dillo. cookiesrc is only read from ~/.dillo/; the default (no file) is
+# already DEFAULT DENY, and user_setup copies this template into the gnu home.
+if ! step_done dillo_config; then
+  header "Dillo config (/etc/dillo, Tokyo Night, privacy defaults)"
+  mkdir -p /etc/dillo
+  cat > /etc/dillo/dillorc << 'EOF'
+# /etc/dillo/dillorc — Dillo (FLTK, no JS), Tokyo Night, privacy defaults.
+# User overrides go in ~/.dillo/dillorc (read first). Colours are 0xRRGGBB.
+# Fonts are local DejaVu only; Dillo does not load remote/web fonts.
+
+start_page="about:blank"
+home="https://lite.duckduckgo.com/lite/"
+new_tab_page="about:blank"
+search_url="ddg DuckDuckGo https://lite.duckduckgo.com/lite/?q=%s"
+search_url="wi Wikipedia https://www.wikipedia.org/w/index.php?search=%s&go=Go"
+
+# page defaults (unstyled pages). Sites that set their own colours keep them.
+bg_color=0x1a1b26
+allow_white_bg=YES
+white_bg_replacement=0x1a1b26
+contrast_visited_color=YES
+
+# fonts (DejaVu is installed by the free_fonts step)
+font_serif="DejaVu Serif"
+font_sans_serif="DejaVu Sans"
+font_monospace="DejaVu Sans Mono"
+font_cursive="DejaVu Sans"
+font_fantasy="DejaVu Sans"
+font_factor=1.0
+
+# UI chrome — Tokyo Night
+ui_main_bg_color=0x16161e
+ui_fg_color=0xc0caf5
+ui_text_bg_color=0x1a1b26
+ui_selection_color=0x33467c
+ui_button_highlight_color=0x414868
+ui_tab_active_bg_color=0x7aa2f7
+ui_tab_active_fg_color=0x1a1b26
+ui_tab_bg_color=0x24283b
+ui_tab_fg_color=0xa9b1d6
+panel_size=small
+small_icons=YES
+show_tooltip=YES
+fullwindow_start=NO
+
+# privacy / speed
+load_images=YES
+load_background_images=NO
+load_stylesheets=YES
+parse_embedded_css=YES
+http_referer=none
+http_user_agent="Mozilla/5.0 (X11; Linux x86_64)"
+# cookies are denied by default (see cookiesrc); this is just documentation
+EOF
+  cat > /etc/dillo/keysrc << 'EOF'
+# /etc/dillo/keysrc — vi-ish keys (from legenddots/dillo/keysrc).
+# Only modifier-less keys that don't clash with typing in a form.
+j = line-down
+k = line-up
+h = left
+l = right
+<ctrl>d = screen-down
+<ctrl>u = screen-up
+<shift>g = bottom
+g = top
+<shift>h = back
+<shift>l = forward
+r = reload
+o = location
+<ctrl>l = location
+/ = find
+t = new-tab
+<ctrl>t = new-tab
+x = close-tab
+<ctrl>w = close-tab
+<shift>j = left-tab
+<shift>k = right-tab
+s = websearch
+b = bookmarks
+<shift>b = add-bookmark
+<ctrl>q = close-all
+f = fullscreen
+EOF
+  cat > /etc/dillo/cookiesrc << 'EOF'
+# Dillo cookie policy (template). Dillo only reads ~/.dillo/cookiesrc;
+# without that file it already defaults to DEFAULT DENY.
+#   DENY           reject all cookies (most private)
+#   ACCEPT_SESSION keep cookies only until Dillo quits
+#   ACCEPT         persist cookies to disk
+# Add per-host exceptions ABOVE the DEFAULT line.
+
+DEFAULT  DENY
+EOF
+  mark_step dillo_config
+fi
+
+# =============================================================================
+# 12. GNU IceCat — the FSF's fully-free Firefox derivative
 #     HEAVY: Firefox-class build. Needs a Rust/Node/clang toolchain, at least
 #     16 GB RAM and a powerful multi-core CPU. Guarded so a smaller VM doesn't
 #     thrash to death.
@@ -2195,7 +2345,7 @@ MOZ
 fi
 
 # =============================================================================
-# 12. Display manager (xdm) — free, from Xorg
+# 13. Display manager (xdm) — free, from Xorg
 # =============================================================================
 if ! step_done xdm; then
   header "xdm ${XDM_VER}"
@@ -2204,7 +2354,7 @@ if ! step_done xdm; then
 fi
 
 # =============================================================================
-# 13. User + dotfiles (ratpoison, .xinitrc)
+# 14. User + dotfiles (ratpoison, .xinitrc)
 # =============================================================================
 if ! step_done user_setup; then
   header "Creating user 'gnu' and desktop config"
@@ -2214,7 +2364,7 @@ if ! step_done user_setup; then
     echo 'gnu:libre' | chpasswd
   }
 
-  # Session: startx runs ratpoison. EWW/IceCat + xterm launched from ratpoison.
+  # Session: startx runs ratpoison. EWW / Dillo / IceCat + xterm launched from ratpoison.
   cat > /home/gnu/.xinitrc << 'EOF'
 #!/bin/sh
 # Free desktop session: ratpoison window manager.
@@ -2233,13 +2383,26 @@ set fgcolor green
 bind c exec xterm
 bind e exec emacs
 bind b exec eww-open
-bind B exec icecat
 bind w exec ratpoison -c "windows"
 escape C-t
 # wallpaper (harmless no-op if xwallpaper wasn't built)
 exec xwallpaper --zoom ~/.config/wallpapers/libre.jpg
 exec xterm
 EOF
+  # C-t B: IceCat when it was built, otherwise Dillo (the 4 GB graphical browser).
+  # C-t d: Dillo when it was built, so it stays reachable if IceCat took B.
+  # C-t b stays EWW (the default browser).
+  if command -v icecat >/dev/null 2>&1; then
+    sed -i '/^bind b /a bind B exec icecat' /home/gnu/.ratpoisonrc
+  elif command -v dillo >/dev/null 2>&1; then
+    sed -i '/^bind b /a bind B exec dillo' /home/gnu/.ratpoisonrc
+  fi
+  if command -v dillo >/dev/null 2>&1; then
+    sed -i '/^bind b /a bind d exec dillo' /home/gnu/.ratpoisonrc
+    mkdir -p /home/gnu/.dillo
+    # cookiesrc is only read from ~/.dillo/ (not /etc/dillo); default is already DENY
+    [[ -e /home/gnu/.dillo/cookiesrc ]] || cp /etc/dillo/cookiesrc /home/gnu/.dillo/cookiesrc
+  fi
 
   cat > /home/gnu/.Xresources << 'EOF'
 XTerm*faceName: DejaVu Sans Mono
@@ -2273,7 +2436,7 @@ EOF
 fi
 
 # =============================================================================
-# 14. fastfetch — SLFS 13.1 (Supplemental LFS, ch. 3), system info tool.
+# 15. fastfetch — SLFS 13.1 (Supplemental LFS, ch. 3), system info tool.
 #     Only hard dep is CMake (built in phase 1, cmake_f). The book's
 #     ENABLE_SYSTEM_YYJSON=ON needs yyjson, which libre doesn't build, so it's
 #     OFF here: fastfetch then compiles its bundled src/3rdparty/yyjson.
@@ -2328,7 +2491,8 @@ fi
 echo ""
 echo -e "${GREEN}── GNU/Linux-libre desktop complete ──${NC}"
 echo "Reboot, log in as 'gnu' (password: libre) on tty1 — X starts automatically"
-echo "into ratpoison. Prefix is C-t:  C-t c = xterm, C-t e = emacs, C-t b = EWW (C-t B = icecat)."
+echo "into ratpoison. Prefix is C-t:  C-t c = xterm, C-t e = emacs, C-t b = EWW"
+echo "  (C-t B = IceCat if built, otherwise Dillo; C-t d = Dillo)."
 echo ""
 echo "100% free software: Linux-libre kernel, GNU Shepherd init, Xorg, ratpoison,"
-echo "GNU Emacs + EWW (GNU IceCat on 16 GB). No nonfree firmware or blobs anywhere."
+echo "GNU Emacs + EWW, Dillo (GNU IceCat on 16 GB). No nonfree firmware or blobs anywhere."

@@ -2,7 +2,7 @@
 
 A fully [FSDG](https://www.gnu.org/distros/free-system-distribution-guidelines.html)-compliant
 GNU/Linux built entirely from source: **Linux-libre** kernel, **GNU Shepherd**
-init, **Xorg + ratpoison**, **GNU Emacs** (EWW as the browser), optional **GNU IceCat**. No nonfree firmware,
+init, **Xorg + ratpoison**, **GNU Emacs** (EWW as the default browser), **Dillo** as the graphical browser, optional **GNU IceCat**. No nonfree firmware,
 no binary blobs, no proprietary software anywhere in the stack.
 
 One script, two phases — the same shape as `../blfs/setup`, but every choice is
@@ -32,7 +32,7 @@ without KVM instead of exiting — very slow).
 
 Defaults to **`MEM=4G` with virtio-balloon** (free-page-reporting), so on an 8 GB
 host the guest hands idle RAM back instead of pinning all 8 GB. Below 16 GB IceCat
-is auto-skipped (EWW is the default browser anyway), and at 4 GB the heavy links page to the
+is auto-skipped (EWW stays the default browser; Dillo is the graphical one), and at 4 GB the heavy links page to the
 target's swap; pass **`MEM=8G ./libre/run-vm.sh`** for no swapping.
 
 ### Libre all the way down — build it from Guix System (experimental)
@@ -112,6 +112,7 @@ first, VM-only.
 | Display | **Xorg** | X.Org server — free; ratpoison/IceCat/Emacs are X11 |
 | WM | **GNU ratpoison** | GNU keyboard-driven, screen-style window manager |
 | Browser | **EWW** (default) | Emacs's built-in web browser; https through GnuTLS |
+| Browser | **Dillo** | Small FLTK graphical browser (no JS); HTTPS through OpenSSL; fits in 4 GB |
 | Browser | **GNU IceCat** (16 GB+) | FSF's fully-free Firefox derivative (no nonfree addons/telemetry) |
 | Editor | **GNU Emacs** | The GNU editor, Lucid/Athena X toolkit build |
 | Terminal | **xterm** | X.Org terminal emulator |
@@ -166,6 +167,7 @@ virtio disk is what stretches the 4 GB times.
 | xterm, **ratpoison**, GnuTLS | ~20 min | ~20 min |
 | **GNU Emacs** | ~45–60 min | ~30–45 min |
 | ALSA | ~10 min | ~10 min |
+| **FLTK 1.3.11 + Dillo 3.3.0** | ~5–10 min | ~5–10 min |
 | **GNU IceCat** | **skipped** (needs 16 GB — see below) | **skipped** |
 | xdm, user + dotfiles | ~15 min | ~15 min |
 | fastfetch 2.67.1 (SLFS 13.1) + config | ~5 min | ~5 min |
@@ -174,9 +176,9 @@ virtio disk is what stretches the 4 GB times.
 
 | Configuration | Total wall-clock | Browser? |
 |---------------|-----------------:|----------|
-| **4 GB VM** | **~32–44 h** | IceCat auto-skipped; use Emacs `eww` |
-| **8 GB VM** | **~26–36 h** | IceCat auto-skipped (needs 16 GB) |
-| **16 GB+ VM, fast multi-core CPU** | longer, IceCat alone is many hours | full GNU IceCat |
+| **4 GB VM** | **~32–44 h** | IceCat auto-skipped; EWW + Dillo |
+| **8 GB VM** | **~26–36 h** | IceCat auto-skipped (needs 16 GB); EWW + Dillo |
+| **16 GB+ VM, fast multi-core CPU** | longer, IceCat alone is many hours | full GNU IceCat + Dillo |
 
 LLVM alone is roughly a third to a half of the whole build; if you only have one
 long unattended window, that's the step to expect to sit through. The 8 GB
@@ -204,18 +206,23 @@ you can build across several sessions. Force one step to rerun with
    Firefox 140 ESR source, applies the IceCat changes with gnuzilla's
    `makeicecat` (pinned tag) and runs `./mach build`.
 
-Without IceCat you still get Xorg + ratpoison + Emacs + xterm, and EWW, Emacs's
-built-in browser, is the default browser:
+Without IceCat you still get Xorg + ratpoison + Emacs + xterm, EWW as the
+default browser, and **Dillo** as the graphical browser (FLTK, ~20 MB RAM,
+no JavaScript). Dillo is always built; it uses the OpenSSL from phase 1 for
+HTTPS and is configured system-wide in `/etc/dillo/dillorc` (Tokyo Night UI,
+DuckDuckGo lite search, cookies denied, generic User-Agent).
 
 - `C-t b` opens EWW and asks for a URL.
+- `C-t B` opens Dillo when IceCat was skipped (or IceCat, if it was built).
+  `C-t d` always opens Dillo when it was built.
 - `/usr/bin/eww-open URL` opens a URL in EWW. `$BROWSER` is set to it, and
   `/etc/xdg/mimeapps.list` makes it the handler for http, https and HTML files.
 - Emacs is built with GnuTLS (Nettle + GnuTLS are built just before it), so
   https works. If GnuTLS failed to build, the Emacs step warns and builds
   without TLS, and EWW can then only open http:// pages.
 
-EWW shows text and images but doesn't run JavaScript, so it's for reading
-pages, not web apps.
+EWW and Dillo show text and images but don't run JavaScript, so they're for
+reading pages, not web apps.
 
 ---
 
@@ -229,8 +236,9 @@ is **C-t** (Control-t), screen-style:
 |-----|--------|
 | `C-t c` | new xterm |
 | `C-t e` | GNU Emacs |
-| `C-t b` | EWW (Emacs web browser) |
-| `C-t B` | GNU IceCat (if it was built) |
+| `C-t b` | EWW (Emacs web browser, the default) |
+| `C-t B` | GNU IceCat if it was built, otherwise Dillo |
+| `C-t d` | Dillo (if it was built) |
 | `C-t w` | list windows |
 | `C-t n` / `C-t p` | next / previous window |
 | `C-t ?` | help |
@@ -305,7 +313,7 @@ you just didn't have to sit through two phases by hand.
 | Init | SysVinit | **GNU Shepherd** |
 | Display | Wayland | **Xorg** |
 | Compositor/WM | niri | **ratpoison** |
-| Browser | Brave (nonfree) | **EWW** (GNU IceCat on 16 GB+) |
+| Browser | Brave (nonfree) | **EWW** + **Dillo** (GNU IceCat on 16 GB+) |
 | Editor | Neovim | **GNU Emacs** |
 | Firmware | uses nonfree blobs for WiFi | **none — 100% free** |
 | Philosophy | pragmatic (working laptop) | freedom-first (FSDG) |
