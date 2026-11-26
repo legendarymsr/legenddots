@@ -1732,7 +1732,7 @@ fi
 if ! step_done giflib; then
   header "giflib ${GIFLIB_VER}"
   a=$(fetch "https://downloads.sourceforge.net/giflib/giflib-${GIFLIB_VER}.tar.gz")
-  bpkg "$a" bash -c "make -j${NPROC}; make PREFIX=/usr install; rm -fv /usr/lib/libgif.a"
+  bpkg "$a" bash -c "sed -i '/\$(MAKE) -C doc/d' Makefile; make -j${NPROC}; make PREFIX=/usr install; rm -fv /usr/lib/libgif.a"
   mark_step giflib
 fi
 
