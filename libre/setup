@@ -1554,7 +1554,7 @@ fetch() {
   local url="$1"
   local out="$SOURCES/$(basename "$url")"
   if [[ ! -s "$out" ]]; then
-    info "Fetching $(basename "$url")..."
+    info "Fetching $(basename "$url")..." >&2   # stderr: stdout is the returned path
     # ftp.gnu.org is often slow/unreachable: fall back to the GNU mirror network
     wget -q --show-progress --timeout=30 --tries=3 -c -O "$out.part" "$url" \
       || { [[ $url == https://ftp.gnu.org/gnu/* ]] && rm -f "$out.part" \
