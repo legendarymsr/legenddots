@@ -1545,7 +1545,12 @@ export CXX="g++"
 export CFLAGS="-march=x86-64 -O2 -pipe"
 export CXXFLAGS="-march=x86-64 -O2 -pipe"
 export MAKEFLAGS="-j2"
-export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig"
+# meson installs to /usr/lib64 on x86_64 by default (libevdev, libxcvt, pixman,
+# libxkbcommon...): make pkg-config and the dynamic linker look there too.
+export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig"
+mkdir -p /etc/ld.so.conf.d
+[[ -f /etc/ld.so.conf.d/lib64.conf ]] || echo /usr/lib64 > /etc/ld.so.conf.d/lib64.conf
+ldconfig 2>/dev/null || true
 export PATH="/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin"
 
 NPROC=2
