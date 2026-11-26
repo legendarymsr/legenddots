@@ -72,6 +72,25 @@ zi for is-snippet \
     OMZL::{compfix,completion,git,key-bindings}.zsh \
     PZT::modules/{history}
 
+# -----------------------------------------------------------------------------
+# VI MODE — vim keys on the command line (Esc = normal mode, i/a = insert)
+# -----------------------------------------------------------------------------
+# Set here, right after OMZ's key-bindings.zsh (which switches to emacs mode),
+# so every plugin bind below lands in the vi insert keymap.
+bindkey -v
+export KEYTIMEOUT=1                           # Esc switches instantly
+autoload -Uz edit-command-line && zle -N edit-command-line
+bindkey -M vicmd 'v' edit-command-line        # v in normal mode: edit command in nvim
+bindkey -M viins '^R' history-incremental-search-backward
+bindkey -M vicmd '/'  history-incremental-search-backward
+bindkey -M viins '^?' backward-delete-char    # backspace past where insert began
+bindkey -M viins '^W' backward-kill-word
+# Block cursor in normal mode, beam in insert mode
+function zle-keymap-select zle-line-init {
+  if [[ $KEYMAP == vicmd ]]; then print -n '\e[2 q'; else print -n '\e[6 q'; fi
+}
+zle -N zle-keymap-select; zle -N zle-line-init
+
 # Load completions for specific tools
 zi as'completion' for \
     OMZP::{pip/_pip,terraform/_terraform}

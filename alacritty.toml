@@ -44,3 +44,15 @@ text   = "#1a1b26"
 [colors.selection]
 background = "#283457"
 text       = "CellForeground"
+
+# Vim keys: Ctrl+Shift+Space enters vi mode (hjkl, w/b, v to select, y to yank,
+# / to search, i or Esc to leave). Scroll without leaving the keyboard row:
+[keyboard]
+bindings = [
+  { key = "Space", mods = "Control|Shift", action = "ToggleViMode" },
+  { key = "K",     mods = "Control|Shift", action = "ScrollLineUp" },
+  { key = "J",     mods = "Control|Shift", action = "ScrollLineDown" },
+  { key = "U",     mods = "Control|Shift", action = "ScrollHalfPageUp" },
+  { key = "D",     mods = "Control|Shift", action = "ScrollHalfPageDown" },
+  { key = "G",     mods = "Control|Shift", action = "ScrollToBottom" },
+]
