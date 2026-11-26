@@ -1592,6 +1592,9 @@ bpkg() {
   popd >/dev/null
   if (( rc != 0 )); then warn "build failed (exit $rc), build dir kept: $bdir"; return $rc; fi
   rm -rf "$bdir"
+  # refresh ld.so.cache: meson/nettle install to /usr/lib64, which only the
+  # cache covers, and later builds run binaries linked against them (Emacs)
+  ldconfig 2>/dev/null || true
   return 0
 }
 
@@ -1919,6 +1922,7 @@ if ! step_done llvm; then
   a=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-${LLVM_VER}.src.tar.xz")
   ac=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/cmake-${LLVM_VER}.src.tar.xz")
   al=$(fetch "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/third-party-${LLVM_VER}.src.tar.xz")
+  rm -rf "$SOURCES"/llvm.??????   # half-built tree from a failed run
   wd=$(mktemp -d "$SOURCES/llvm.XXXXXX")
   tar -xf "$a"  -C "$wd"
   tar -xf "$ac" -C "$wd"
@@ -1926,9 +1930,17 @@ if ! step_done llvm; then
   mv "$wd/cmake-${LLVM_VER}.src" "$wd/cmake"
   mv "$wd/third-party-${LLVM_VER}.src" "$wd/third-party"
   pushd "$wd/llvm-${LLVM_VER}.src" >/dev/null
+  # GCC 15's libstdc++ no longer pulls in <cstdint> transitively (SmallVector.h
+  # "'set_size' has not been declared"): add the includes, as Fedora's llvm18 does.
+  sed -i '/^#include <cstdlib>$/a #include <cstdint>' include/llvm/ADT/SmallVector.h
+  sed -i '/^#include <memory>$/a #include <cstdint>' \
+    lib/Target/AMDGPU/MCTargetDesc/AMDGPUMCTargetDesc.h lib/Target/X86/MCTargetDesc/X86MCTargetDesc.h
+  sed -i '/OS << "#undef GET_REGINFO_ENUM\\n\\n";/a \  OS << "#include <cstdint>\\n";' \
+    utils/TableGen/RegisterInfoEmitter.cpp
   cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_TARGETS_TO_BUILD="X86;AMDGPU" -DLLVM_ENABLE_RTTI=ON \
-    -DLLVM_BUILD_LLVM_DYLIB=ON -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_TERMINFO=OFF
+    -DLLVM_BUILD_LLVM_DYLIB=ON -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_TERMINFO=OFF \
+    -DLLVM_PARALLEL_LINK_JOBS=1
   ninja -C build -j${NPROC}
   ninja -C build install
   popd >/dev/null
@@ -1979,6 +1991,9 @@ if ! step_done xorg_server; then
     ninja -C build install
     mkdir -pv /etc/X11/xorg.conf.d
   "
+  # No logind: with KMS, Xorg.wrap would drop root and Xorg then dies on
+  # /dev/tty0 and the input devices. Keep root for the startx session.
+  printf 'allowed_users = console\nneeds_root_rights = yes\n' > /etc/X11/Xwrapper.config
   mark_step xorg_server
 fi
 if ! step_done xf86_input_libinput; then
@@ -2061,6 +2076,13 @@ if ! step_done ncurses_gnutls_dep; then
   a=$(fetch "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-${GNUTLS_VER}.tar.xz")
   bpkg "$a" bash -c "./configure --prefix=/usr --disable-static --without-p11-kit --with-included-libtasn1 --with-included-unistring; make -j${NPROC}; make install" || warn "gnutls failed — Emacs will build without TLS"
   mark_step ncurses_gnutls_dep
+fi
+# libxml2: EWW (the default browser) needs Emacs built with libxml2
+if ! step_done libxml2; then
+  header "libxml2 2.14.5 (for EWW)"
+  a=$(fetch "https://download.gnome.org/sources/libxml2/2.14/libxml2-2.14.5.tar.xz")
+  bpkg "$a" bash -c "./configure --prefix=/usr --sysconfdir=/etc --disable-static --without-python; make -j${NPROC}; make install"
+  mark_step libxml2
 fi
 if ! step_done emacs; then
   header "GNU Emacs ${EMACS_VER}"
@@ -2365,7 +2387,7 @@ if ! step_done user_setup; then
   header "Creating user 'gnu' and desktop config"
   grep -q '^gnu:' /etc/passwd || {
     groupadd -f gnu
-    useradd -m -G audio,video,users,gnu -s /bin/bash gnu
+    useradd -m -g gnu -G audio,video,users -s /bin/bash gnu
     echo 'gnu:libre' | chpasswd
   }
 
