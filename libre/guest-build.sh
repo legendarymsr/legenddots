@@ -102,6 +102,16 @@ for s in xdm fastfetch; do
     || pending="${pending}${s}\n"
 done
 
+
+# Record the boot-init stamp on the builder work dir (9p shares it to the host;
+# in SHARE=copy only the log line reaches the host).
+if [ -f "$LFS/etc/shepherd/boot-init.version" ]; then
+  ver=$(tr -d '[:space:]' < "$LFS/etc/shepherd/boot-init.version")
+  mkdir -p /mnt/work
+  printf '%s\n' "$ver" > /mnt/work/boot-init.version
+  say "LIBRE-BOOT-INIT: $ver"
+fi
+
 say "cleanup — unmount target"
 umount -R "$LFS" 2>/dev/null || true
 

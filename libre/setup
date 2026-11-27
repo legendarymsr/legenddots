@@ -34,6 +34,19 @@ ok()     { echo -e "${GREEN}  ✓ $*${NC}" >&2; }
 warn()   { echo -e "${YELLOW}  ! $*${NC}" >&2; }
 die()    { echo -e "${RED}  ✗ $*${NC}" >&2; exit 1; }
 
+# Bump libre/boot-init.version when the generated grub/init/fstab refresh
+# changes. The launcher compares that to $VM_DIR/work/boot-init.version so a
+# plain ./run-vm-guix.sh (or ./run-vm.sh) resumes just to rewrite boot files.
+write_boot_init_stamp() {
+  local src ver
+  src="$(dirname "${BASH_SOURCE[0]}")/boot-init.version"
+  ver=$(tr -d '[:space:]' < "$src" 2>/dev/null || true)
+  [[ -n "$ver" ]] || ver=1
+  mkdir -p /etc/shepherd
+  printf '%s\n' "$ver" > /etc/shepherd/boot-init.version
+  echo "LIBRE-BOOT-INIT: $ver"
+}
+
 # =============================================================================
 # PHASE DETECTION
 # =============================================================================
@@ -1387,9 +1400,9 @@ FSCKEOF
 ;; the original PID 1 would exit, panicking the kernel.
 ;;
 ;; API is Shepherd 0.10: (service '(name) #:requirement '(...) ...).
-;; start-in-the-background takes one list of symbols, not a bare symbol
-;; (for-each over the names called start-in-parallel with a symbol, and
-;; map raised "Wrong type argument: getty-tty1").
+;; Start services with (start-service <object>), not start-in-the-background
+;; via for-each (that passed a bare symbol and map raised
+;; "Wrong type argument: getty-tty1").
 (use-modules (shepherd service))
 
 (define sysinit
@@ -1440,9 +1453,17 @@ FSCKEOF
 (register-services
  (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
-;; One list of symbols — not (for-each start-in-the-background names).
-(start-in-the-background '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+;; start-service takes a service object. start-in-the-background takes one
+;; list of symbols; (for-each start-in-the-background names) passed a bare
+;; symbol and start-in-parallel's map raised "Wrong type argument: getty-tty1".
+;; Start sysinit first; each getty requires it.
+(start-service sysinit)
+(start-service getty-tty1)
+(start-service getty-tty2)
+(start-service getty-tty3)
+(start-service getty-ttyS0)
 EOF2
+  write_boot_init_stamp
 
   cat > /etc/securetty << 'EOF2'
 tty1
@@ -1972,9 +1993,9 @@ FSCKEOF
 ;; the original PID 1 would exit, panicking the kernel.
 ;;
 ;; API is Shepherd 0.10: (service '(name) #:requirement '(...) ...).
-;; start-in-the-background takes one list of symbols, not a bare symbol
-;; (for-each over the names called start-in-parallel with a symbol, and
-;; map raised "Wrong type argument: getty-tty1").
+;; Start services with (start-service <object>), not start-in-the-background
+;; via for-each (that passed a bare symbol and map raised
+;; "Wrong type argument: getty-tty1").
 (use-modules (shepherd service))
 
 (define sysinit
@@ -2025,8 +2046,15 @@ FSCKEOF
 (register-services
  (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
-;; One list of symbols — not (for-each start-in-the-background names).
-(start-in-the-background '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+;; start-service takes a service object. start-in-the-background takes one
+;; list of symbols; (for-each start-in-the-background names) passed a bare
+;; symbol and start-in-parallel's map raised "Wrong type argument: getty-tty1".
+;; Start sysinit first; each getty requires it.
+(start-service sysinit)
+(start-service getty-tty1)
+(start-service getty-tty2)
+(start-service getty-tty3)
+(start-service getty-ttyS0)
 SHEPEOF
   if [[ ! -f /etc/securetty ]] || ! grep -qx ttyS0 /etc/securetty 2>/dev/null; then
     cat > /etc/securetty << 'SECEOF'
@@ -2042,6 +2070,7 @@ SECEOF
   fi
   [[ -e /etc/issue ]] || printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
   [[ -f /home/gnu/.xinitrc ]] && chmod +x /home/gnu/.xinitrc
+  write_boot_init_stamp
   ok "/sbin/init pre-mounts proc/sys/dev/run, then execs shepherd (no daemonize)"
 }
 install_boot_init

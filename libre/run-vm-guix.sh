@@ -14,8 +14,14 @@
 #     phase 1 (base) natively, phase 2 (desktop) in a chroot, then halts.
 #
 #   ./run-vm-guix.sh         build (or resume) the whole thing, headless
+#   ./run-vm-guix.sh build   same, even if the image is already marked done
+#                           (rewrites grub/init/fstab; no package rebuild)
 #   ./run-vm-guix.sh boot    boot the FINISHED libre system (UEFI + GUI)
 #   ./run-vm-guix.sh watch   tail the live build log
+#
+# A plain re-run also resumes when libre/boot-init.version is newer than the
+# stamp last applied on the target (or no stamp yet), so a boot/init fix is
+# not skipped with "Already built".
 #
 # Separate from run-vm.sh (own $VM_DIR): don't mix Debian/Guix builders on one
 # target — phase-1 checkpoints live on the builder, so pick one and stick with
@@ -271,6 +277,7 @@ run_build() {
     -device virtio-balloon,free-page-reporting=on \
     "${share[@]}" \
     -display none -serial mon:stdio
+  sync_boot_init_stamp
   if [[ -s "$WORK/pending" ]] || grep -q 'LIBRE-PENDING:' "$LOG" 2>/dev/null; then
     local miss=""
     # In SHARE=copy the guest writes pending on its own disk; only the
@@ -336,6 +343,49 @@ run_boot() {
     -device virtio-balloon,free-page-reporting=on
 }
 
+# Compare libre/boot-init.version to the stamp last applied on the target.
+# Missing stamp => stale (a finished image from before this existed).
+boot_init_repo_version() {
+  local f="$SELF_DIR/boot-init.version"
+  [[ -f "$f" ]] || { echo 0; return; }
+  tr -d '[:space:]' < "$f"
+}
+
+boot_init_installed_version() {
+  local ver=""
+  if [[ -s "$WORK/boot-init.version" ]]; then
+    ver=$(tr -d '[:space:]' < "$WORK/boot-init.version")
+  fi
+  if [[ -z "$ver" && -f "$LOG" ]]; then
+    ver=$(sed -n 's/.*LIBRE-BOOT-INIT: *//p' "$LOG" | tail -n1 | tr -d '[:space:]')
+  fi
+  printf '%s\n' "$ver"
+}
+
+boot_init_stale() {
+  local repo inst
+  repo=$(boot_init_repo_version)
+  inst=$(boot_init_installed_version)
+  [[ -n "$repo" && "$repo" != "$inst" ]]
+}
+
+# After the builder exits, copy the latest log line (needed in SHARE=copy,
+# where /mnt/work is not the host work dir).
+sync_boot_init_stamp() {
+  local ver=""
+  if [[ -f "$LOG" ]]; then
+    ver=$(sed -n 's/.*LIBRE-BOOT-INIT: *//p' "$LOG" | tail -n1 | tr -d '[:space:]')
+  fi
+  if [[ -z "$ver" && -s "$WORK/boot-init.version" ]]; then
+    return 0
+  fi
+  if [[ -n "$ver" ]]; then
+    mkdir -p "$WORK"
+    printf '%s\n' "$ver" > "$WORK/boot-init.version"
+  fi
+}
+
+
 # Optional packages that can fail at the end of phase 2 without aborting.
 # A done-marker used to be written anyway, so a plain re-run exited as
 # "Already built" and never retried them.
@@ -352,6 +402,8 @@ case "${1:-}" in
     if [[ -f "$VM_DIR/.built" && -z "${1:-}" ]]; then
       if optional_steps_pending; then
         warn "previous build finished, but fastfetch/xdm never installed — resuming"
+      elif boot_init_stale; then
+        warn "finished system is missing a newer boot/init fix — resuming to apply it (no package rebuild)"
       else
         header "Already built"; echo -e "  boot it:  ${GRN}./run-vm-guix.sh boot${NC}   (or 'build' to force a rebuild/resume)"; exit 0
       fi
