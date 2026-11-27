@@ -1316,46 +1316,86 @@ EOF2
   echo "guixless" > /etc/hostname
 
   # ── GNU Shepherd as PID 1 ───────────────────────────────────────────────────
-  # The kernel execs /sbin/init; we make that a thin wrapper that hands control
-  # to Shepherd, which reads its service graph from /etc/shepherd/init.scm.
+  # /sbin/init mounts proc/sys/dev/run and mkdir /run/shepherd, then execs
+  # Shepherd (which must stay PID 1 — it is not daemonized).
   cat > /sbin/init << 'EOF2'
 #!/bin/sh
-exec /usr/bin/shepherd --config /etc/shepherd/init.scm
+# /sbin/init — mount the filesystems GNU Shepherd needs, then exec it as PID 1.
+# Shepherd cannot do this itself: it stats /var/run/shepherd and Guile's GC
+# reads /proc/stat before any service runs. Do not daemonize shepherd: it
+# must stay PID 1.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+mkdir -p /proc /sys /dev /run /dev/pts /dev/shm
+
+mounted() { [ -r /proc/mounts ] && grep -q " $1 " /proc/mounts 2>/dev/null; }
+
+mounted /proc || mount -n -t proc proc /proc
+mounted /sys  || mount -n -t sysfs sysfs /sys
+mounted /dev  || mount -n -t devtmpfs devtmpfs /dev
+mounted /dev/pts || mount -n -t devpts devpts /dev/pts -o gid=5,mode=0620
+mounted /dev/shm || mount -n -t tmpfs tmpfs /dev/shm -o nosuid,nodev,mode=1777
+mounted /run  || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
+
+# /var/run -> /run (LFS default). Replace a leftover directory so shepherd's
+# socket dir lands on the tmpfs, not the root filesystem.
+if [ ! -L /var/run ]; then
+  rm -rf /var/run
+  ln -sf /run /var/run
+fi
+if [ ! -L /var/lock ]; then
+  rm -rf /var/lock
+  ln -sf /run/lock /var/lock
+fi
+mkdir -p -m 0755 /run/lock /run/udev
+mkdir -p -m 0700 /run/shepherd
+
+mount -o remount,rw / 2>/dev/null || true
+mkdir -p /var/log
+
+exec /usr/bin/shepherd --config /etc/shepherd/init.scm --logfile /var/log/shepherd.log
 EOF2
   chmod 755 /sbin/init
 
   mkdir -pv /etc/shepherd
   cat > /etc/shepherd/init.scm << 'EOF2'
 ;; GNU Shepherd PID-1 configuration — GNU/Linux-libre From Scratch
+;; Pre-init (/sbin/init) already mounted proc, sys, dev, run and created
+;; /run/shepherd. Do not (action 'shepherd 'daemonize): that would fork and
+;; the original PID 1 would exit, panicking the kernel.
 (use-modules (shepherd service)
              (oop goops))
 
-;; Bring up early boot: pseudo-filesystems, remount root rw, swap, hostname.
 (define sysinit
   (make <service>
     #:provides '(sysinit)
     #:respawn? #f
     #:start (lambda _
-              (system "/usr/bin/mount -n -t proc     proc     /proc")
-              (system "/usr/bin/mount -n -t sysfs    sysfs    /sys")
-              (system "/usr/bin/mount -n -t devtmpfs devtmpfs /dev")
-              (system "/usr/bin/mount -n -t tmpfs    tmpfs    /run")
-              (system "/usr/bin/mount -o remount,rw /")
+              (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
               (system "/usr/sbin/udevd --daemon")
-              (system "/usr/bin/udevadm trigger --action=add")
+              (system "/usr/sbin/udevadm trigger --action=add")
+              (system "/usr/sbin/udevadm settle --timeout=30")
+              (system "/usr/sbin/ip link set lo up")
+              ;; No DHCP client is built. QEMU user-net (slirp) defaults:
+              ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
+              (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
+              (system "/usr/sbin/syslogd")
               #t)
     #:stop (const #f)))
 
-;; A getty on tty1..tty3 so you can log in on the console.
+;; Virtual consoles. agetty lives in /usr/sbin; /sbin is a symlink to that
+;; on this merged-/usr system, but use /usr/sbin explicitly. login(1) comes
+;; from shadow (/usr/bin/login == /bin/login).
 (define (getty tty)
   (make <service>
     #:provides (list (string->symbol (string-append "getty-" tty)))
     #:requires '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
-             (list "/sbin/agetty" "--noclear" tty "38400" "linux"))
+             (list "/usr/sbin/agetty" "--noclear" tty "38400" "linux"))
     #:stop  (make-kill-destructor)))
 
 ;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
@@ -1365,7 +1405,7 @@ EOF2
     #:requires '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
-             (list "/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
+             (list "/usr/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
     #:stop  (make-kill-destructor)))
 
 (register-services
@@ -1373,11 +1413,22 @@ EOF2
        (getty "tty1") (getty "tty2") (getty "tty3")
        (serial-getty "ttyS0")))
 
-(action 'shepherd 'daemonize)
 (for-each start-service (list sysinit))
 (for-each start-in-the-background
           '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 EOF2
+
+  cat > /etc/securetty << 'EOF2'
+tty1
+tty2
+tty3
+tty4
+tty5
+tty6
+ttyS0
+console
+EOF2
+  printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
 
   mkdir -pv /etc/profile.d
   cat > /etc/profile << 'EOF2'
@@ -1823,41 +1874,87 @@ verify_fstab() {
 }
 verify_fstab || true
 
-# Serial login: the GTK window can stay blank on a kernel that has VGA_CONSOLE
-# but no fbcon (GRUB's efi_gop leaves the card in graphics mode). A getty on
-# ttyS0 lets you log in from the QEMU terminal.
-if [[ -f /etc/shepherd/init.scm ]] && ! grep -q 'getty-ttyS0' /etc/shepherd/init.scm; then
+# Always refresh /sbin/init and shepherd's config on resume (cheap; no
+# package or kernel rebuild). The target used to exec shepherd as PID 1
+# before /proc and /run were mounted, so it died on /var/run/shepherd.
+install_boot_init() {
+  cat > /sbin/init << 'INITEOF'
+#!/bin/sh
+# /sbin/init — mount the filesystems GNU Shepherd needs, then exec it as PID 1.
+# Shepherd cannot do this itself: it stats /var/run/shepherd and Guile's GC
+# reads /proc/stat before any service runs. Do not daemonize shepherd: it
+# must stay PID 1.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+mkdir -p /proc /sys /dev /run /dev/pts /dev/shm
+
+mounted() { [ -r /proc/mounts ] && grep -q " $1 " /proc/mounts 2>/dev/null; }
+
+mounted /proc || mount -n -t proc proc /proc
+mounted /sys  || mount -n -t sysfs sysfs /sys
+mounted /dev  || mount -n -t devtmpfs devtmpfs /dev
+mounted /dev/pts || mount -n -t devpts devpts /dev/pts -o gid=5,mode=0620
+mounted /dev/shm || mount -n -t tmpfs tmpfs /dev/shm -o nosuid,nodev,mode=1777
+mounted /run  || mount -n -t tmpfs tmpfs /run -o mode=0755,nosuid,nodev
+
+# /var/run -> /run (LFS default). Replace a leftover directory so shepherd's
+# socket dir lands on the tmpfs, not the root filesystem.
+if [ ! -L /var/run ]; then
+  rm -rf /var/run
+  ln -sf /run /var/run
+fi
+if [ ! -L /var/lock ]; then
+  rm -rf /var/lock
+  ln -sf /run/lock /var/lock
+fi
+mkdir -p -m 0755 /run/lock /run/udev
+mkdir -p -m 0700 /run/shepherd
+
+mount -o remount,rw / 2>/dev/null || true
+mkdir -p /var/log
+
+exec /usr/bin/shepherd --config /etc/shepherd/init.scm --logfile /var/log/shepherd.log
+INITEOF
+  chmod 755 /sbin/init
+  mkdir -p /etc/shepherd
   cat > /etc/shepherd/init.scm << 'SHEPEOF'
 ;; GNU Shepherd PID-1 configuration — GNU/Linux-libre From Scratch
+;; Pre-init (/sbin/init) already mounted proc, sys, dev, run and created
+;; /run/shepherd. Do not (action 'shepherd 'daemonize): that would fork and
+;; the original PID 1 would exit, panicking the kernel.
 (use-modules (shepherd service)
              (oop goops))
 
-;; Bring up early boot: pseudo-filesystems, remount root rw, swap, hostname.
 (define sysinit
   (make <service>
     #:provides '(sysinit)
     #:respawn? #f
     #:start (lambda _
-              (system "/usr/bin/mount -n -t proc     proc     /proc")
-              (system "/usr/bin/mount -n -t sysfs    sysfs    /sys")
-              (system "/usr/bin/mount -n -t devtmpfs devtmpfs /dev")
-              (system "/usr/bin/mount -n -t tmpfs    tmpfs    /run")
-              (system "/usr/bin/mount -o remount,rw /")
+              (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
               (system "/usr/sbin/udevd --daemon")
-              (system "/usr/bin/udevadm trigger --action=add")
+              (system "/usr/sbin/udevadm trigger --action=add")
+              (system "/usr/sbin/udevadm settle --timeout=30")
+              (system "/usr/sbin/ip link set lo up")
+              ;; No DHCP client is built. QEMU user-net (slirp) defaults:
+              ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
+              (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
+              (system "/usr/sbin/syslogd")
               #t)
     #:stop (const #f)))
 
-;; A getty on tty1..tty3 so you can log in on the console.
+;; Virtual consoles. agetty lives in /usr/sbin; /sbin is a symlink to that
+;; on this merged-/usr system, but use /usr/sbin explicitly. login(1) comes
+;; from shadow (/usr/bin/login == /bin/login).
 (define (getty tty)
   (make <service>
     #:provides (list (string->symbol (string-append "getty-" tty)))
     #:requires '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
-             (list "/sbin/agetty" "--noclear" tty "38400" "linux"))
+             (list "/usr/sbin/agetty" "--noclear" tty "38400" "linux"))
     #:stop  (make-kill-destructor)))
 
 ;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
@@ -1867,7 +1964,7 @@ if [[ -f /etc/shepherd/init.scm ]] && ! grep -q 'getty-ttyS0' /etc/shepherd/init
     #:requires '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
-             (list "/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
+             (list "/usr/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
     #:stop  (make-kill-destructor)))
 
 (register-services
@@ -1875,13 +1972,27 @@ if [[ -f /etc/shepherd/init.scm ]] && ! grep -q 'getty-ttyS0' /etc/shepherd/init
        (getty "tty1") (getty "tty2") (getty "tty3")
        (serial-getty "ttyS0")))
 
-(action 'shepherd 'daemonize)
 (for-each start-service (list sysinit))
 (for-each start-in-the-background
           '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 SHEPEOF
-  ok "shepherd: added getty on ttyS0"
-fi
+  if [[ ! -f /etc/securetty ]] || ! grep -qx ttyS0 /etc/securetty 2>/dev/null; then
+    cat > /etc/securetty << 'SECEOF'
+tty1
+tty2
+tty3
+tty4
+tty5
+tty6
+ttyS0
+console
+SECEOF
+  fi
+  [[ -e /etc/issue ]] || printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
+  [[ -f /home/gnu/.xinitrc ]] && chmod +x /home/gnu/.xinitrc
+  ok "/sbin/init pre-mounts proc/sys/dev/run, then execs shepherd (no daemonize)"
+}
+install_boot_init
 
 # ── Kernel framebuffer console ───────────────────────────────────────────────
 # x86_64 defconfig already has VIRTIO_BLK/PCI, EXT4, DRM_VIRTIO_GPU, VGA_CONSOLE

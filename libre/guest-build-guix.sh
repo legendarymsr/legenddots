@@ -101,8 +101,11 @@ chroot "$LFS" /usr/bin/env -i \
 # install are missing (a failed xdm/fastfetch fetch used to still print
 # ALL DONE and leave a done-marker, so a plain re-run exited as "Already built").
 pending=""
+# command(1) is a shell builtin. `env -i … command -v` execs a non-existent
+# binary and always failed, so a successful xdm/fastfetch still looked missing.
 for s in xdm fastfetch; do
-  chroot "$LFS" /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin command -v "$s" >/dev/null 2>&1 \
+  chroot "$LFS" /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    /bin/bash -c 'command -v "$1" >/dev/null' bash "$s" \
     || pending="${pending}${s}\n"
 done
 
