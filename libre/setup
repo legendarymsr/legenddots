@@ -1358,14 +1358,25 @@ EOF2
              (list "/sbin/agetty" "--noclear" tty "38400" "linux"))
     #:stop  (make-kill-destructor)))
 
+;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
+(define (serial-getty tty)
+  (make <service>
+    #:provides (list (string->symbol (string-append "getty-" tty)))
+    #:requires '(sysinit)
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
+    #:stop  (make-kill-destructor)))
+
 (register-services
  (list sysinit
-       (getty "tty1") (getty "tty2") (getty "tty3")))
+       (getty "tty1") (getty "tty2") (getty "tty3")
+       (serial-getty "ttyS0")))
 
 (action 'shepherd 'daemonize)
 (for-each start-service (list sysinit))
 (for-each start-in-the-background
-          '(getty-tty1 getty-tty2 getty-tty3))
+          '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 EOF2
 
   mkdir -pv /etc/profile.d
@@ -1423,7 +1434,13 @@ if ! is_done kernel; then
       -e CONFIG_USB_NET_CDC_ETHER -e CONFIG_USB_NET_RNDIS_HOST \
       -e CONFIG_EXT4_FS -e CONFIG_VFAT_FS -e CONFIG_NLS_UTF8 \
       -e CONFIG_TMPFS -e CONFIG_DRM -e CONFIG_DRM_KMS_HELPER \
-      -e CONFIG_FB_EFI -e CONFIG_ACPI -e CONFIG_MAGIC_SYSRQ \
+      -e CONFIG_FB -e CONFIG_FB_EFI \
+      -e CONFIG_SYSFB_SIMPLEFB -e CONFIG_DRM_SIMPLEDRM \
+      -e CONFIG_DRM_CLIENT_SELECTION -e CONFIG_DRM_FBDEV_EMULATION \
+      -e CONFIG_VT -e CONFIG_VT_CONSOLE -e CONFIG_VGA_CONSOLE \
+      -e CONFIG_FRAMEBUFFER_CONSOLE \
+      -e CONFIG_SERIAL_8250 -e CONFIG_SERIAL_8250_CONSOLE \
+      -e CONFIG_ACPI -e CONFIG_MAGIC_SYSRQ \
       -e CONFIG_RANDOMIZE_BASE -e CONFIG_RANDOMIZE_MEMORY \
       -e CONFIG_PAGE_TABLE_ISOLATION -e CONFIG_RETPOLINE \
       -e CONFIG_STRICT_KERNEL_RWX -e CONFIG_STRICT_MODULE_RWX \
@@ -1466,14 +1483,18 @@ if ! is_done grub_install; then
 # GNU GRUB configuration — GNU/Linux-libre From Scratch
 set default=0
 set timeout=5
+# Drop back to VGA text so VGA_CONSOLE can show kernel messages after
+# efi_gop. Serial is also on the cmdline (QEMU -serial mon:stdio).
+set gfxpayload=text
 
 insmod part_gpt
 insmod ext2
+insmod all_video
 insmod efi_gop
 search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
 
 menuentry "GNU/Linux-libre 6.16" {
-  linux /boot/vmlinuz-6.16-libre root=UUID=${ROOT_UUID} ro quiet
+  linux /boot/vmlinuz-6.16-libre root=UUID=${ROOT_UUID} ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
 }
 EOF2
   mark grub_install
@@ -1713,6 +1734,173 @@ if ! wget -q --spider --timeout=5 https://www.linuxfromscratch.org/ >/dev/null 2
     (( i == 1 )) && info "Waiting for DHCP/DNS…"
     sleep 5
   done
+fi
+
+# ── GRUB cmdline + serial getty (no kernel rebuild) ──────────────────────────
+# The first boot of the finished target uses this disk alone (/dev/vda; root
+# is UUID so the vdb→vda change is fine) and OVMF+GRUB. The original grub.cfg
+# used "quiet" and no console=, and QEMU boot had no -serial, so after
+# "Booting GNU/Linux-libre 6.16" the window went blank and the terminal stayed
+# quiet. Rewrite grub.cfg every resume; cheap and fixes visibility on serial.
+write_grub_cfg() {
+  local uuid
+  uuid=$(findmnt -no UUID / 2>/dev/null || true)
+  [[ -n "$uuid" ]] || uuid=$(blkid -s UUID -o value "$(findmnt -no SOURCE /)" 2>/dev/null || true)
+  [[ -n "$uuid" ]] || uuid=$(sed -n 's/.*root=UUID=\([^ ]*\).*/\1/p' /boot/grub/grub.cfg 2>/dev/null | head -n1)
+  [[ -n "$uuid" ]] || { warn "cannot determine root UUID — leaving grub.cfg alone"; return 1; }
+  mkdir -p /boot/grub
+  cat > /boot/grub/grub.cfg << EOF
+# GNU GRUB configuration — GNU/Linux-libre From Scratch
+set default=0
+set timeout=5
+set gfxpayload=text
+
+insmod part_gpt
+insmod ext2
+insmod all_video
+insmod efi_gop
+search --no-floppy --fs-uuid --set=root ${uuid}
+
+menuentry "GNU/Linux-libre 6.16" {
+  linux /boot/vmlinuz-6.16-libre root=UUID=${uuid} ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
+}
+EOF
+  ok "grub.cfg: root=UUID=$uuid console=tty0 console=ttyS0 (no quiet)"
+}
+
+write_grub_cfg || true
+
+# Serial login: the GTK window can stay blank on a kernel that has VGA_CONSOLE
+# but no fbcon (GRUB's efi_gop leaves the card in graphics mode). A getty on
+# ttyS0 lets you log in from the QEMU terminal.
+if [[ -f /etc/shepherd/init.scm ]] && ! grep -q 'getty-ttyS0' /etc/shepherd/init.scm; then
+  cat > /etc/shepherd/init.scm << 'SHEPEOF'
+;; GNU Shepherd PID-1 configuration — GNU/Linux-libre From Scratch
+(use-modules (shepherd service)
+             (oop goops))
+
+;; Bring up early boot: pseudo-filesystems, remount root rw, swap, hostname.
+(define sysinit
+  (make <service>
+    #:provides '(sysinit)
+    #:respawn? #f
+    #:start (lambda _
+              (system "/usr/bin/mount -n -t proc     proc     /proc")
+              (system "/usr/bin/mount -n -t sysfs    sysfs    /sys")
+              (system "/usr/bin/mount -n -t devtmpfs devtmpfs /dev")
+              (system "/usr/bin/mount -n -t tmpfs    tmpfs    /run")
+              (system "/usr/bin/mount -o remount,rw /")
+              (system "/usr/sbin/swapon -a")
+              (system "/usr/bin/hostname -F /etc/hostname")
+              (system "/usr/sbin/udevd --daemon")
+              (system "/usr/bin/udevadm trigger --action=add")
+              #t)
+    #:stop (const #f)))
+
+;; A getty on tty1..tty3 so you can log in on the console.
+(define (getty tty)
+  (make <service>
+    #:provides (list (string->symbol (string-append "getty-" tty)))
+    #:requires '(sysinit)
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/sbin/agetty" "--noclear" tty "38400" "linux"))
+    #:stop  (make-kill-destructor)))
+
+;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
+(define (serial-getty tty)
+  (make <service>
+    #:provides (list (string->symbol (string-append "getty-" tty)))
+    #:requires '(sysinit)
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
+    #:stop  (make-kill-destructor)))
+
+(register-services
+ (list sysinit
+       (getty "tty1") (getty "tty2") (getty "tty3")
+       (serial-getty "ttyS0")))
+
+(action 'shepherd 'daemonize)
+(for-each start-service (list sysinit))
+(for-each start-in-the-background
+          '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+SHEPEOF
+  ok "shepherd: added getty on ttyS0"
+fi
+
+# ── Kernel framebuffer console ───────────────────────────────────────────────
+# x86_64 defconfig already has VIRTIO_BLK/PCI, EXT4, DRM_VIRTIO_GPU, VGA_CONSOLE
+# and SERIAL_8250_CONSOLE built-in, so root=UUID= works with no initramfs and
+# serial works once the cmdline has console=ttyS0. But CONFIG_FB is off, so
+# -e FB_EFI is dropped by olddefconfig (depends on FB=y), DRM_FBDEV_EMULATION
+# defaults to n, and FRAMEBUFFER_CONSOLE defaults to n. After GRUB hands off
+# from efi_gop, there is no fbcon and the graphical window stays blank.
+# Rebuild only the kernel, and only if /boot/config-6.16-libre lacks these.
+kernel_console_ok() {
+  local c=/boot/config-6.16-libre s
+  [[ -f "$c" ]] || return 1
+  for s in CONFIG_VIRTIO_PCI=y CONFIG_VIRTIO_BLK=y CONFIG_EXT4_FS=y \
+           CONFIG_DRM_VIRTIO_GPU=y CONFIG_SERIAL_8250_CONSOLE=y \
+           CONFIG_VGA_CONSOLE=y CONFIG_FB=y CONFIG_FRAMEBUFFER_CONSOLE=y \
+           CONFIG_DRM_FBDEV_EMULATION=y; do
+    grep -qx "$s" "$c" || return 1
+  done
+  return 0
+}
+
+if ! kernel_console_ok; then
+  header "Rebuilding Linux-libre 6.16 (framebuffer console)"
+  warn "This kernel has no framebuffer console, so the QEMU window stays"
+  warn "blank after GRUB. Rebuilding with CONFIG_FB, FRAMEBUFFER_CONSOLE"
+  warn "and DRM_FBDEV_EMULATION as built-in. About 1–2 hours on 2 cores;"
+  warn "only the kernel is rebuilt, then GRUB is updated."
+  a="$SOURCES/linux-libre-6.16-gnu.tar.xz"
+  [[ -s "$a" ]] || die "kernel source missing at $a — cannot rebuild"
+  # Drop a stale phase-1 'kernel' checkpoint if it is still around; phase 2
+  # does the rebuild itself (phase 1 will not run again once lfs_complete).
+  if [[ -f /tmp/lfs-chroot.state ]]; then
+    sed -i '/^kernel$/d' /tmp/lfs-chroot.state
+  fi
+  bpkg "$a" bash -c "
+    if [[ -f /boot/config-6.16-libre ]]; then
+      cp /boot/config-6.16-libre .config
+    else
+      make defconfig
+    fi
+    ./scripts/config \
+      -e CONFIG_VIRTIO_PCI -e CONFIG_VIRTIO_BLK -e CONFIG_VIRTIO_NET \
+      -e CONFIG_VIRTIO_MMIO -e CONFIG_DRM_VIRTIO_GPU \
+      -e CONFIG_HW_RANDOM_VIRTIO -e CONFIG_VIRTIO_BALLOON \
+      -e CONFIG_VIRTIO_INPUT -e CONFIG_VIRTIO_CONSOLE \
+      -e CONFIG_9P_FS -e CONFIG_9P_FS_POSIX_ACL \
+      -e CONFIG_NET_9P -e CONFIG_NET_9P_VIRTIO \
+      -e CONFIG_USB_NET_CDC_ETHER -e CONFIG_USB_NET_RNDIS_HOST \
+      -e CONFIG_EXT4_FS -e CONFIG_VFAT_FS -e CONFIG_NLS_UTF8 \
+      -e CONFIG_TMPFS -e CONFIG_DRM -e CONFIG_DRM_KMS_HELPER \
+      -e CONFIG_FB -e CONFIG_FB_EFI \
+      -e CONFIG_SYSFB_SIMPLEFB -e CONFIG_DRM_SIMPLEDRM \
+      -e CONFIG_DRM_CLIENT_SELECTION -e CONFIG_DRM_FBDEV_EMULATION \
+      -e CONFIG_VT -e CONFIG_VT_CONSOLE -e CONFIG_VGA_CONSOLE \
+      -e CONFIG_FRAMEBUFFER_CONSOLE \
+      -e CONFIG_SERIAL_8250 -e CONFIG_SERIAL_8250_CONSOLE \
+      -e CONFIG_ACPI -e CONFIG_MAGIC_SYSRQ \
+      -e CONFIG_RANDOMIZE_BASE -e CONFIG_RANDOMIZE_MEMORY \
+      -e CONFIG_PAGE_TABLE_ISOLATION -e CONFIG_RETPOLINE \
+      -e CONFIG_STRICT_KERNEL_RWX -e CONFIG_STRICT_MODULE_RWX \
+      -e CONFIG_ZSWAP -e CONFIG_ZSWAP_DEFAULT_ON \
+      -d CONFIG_INTEL_MEI -d CONFIG_INTEL_MEI_ME
+    make olddefconfig
+    make -j${NPROC}
+    make modules_install
+    cp -v arch/x86/boot/bzImage /boot/vmlinuz-6.16-libre
+    cp -v System.map /boot/System.map-6.16-libre
+    cp -v .config /boot/config-6.16-libre
+  " || die "kernel rebuild failed"
+  write_grub_cfg || true
+  kernel_console_ok || warn "kernel rebuilt but /boot/config-6.16-libre still lacks a required option — check the config"
+  ok "kernel rebuilt with framebuffer console"
 fi
 
 # =============================================================================

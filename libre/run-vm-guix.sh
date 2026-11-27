@@ -272,8 +272,13 @@ run_build() {
     "${share[@]}" \
     -display none -serial mon:stdio
   if [[ -s "$WORK/pending" ]] || grep -q 'LIBRE-PENDING:' "$LOG" 2>/dev/null; then
-    local miss
-    miss=$(tr '\n' ' ' < "$WORK/pending" 2>/dev/null)
+    local miss=""
+    # In SHARE=copy the guest writes pending on its own disk; only the
+    # LIBRE-PENDING log line reaches the host. Don't redirect from a
+    # missing file: with set -e that exits the launcher.
+    if [[ -s "$WORK/pending" ]]; then
+      miss=$(tr '\n' ' ' < "$WORK/pending")
+    fi
     miss=${miss:-$(sed -n 's/.*LIBRE-PENDING: *//p' "$LOG" | tail -n1)}
     warn "build finished, but optional packages are still missing: ${miss}"
     echo -e "  re-run:   ${GRN}./run-vm-guix.sh${NC}    (it will resume and retry just those)"
@@ -318,12 +323,15 @@ run_boot() {
     display_opt+=",gl=on"
   fi
   header "Booting the libre system (login: gnu / libre — X starts into ratpoison)"
+  echo -e "  video is the QEMU window; kernel and console also go to this terminal"
+  echo -e "  (serial).  ${CYAN}Ctrl-A c${NC} switches to the QEMU monitor and back."
   exec qemu-system-x86_64 \
     "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE" \
     -drive "if=pflash,format=raw,file=$nvram" \
     -drive "file=$TARGET,if=virtio" \
     -device virtio-vga -display "$display_opt" \
+    -serial mon:stdio \
     -netdev user,id=n0 -device virtio-net,netdev=n0 -device virtio-rng \
     -device virtio-balloon,free-page-reporting=on
 }
