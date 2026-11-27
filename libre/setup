@@ -1475,7 +1475,9 @@ if ! is_done grub_install; then
   echo "==> Installing GNU GRUB"
   mountpoint -q /boot/efi || mount "$EFI" /boot/efi
   ROOT_UUID=$(blkid -s UUID -o value "$ROOT" 2>/dev/null || true)
-  [ -n "$ROOT_UUID" ] || { echo "!!! no UUID for root partition $ROOT"; exit 1; }
+  ROOT_PARTUUID=$(blkid -s PARTUUID -o value "$ROOT" 2>/dev/null || true)
+  [ -n "$ROOT_UUID" ] || { echo "!!! no filesystem UUID for root partition $ROOT"; exit 1; }
+  [ -n "$ROOT_PARTUUID" ] || { echo "!!! no PARTUUID for root partition $ROOT (GPT required)"; exit 1; }
   grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot \
     --removable --no-nvram
   rm -f /boot/efi/EFI/BOOT/refind_linux.conf /boot/efi/EFI/BOOT/refind.conf
@@ -1491,10 +1493,12 @@ insmod part_gpt
 insmod ext2
 insmod all_video
 insmod efi_gop
+# GRUB can look up a filesystem UUID; the kernel, with no initramfs, cannot.
+# It only understands root=PARTUUID= or a device node — not root=UUID=.
 search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
 
 menuentry "GNU/Linux-libre 6.16" {
-  linux /boot/vmlinuz-6.16-libre root=UUID=${ROOT_UUID} ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
+  linux /boot/vmlinuz-6.16-libre root=PARTUUID=${ROOT_PARTUUID} rootwait ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
 }
 EOF2
   mark grub_install
@@ -1737,17 +1741,22 @@ if ! wget -q --spider --timeout=5 https://www.linuxfromscratch.org/ >/dev/null 2
 fi
 
 # ── GRUB cmdline + serial getty (no kernel rebuild) ──────────────────────────
-# The first boot of the finished target uses this disk alone (/dev/vda; root
-# is UUID so the vdb→vda change is fine) and OVMF+GRUB. The original grub.cfg
-# used "quiet" and no console=, and QEMU boot had no -serial, so after
-# "Booting GNU/Linux-libre 6.16" the window went blank and the terminal stayed
-# quiet. Rewrite grub.cfg every resume; cheap and fixes visibility on serial.
+# The first boot of the finished target uses this disk alone (/dev/vda; the
+# kernel cmdline uses PARTUUID so the vdb→vda change is fine) and OVMF+GRUB.
+# Rewrite grub.cfg every resume (cheap, no kernel rebuild).
 write_grub_cfg() {
-  local uuid
-  uuid=$(findmnt -no UUID / 2>/dev/null || true)
-  [[ -n "$uuid" ]] || uuid=$(blkid -s UUID -o value "$(findmnt -no SOURCE /)" 2>/dev/null || true)
-  [[ -n "$uuid" ]] || uuid=$(sed -n 's/.*root=UUID=\([^ ]*\).*/\1/p' /boot/grub/grub.cfg 2>/dev/null | head -n1)
-  [[ -n "$uuid" ]] || { warn "cannot determine root UUID — leaving grub.cfg alone"; return 1; }
+  # Without an initramfs the kernel cannot resolve root=UUID= (filesystem
+  # UUID). It only understands root=PARTUUID= or a device node. GRUB's
+  # search --fs-uuid still uses the filesystem UUID — that path already works.
+  local src fs_uuid partuuid
+  src=$(findmnt -no SOURCE / 2>/dev/null || true)
+  fs_uuid=$(findmnt -no UUID / 2>/dev/null || true)
+  [[ -n "$fs_uuid" ]] || fs_uuid=$(blkid -s UUID -o value "$src" 2>/dev/null || true)
+  partuuid=$(blkid -s PARTUUID -o value "$src" 2>/dev/null || true)
+  [[ -n "$partuuid" ]] || partuuid=$(lsblk -no PARTUUID "$src" 2>/dev/null | head -n1)
+  [[ -n "$fs_uuid" ]] || fs_uuid=$(sed -n 's/.*search --.*--fs-uuid --set=root \([^ ]*\).*/\1/p' /boot/grub/grub.cfg 2>/dev/null | head -n1)
+  [[ -n "$partuuid" ]] || partuuid=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /boot/grub/grub.cfg 2>/dev/null | head -n1)
+  [[ -n "$partuuid" ]] || { warn "cannot determine root PARTUUID — leaving grub.cfg alone"; return 1; }
   mkdir -p /boot/grub
   cat > /boot/grub/grub.cfg << EOF
 # GNU GRUB configuration — GNU/Linux-libre From Scratch
@@ -1759,16 +1768,60 @@ insmod part_gpt
 insmod ext2
 insmod all_video
 insmod efi_gop
-search --no-floppy --fs-uuid --set=root ${uuid}
+search --no-floppy --fs-uuid --set=root ${fs_uuid}
 
 menuentry "GNU/Linux-libre 6.16" {
-  linux /boot/vmlinuz-6.16-libre root=UUID=${uuid} ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
+  linux /boot/vmlinuz-6.16-libre root=PARTUUID=${partuuid} rootwait ro console=tty0 console=ttyS0,115200n8 earlyprintk=ttyS0,115200
 }
 EOF
-  ok "grub.cfg: root=UUID=$uuid console=tty0 console=ttyS0 (no quiet)"
+  ok "grub.cfg: root=PARTUUID=$partuuid rootwait (GRUB search fs UUID ${fs_uuid:-unknown})"
 }
 
 write_grub_cfg || true
+
+# fstab uses filesystem UUIDs, which userspace (mount, swapon) can resolve.
+# The kernel panic's root=UUID=d8c18a72-… was that kind of UUID, not a GPT
+# PARTUUID; confirm fstab actually matches the mounted filesystems.
+verify_fstab() {
+  local fstab=/etc/fstab root_u efi_u swap_u swap_dev changed=0
+  [[ -f "$fstab" ]] || return 0
+  root_u=$(findmnt -no UUID / 2>/dev/null || true)
+  efi_u=$(findmnt -no UUID /boot/efi 2>/dev/null || true)
+  swap_dev=$(awk 'NR>1 && $2=="partition"{print $1; exit}' /proc/swaps 2>/dev/null || true)
+  [[ -n "$swap_dev" ]] && swap_u=$(blkid -s UUID -o value "$swap_dev" 2>/dev/null || true)
+  [[ -z "$swap_u" ]] && swap_u=$(lsblk -nr -o UUID,FSTYPE 2>/dev/null | awk '$2=="swap"{print $1; exit}')
+  if [[ -n "$root_u" ]] && ! awk -v u="UUID=$root_u" '$1==u && $2=="/"{ok=1} END{exit !ok}' "$fstab"; then
+    if grep -qE '^UUID=[^[:space:]]+[[:space:]]+/[[:space:]]' "$fstab"; then
+      sed -i "s|^UUID=[^[:space:]]*[[:space:]]\+/[[:space:]]\+|UUID=$root_u  /         |" "$fstab"
+    else
+      printf 'UUID=%s  /         ext4  defaults,noatime 0 1\n' "$root_u" >> "$fstab"
+    fi
+    warn "fstab root UUID was wrong or missing — set to $root_u"
+    changed=1
+  fi
+  if [[ -n "$efi_u" ]] && ! awk -v u="UUID=$efi_u" '$1==u && $2=="/boot/efi"{ok=1} END{exit !ok}' "$fstab"; then
+    if grep -qE '^UUID=[^[:space:]]+[[:space:]]+/boot/efi[[:space:]]' "$fstab"; then
+      sed -i "s|^UUID=[^[:space:]]*[[:space:]]\+/boot/efi[[:space:]]\+|UUID=$efi_u   /boot/efi |" "$fstab"
+    else
+      printf 'UUID=%s   /boot/efi vfat  umask=0077       0 2\n' "$efi_u" >> "$fstab"
+    fi
+    warn "fstab /boot/efi UUID was wrong or missing — set to $efi_u"
+    changed=1
+  fi
+  if [[ -n "$swap_u" ]] && ! awk -v u="UUID=$swap_u" '$1==u && $3=="swap"{ok=1} END{exit !ok}' "$fstab"; then
+    if grep -qE '[[:space:]]swap[[:space:]]' "$fstab"; then
+      sed -i "s|^UUID=[^[:space:]]*[[:space:]]\+[^[:space:]]\+[[:space:]]\+swap[[:space:]]|UUID=$swap_u  none      swap  |" "$fstab"
+    else
+      printf 'UUID=%s  none      swap  sw               0 0\n' "$swap_u" >> "$fstab"
+    fi
+    warn "fstab swap UUID was wrong or missing — set to $swap_u"
+    changed=1
+  fi
+  if (( changed == 0 )); then
+    ok "fstab filesystem UUIDs match the mounted root${efi_u:+, ESP}${swap_u:+, swap}"
+  fi
+}
+verify_fstab || true
 
 # Serial login: the GTK window can stay blank on a kernel that has VGA_CONSOLE
 # but no fbcon (GRUB's efi_gop leaves the card in graphics mode). A getty on
@@ -1832,7 +1885,7 @@ fi
 
 # ── Kernel framebuffer console ───────────────────────────────────────────────
 # x86_64 defconfig already has VIRTIO_BLK/PCI, EXT4, DRM_VIRTIO_GPU, VGA_CONSOLE
-# and SERIAL_8250_CONSOLE built-in, so root=UUID= works with no initramfs and
+# and SERIAL_8250_CONSOLE built-in, so root=PARTUUID= works with no initramfs and
 # serial works once the cmdline has console=ttyS0. But CONFIG_FB is off, so
 # -e FB_EFI is dropped by olddefconfig (depends on FB=y), DRM_FBDEV_EMULATION
 # defaults to n, and FRAMEBUFFER_CONSOLE defaults to n. After GRUB hands off

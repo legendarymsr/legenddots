@@ -268,7 +268,8 @@ The VM boots with UEFI (OVMF). The base build compiles GNU GRUB 2.14 for
 x86_64-efi in the chroot and runs `grub-install --removable --no-nvram`, which
 puts GRUB at `EFI/BOOT/BOOTX64.EFI` on the ESP. OVMF boots that path without a
 boot entry, so efibootmgr isn't needed. `/boot/grub/grub.cfg` boots
-`/boot/vmlinuz-6.16-libre` with `root=UUID=<root partition>`.
+`/boot/vmlinuz-6.16-libre` with `root=PARTUUID=<root partition>` (the kernel
+has no initramfs, so it cannot resolve a filesystem `UUID=`).
 
 `./run-vm.sh boot` does this for you (finds OVMF, makes writable NVRAM, picks a
 display). It runs, in effect:
