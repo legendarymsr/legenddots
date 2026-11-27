@@ -1359,19 +1359,48 @@ EOF2
   chmod 755 /sbin/init
 
   mkdir -pv /etc/shepherd
+  cat > /etc/shepherd/fsck-esp.sh << 'FSCKEOF'
+#!/bin/sh
+# Optional check of the EFI System Partition before mount -a.
+# dosfstools is not part of the libre target by default; no-op if missing.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+command -v fsck.vfat >/dev/null 2>&1 || exit 0
+# Already mounted (should not be, this early): skip rather than fsck a live fs.
+# /proc is mounted by /sbin/init; don't depend on mountpoint(1).
+if [ -r /proc/mounts ] && grep -q ' /boot/efi ' /proc/mounts; then
+  exit 0
+fi
+dev=$(awk '$2=="/boot/efi"{print $1; exit}' /etc/fstab)
+case $dev in
+  UUID=*)     dev=$(blkid -U "${dev#UUID=}") ;;
+  PARTUUID=*) dev=$(blkid -t "PARTUUID=${dev#PARTUUID=}" -o device) ;;
+  LABEL=*)    dev=$(blkid -L "${dev#LABEL=}") ;;
+esac
+[ -n "$dev" ] && [ -b "$dev" ] || exit 0
+fsck.vfat -a "$dev" || true
+FSCKEOF
+  chmod 755 /etc/shepherd/fsck-esp.sh
   cat > /etc/shepherd/init.scm << 'EOF2'
 ;; GNU Shepherd PID-1 configuration — GNU/Linux-libre From Scratch
 ;; Pre-init (/sbin/init) already mounted proc, sys, dev, run and created
 ;; /run/shepherd. Do not (action 'shepherd 'daemonize): that would fork and
 ;; the original PID 1 would exit, panicking the kernel.
-(use-modules (shepherd service)
-             (oop goops))
+;;
+;; API is Shepherd 0.10: (service '(name) #:requirement '(...) ...).
+;; start-in-the-background takes one list of symbols, not a bare symbol
+;; (for-each over the names called start-in-parallel with a symbol, and
+;; map raised "Wrong type argument: getty-tty1").
+(use-modules (shepherd service))
 
 (define sysinit
-  (make <service>
-    #:provides '(sysinit)
-    #:respawn? #f
-    #:start (lambda _
+  (service '(sysinit)
+    #:documentation "Mount remaining filesystems, swap, udev, and network."
+    #:requirement '()
+    #:one-shot? #t
+    #:start (lambda ()
+              ;; ESP may be dirty if the VM was cut off; fsck.vfat is optional
+              ;; (dosfstools is not built in the target by default).
+              (system "/etc/shepherd/fsck-esp.sh")
               (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
@@ -1383,39 +1412,36 @@ EOF2
               ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
               (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
               (system "/usr/sbin/syslogd")
-              #t)
-    #:stop (const #f)))
+              #t)))
 
-;; Virtual consoles. agetty lives in /usr/sbin; /sbin is a symlink to that
-;; on this merged-/usr system, but use /usr/sbin explicitly. login(1) comes
-;; from shadow (/usr/bin/login == /bin/login).
-(define (getty tty)
-  (make <service>
-    #:provides (list (string->symbol (string-append "getty-" tty)))
-    #:requires '(sysinit)
+(define (make-getty tty)
+  (service (list (string->symbol (string-append "getty-" tty)))
+    #:documentation (string-append "agetty on " tty)
+    #:requirement '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
              (list "/usr/sbin/agetty" "--noclear" tty "38400" "linux"))
-    #:stop  (make-kill-destructor)))
+    #:stop (make-kill-destructor)))
 
-;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
-(define (serial-getty tty)
-  (make <service>
-    #:provides (list (string->symbol (string-append "getty-" tty)))
-    #:requires '(sysinit)
+(define (make-serial-getty tty)
+  (service (list (string->symbol (string-append "getty-" tty)))
+    #:documentation (string-append "serial agetty on " tty)
+    #:requirement '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
              (list "/usr/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
-    #:stop  (make-kill-destructor)))
+    #:stop (make-kill-destructor)))
+
+(define getty-tty1  (make-getty "tty1"))
+(define getty-tty2  (make-getty "tty2"))
+(define getty-tty3  (make-getty "tty3"))
+(define getty-ttyS0 (make-serial-getty "ttyS0"))
 
 (register-services
- (list sysinit
-       (getty "tty1") (getty "tty2") (getty "tty3")
-       (serial-getty "ttyS0")))
+ (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
-(for-each start-service (list sysinit))
-(for-each start-in-the-background
-          '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+;; One list of symbols — not (for-each start-in-the-background names).
+(start-in-the-background '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 EOF2
 
   cat > /etc/securetty << 'EOF2'
@@ -1918,19 +1944,48 @@ exec /usr/bin/shepherd --config /etc/shepherd/init.scm --logfile /var/log/shephe
 INITEOF
   chmod 755 /sbin/init
   mkdir -p /etc/shepherd
+  cat > /etc/shepherd/fsck-esp.sh << 'FSCKEOF'
+#!/bin/sh
+# Optional check of the EFI System Partition before mount -a.
+# dosfstools is not part of the libre target by default; no-op if missing.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+command -v fsck.vfat >/dev/null 2>&1 || exit 0
+# Already mounted (should not be, this early): skip rather than fsck a live fs.
+# /proc is mounted by /sbin/init; don't depend on mountpoint(1).
+if [ -r /proc/mounts ] && grep -q ' /boot/efi ' /proc/mounts; then
+  exit 0
+fi
+dev=$(awk '$2=="/boot/efi"{print $1; exit}' /etc/fstab)
+case $dev in
+  UUID=*)     dev=$(blkid -U "${dev#UUID=}") ;;
+  PARTUUID=*) dev=$(blkid -t "PARTUUID=${dev#PARTUUID=}" -o device) ;;
+  LABEL=*)    dev=$(blkid -L "${dev#LABEL=}") ;;
+esac
+[ -n "$dev" ] && [ -b "$dev" ] || exit 0
+fsck.vfat -a "$dev" || true
+FSCKEOF
+  chmod 755 /etc/shepherd/fsck-esp.sh
   cat > /etc/shepherd/init.scm << 'SHEPEOF'
 ;; GNU Shepherd PID-1 configuration — GNU/Linux-libre From Scratch
 ;; Pre-init (/sbin/init) already mounted proc, sys, dev, run and created
 ;; /run/shepherd. Do not (action 'shepherd 'daemonize): that would fork and
 ;; the original PID 1 would exit, panicking the kernel.
-(use-modules (shepherd service)
-             (oop goops))
+;;
+;; API is Shepherd 0.10: (service '(name) #:requirement '(...) ...).
+;; start-in-the-background takes one list of symbols, not a bare symbol
+;; (for-each over the names called start-in-parallel with a symbol, and
+;; map raised "Wrong type argument: getty-tty1").
+(use-modules (shepherd service))
 
 (define sysinit
-  (make <service>
-    #:provides '(sysinit)
-    #:respawn? #f
-    #:start (lambda _
+  (service '(sysinit)
+    #:documentation "Mount remaining filesystems, swap, udev, and network."
+    #:requirement '()
+    #:one-shot? #t
+    #:start (lambda ()
+              ;; ESP may be dirty if the VM was cut off; fsck.vfat is optional
+              ;; (dosfstools is not built in the target by default).
+              (system "/etc/shepherd/fsck-esp.sh")
               (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
@@ -1942,39 +1997,36 @@ INITEOF
               ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
               (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
               (system "/usr/sbin/syslogd")
-              #t)
-    #:stop (const #f)))
+              #t)))
 
-;; Virtual consoles. agetty lives in /usr/sbin; /sbin is a symlink to that
-;; on this merged-/usr system, but use /usr/sbin explicitly. login(1) comes
-;; from shadow (/usr/bin/login == /bin/login).
-(define (getty tty)
-  (make <service>
-    #:provides (list (string->symbol (string-append "getty-" tty)))
-    #:requires '(sysinit)
+(define (make-getty tty)
+  (service (list (string->symbol (string-append "getty-" tty)))
+    #:documentation (string-append "agetty on " tty)
+    #:requirement '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
              (list "/usr/sbin/agetty" "--noclear" tty "38400" "linux"))
-    #:stop  (make-kill-destructor)))
+    #:stop (make-kill-destructor)))
 
-;; Serial getty for QEMU (-serial mon:stdio). -L: don't wait for CD.
-(define (serial-getty tty)
-  (make <service>
-    #:provides (list (string->symbol (string-append "getty-" tty)))
-    #:requires '(sysinit)
+(define (make-serial-getty tty)
+  (service (list (string->symbol (string-append "getty-" tty)))
+    #:documentation (string-append "serial agetty on " tty)
+    #:requirement '(sysinit)
     #:respawn? #t
     #:start (make-forkexec-constructor
              (list "/usr/sbin/agetty" "--keep-baud" "-L" tty "115200" "vt220"))
-    #:stop  (make-kill-destructor)))
+    #:stop (make-kill-destructor)))
+
+(define getty-tty1  (make-getty "tty1"))
+(define getty-tty2  (make-getty "tty2"))
+(define getty-tty3  (make-getty "tty3"))
+(define getty-ttyS0 (make-serial-getty "ttyS0"))
 
 (register-services
- (list sysinit
-       (getty "tty1") (getty "tty2") (getty "tty3")
-       (serial-getty "ttyS0")))
+ (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
-(for-each start-service (list sysinit))
-(for-each start-in-the-background
-          '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+;; One list of symbols — not (for-each start-in-the-background names).
+(start-in-the-background '(getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 SHEPEOF
   if [[ ! -f /etc/securetty ]] || ! grep -qx ttyS0 /etc/securetty 2>/dev/null; then
     cat > /etc/securetty << 'SECEOF'
