@@ -50,6 +50,21 @@ done
 swapon "${TARGET}2" 2>/dev/null && say "enabled ${TARGET}2 as swap" \
   || say "note: ${TARGET}2 swap not enabled (fine if you gave the VM >=8G)"
 
+# On Guix the 'networking' service is up before DHCP has a lease, so the first
+# fetches fail with a resolver error. Phase 1 already waits; a resume skips
+# phase 1, so wait here and only then copy resolv.conf (a copy taken too early
+# can have no nameservers, and would overwrite a working one).
+say "waiting for network (DHCP/DNS) before phase 2"
+for i in $(seq 1 24); do
+  if wget -q --spider --timeout=10 https://www.linuxfromscratch.org/ \
+     || wget -q --spider --timeout=10 https://www.x.org/; then
+    say "network is up"
+    break
+  fi
+  [ "$i" = 1 ] && say "waiting for DHCP…"
+  sleep 5
+done
+
 # The target has no /etc/resolv.conf of its own, and without one glibc only
 # asks 127.0.0.1 — so DNS (hence every phase-2 download) fails in the chroot.
 # Hand it the builder's resolvers; refreshed each run, and a resolv.conf that
@@ -57,6 +72,10 @@ swapon "${TARGET}2" 2>/dev/null && say "enabled ${TARGET}2 as swap" \
 if [ ! -e "$LFS/etc/resolv.conf" ] || grep -q '^# libre-builder:' "$LFS/etc/resolv.conf" 2>/dev/null; then
   rm -f "$LFS/etc/resolv.conf"
   { echo "# libre-builder: copied from the builder VM for the phase-2 chroot"; grep -v '^#' /etc/resolv.conf; } > "$LFS/etc/resolv.conf"
+  if ! awk '/^nameserver/ && $2 !~ /^127\./ { found=1 } END { exit !found }' "$LFS/etc/resolv.conf"; then
+    echo "nameserver 10.0.2.3" >> "$LFS/etc/resolv.conf"
+    say "no non-loopback nameserver in the builder copy — added 10.0.2.3 (QEMU user-net DNS)"
+  fi
   say "target /etc/resolv.conf: $(grep -c '^nameserver' "$LFS/etc/resolv.conf") nameserver(s) from the builder"
 fi
 
@@ -71,7 +90,26 @@ chroot "$LFS" /usr/bin/env -i \
   MAKEFLAGS="${MAKEFLAGS:--j$(nproc)}" \
   bash /root/legenddots/libre/setup || { say "phase 2 failed (resume: re-run the launcher)"; exit 1; }
 
+# Don't claim the build is finished if optional tools setup is supposed to
+# install are missing (a failed xdm/fastfetch fetch used to still print
+# ALL DONE and leave a done-marker, so a plain re-run exited as "Already built").
+pending=""
+for s in xdm fastfetch; do
+  chroot "$LFS" /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin command -v "$s" >/dev/null 2>&1 \
+    || pending="${pending}${s}\n"
+done
+
 say "cleanup — unmount target"
 umount -R "$LFS" 2>/dev/null || true
-say "ALL DONE — libre system built on $TARGET"
-touch /mnt/work/done
+
+if [ -n "$pending" ]; then
+  printf '%b' "$pending" > /mnt/work/pending
+  list=$(printf '%b' "$pending" | tr '\n' ' ')
+  say "optional packages not installed: $list"
+  say "LIBRE-PENDING: $list"
+  say "re-run the launcher to retry just those (setup will resume)"
+else
+  rm -f /mnt/work/pending
+  say "ALL DONE — libre system built on $TARGET"
+  touch /mnt/work/done
+fi

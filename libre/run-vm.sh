@@ -31,7 +31,7 @@
 #   ./run-vm.sh watch    tail the live build log
 #
 # Tunables (env): VM_DIR TARGET_SIZE MEM CPUS JOBS CLOUD_IMG_URL SHARE ACCEL ALLOW_TCG
-#                 (and for boot: FW_CODE FW_VARS DISPLAY_TYPE)
+#                 (and for boot: FW_CODE FW_VARS DISPLAY_TYPE DISPLAY_GL)
 #   SHARE=auto  (default) offer 9p too if this QEMU has virtio-9p
 #   SHARE=9p    require 9p in QEMU (errors out if it's missing)
 #   SHARE=copy  never offer 9p: repo -> read-only tar disk, log -> virtio-serial
@@ -267,7 +267,16 @@ run_build() {
     -device virtio-balloon,free-page-reporting=on \
     "${share[@]}" \
     -display none -serial mon:stdio
-  if [[ -f "$DONE" ]] || grep -qx "$DONE_TAG" "$LOG" 2>/dev/null; then
+  if [[ -s "$WORK/pending" ]] || grep -q 'LIBRE-PENDING:' "$LOG" 2>/dev/null; then
+    local miss
+    miss=$(tr '\n' ' ' < "$WORK/pending" 2>/dev/null)
+    miss=${miss:-$(sed -n 's/.*LIBRE-PENDING: *//p' "$LOG" | tail -n1)}
+    warn "build finished, but optional packages are still missing: ${miss}"
+    echo -e "  re-run:   ${GRN}./run-vm.sh${NC}    (it will resume and retry just those)"
+    echo -e "  or boot:  ${GRN}./run-vm.sh boot${NC}   (X starts from tty1 without xdm)"
+    rm -f "$VM_DIR/.built"
+  elif [[ -f "$DONE" ]] || grep -qx "$DONE_TAG" "$LOG" 2>/dev/null; then
+    rm -f "$WORK/pending"
     touch "$VM_DIR/.built"
     header "Build complete ✓"
     echo -e "  boot your new GNU/Linux-libre system:  ${GRN}./run-vm.sh boot${NC}"
@@ -296,23 +305,46 @@ run_boot() {
   local nvram="$VM_DIR/OVMF_VARS.fd"; [[ -f "$nvram" ]] || cp "$fw_vars" "$nvram"
   local disp="${DISPLAY_TYPE:-}"; [[ -z "$disp" ]] && for d in gtk sdl; do qemu-system-x86_64 -display help 2>/dev/null | grep -qw "$d" && { disp="$d"; break; }; done
   pick_accel
+  # virtio-vga: VGA + virtio, so Xorg modesetting works without guest 3D.
+  # Never default to gl=on: QEMU built without OpenGL (typical Gentoo) dies
+  # with "OpenGL support was not enabled in this build of QEMU". Opt in with
+  # DISPLAY_GL=on if your QEMU has virgl/gtk-gl.
+  local display_opt="${disp:-gtk}"
+  if [[ "${DISPLAY_GL:-}" == 1 || "${DISPLAY_GL:-}" == on ]]; then
+    display_opt+=",gl=on"
+  fi
   header "Booting the libre system (login: gnu / libre — X starts into ratpoison)"
   exec qemu-system-x86_64 \
     "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE" \
     -drive "if=pflash,format=raw,file=$nvram" \
     -drive "file=$TARGET,if=virtio" \
-    -device virtio-gpu -display "${disp:-gtk},gl=on" \
+    -device virtio-vga -display "$display_opt" \
     -netdev user,id=n0 -device virtio-net,netdev=n0 -device virtio-rng \
     -device virtio-balloon,free-page-reporting=on
+}
+
+# Optional packages that can fail at the end of phase 2 without aborting.
+# A done-marker used to be written anyway, so a plain re-run exited as
+# "Already built" and never retried them.
+optional_steps_pending() {
+  if [[ -s "$WORK/pending" ]] && grep -Eq '^(xdm|fastfetch)$' "$WORK/pending"; then
+    return 0
+  fi
+  [[ -f "$LOG" ]] || return 1
+  grep -qE 'LIBRE-PENDING:.*(fastfetch|xdm)|fastfetch failed|xdm build failed' "$LOG"
 }
 
 case "${1:-}" in
   ""|build)
     if [[ -f "$VM_DIR/.built" && -z "${1:-}" ]]; then
-      header "Already built"
-      echo -e "  boot it:  ${GRN}./run-vm.sh boot${NC}   (or ./run-vm.sh build to force a rebuild/resume)"
-      exit 0
+      if optional_steps_pending; then
+        warn "previous build finished, but fastfetch/xdm never installed — resuming"
+      else
+        header "Already built"
+        echo -e "  boot it:  ${GRN}./run-vm.sh boot${NC}   (or ./run-vm.sh build to force a rebuild/resume)"
+        exit 0
+      fi
     fi
     ensure_prereqs; ensure_kvm_access "$@"; run_build ;;
   boot)   run_boot ;;

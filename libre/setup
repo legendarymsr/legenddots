@@ -29,10 +29,10 @@ set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[0;33m'; NC='\033[0m'
 header() { echo -e "\n\033[1m\033[36m── $* ──\033[0m"; }
-info()   { echo -e "${CYAN}  → $*${NC}"; }
-ok()     { echo -e "${GREEN}  ✓ $*${NC}"; }
-warn()   { echo -e "${YELLOW}  ! $*${NC}"; }
-die()    { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+info()   { echo -e "${CYAN}  → $*${NC}" >&2; }
+ok()     { echo -e "${GREEN}  ✓ $*${NC}" >&2; }
+warn()   { echo -e "${YELLOW}  ! $*${NC}" >&2; }
+die()    { echo -e "${RED}  ✗ $*${NC}" >&2; exit 1; }
 
 # =============================================================================
 # PHASE DETECTION
@@ -1559,12 +1559,27 @@ fetch() {
   local url="$1"
   local out="$SOURCES/$(basename "$url")"
   if [[ ! -s "$out" ]]; then
-    info "Fetching $(basename "$url")..." >&2   # stderr: stdout is the returned path
-    # ftp.gnu.org is often slow/unreachable: fall back to the GNU mirror network
-    wget -q --show-progress --timeout=30 --tries=3 -c -O "$out.part" "$url" \
-      || { [[ $url == https://ftp.gnu.org/gnu/* ]] && rm -f "$out.part" \
-           && wget -q --show-progress --timeout=30 --tries=3 -c -O "$out.part" "https://ftpmirror.gnu.org/gnu/${url#https://ftp.gnu.org/gnu/}"; } \
-      || { rm -f "$out.part"; die "Download failed: $url"; }
+    # Status and wget errors go to stderr: stdout is only the returned path,
+    # so $(fetch) never feeds "Download failed: …" into tar (which treats a
+    # colon as host:file and prints "Cannot connect to").
+    info "Fetching $(basename "$url")..."
+    local try=1 max=5
+    while true; do
+      # No -q: a failed resolve must show the URL, not a one-line "resolve failed".
+      # ftp.gnu.org is often slow/unreachable: fall back to the GNU mirror network.
+      if wget --show-progress --timeout=30 --tries=3 -c -O "$out.part" "$url" \
+         || { [[ $url == https://ftp.gnu.org/gnu/* ]] && rm -f "$out.part" \
+              && wget --show-progress --timeout=30 --tries=3 -c -O "$out.part" "https://ftpmirror.gnu.org/gnu/${url#https://ftp.gnu.org/gnu/}"; }; then
+        break
+      fi
+      rm -f "$out.part"
+      if (( try >= max )); then
+        die "Download failed: $url"
+      fi
+      warn "fetch of $(basename "$url") failed (try $try/$max) — waiting for network…"
+      sleep 5
+      ((try++)) || true
+    done
     mv -f "$out.part" "$out"
   fi
   echo "$out"
@@ -1664,9 +1679,41 @@ xfetch() { fetch "https://www.x.org/pub/individual/$1/$2"; }
 
 xbuild() {  # xbuild <section> <tarball> [extra configure args...]
   local sect="$1" tarball="$2"; shift 2
-  local a; a=$(xfetch "$sect" "$tarball")
+  local a
+  # || return: callers often use "xbuild … || warn", which disables set -e
+  # in the function, so a failed $(xfetch) must not fall through to tar.
+  a=$(xfetch "$sect" "$tarball") || return 1
   bpkg "$a" bash -c "./configure $XORG_CONFIG $*; make -j${NPROC}; make install"
 }
+
+# Retry optional packages that were marked done even though they never
+# installed. xdm used to be checkpointed after a failed fetch, so a resume
+# skipped it forever.
+for s in xdm fastfetch; do
+  if step_done "$s" && ! command -v "$s" >/dev/null 2>&1; then
+    sed -i "/^${s}\$/d" "$STATE_FILE"
+    warn "$s was marked done but isn't installed — will retry"
+  fi
+done
+
+# On Guix the 'networking' service is up before DHCP has a lease. Phase 1
+# already waits; a resume skips phase 1, so the first phase-2 fetches (xdm,
+# fastfetch, …) can fail instantly. Wait here too. If the chroot's resolv.conf
+# has no non-loopback nameserver, add QEMU user-net DNS (10.0.2.3).
+if ! wget -q --spider --timeout=5 https://www.linuxfromscratch.org/ >/dev/null 2>&1 \
+   && ! wget -q --spider --timeout=5 https://www.x.org/ >/dev/null 2>&1; then
+  if ! awk '/^nameserver/ && $2 !~ /^127\./ { found=1 } END { exit !found }' /etc/resolv.conf 2>/dev/null; then
+    echo "nameserver 10.0.2.3" >> /etc/resolv.conf
+    warn "no non-loopback nameserver in /etc/resolv.conf — added 10.0.2.3 (QEMU user-net DNS)"
+  fi
+  header "Waiting for network"
+  for i in $(seq 1 24); do
+    wget -q --spider --timeout=10 https://www.linuxfromscratch.org/ >/dev/null 2>&1 && break
+    wget -q --spider --timeout=10 https://www.x.org/ >/dev/null 2>&1 && break
+    (( i == 1 )) && info "Waiting for DHCP/DNS…"
+    sleep 5
+  done
+fi
 
 # =============================================================================
 # 0. CA certificates — must run before ANY phase-2 download.
@@ -2376,8 +2423,8 @@ fi
 # =============================================================================
 if ! step_done xdm; then
   header "xdm ${XDM_VER}"
-  xbuild app "xdm-${XDM_VER}.tar.xz" "--with-xdmconfigdir=/etc/X11/xdm" || warn "xdm build failed — you can startx from a getty instead"
-  mark_step xdm
+  xbuild app "xdm-${XDM_VER}.tar.xz" "--with-xdmconfigdir=/etc/X11/xdm" \
+    && mark_step xdm || warn "xdm build failed — you can startx from a getty instead; re-run to retry"
 fi
 
 # =============================================================================
