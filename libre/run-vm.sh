@@ -308,7 +308,13 @@ run_boot() {
   local fw_vars="${FW_VARS:-${FW_CODE/OVMF_CODE/OVMF_VARS}}"
   [[ -f "$fw_vars" ]] || fw_vars="$(dirname "$FW_CODE")/OVMF_VARS.fd"
   [[ -f "$fw_vars" ]] || die "OVMF_VARS not found — set FW_VARS=/path/OVMF_VARS.fd"
-  local nvram="$VM_DIR/OVMF_VARS.fd"; [[ -f "$nvram" ]] || cp "$fw_vars" "$nvram"
+  # A kept OVMF_VARS can store a BootOrder that prefers "EFI Internal Shell"
+  # (e.g. Boot0006) after the virtio disk's PCI address changes (tablet, VGA,
+  # etc.). GRUB is installed --removable as \EFI\BOOT\BOOTX64.EFI, so a
+  # fresh vars template plus bootindex is enough; no NVRAM boot entry is used.
+  local nvram="$VM_DIR/OVMF_VARS.fd"
+  cp -f "$fw_vars" "$nvram"
+  chmod u+w "$nvram"
   local disp="${DISPLAY_TYPE:-}"; [[ -z "$disp" ]] && for d in gtk sdl; do qemu-system-x86_64 -display help 2>/dev/null | grep -qw "$d" && { disp="$d"; break; }; done
   pick_accel
   # virtio-vga: VGA + virtio, so Xorg modesetting works without guest 3D.
@@ -342,7 +348,8 @@ run_boot() {
     "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE" \
     -drive "if=pflash,format=raw,file=$nvram" \
-    -drive "file=$TARGET,if=virtio" \
+    -drive "file=$TARGET,if=none,id=osdisk,format=qcow2" \
+    -device virtio-blk-pci,drive=osdisk,bootindex=0 \
     -device "virtio-vga,xres=$vm_xres,yres=$vm_yres" -display "$display_opt" \
     -device virtio-tablet-pci \
     -serial mon:stdio \

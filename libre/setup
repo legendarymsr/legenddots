@@ -2202,6 +2202,16 @@ SECEOF
   fi
   [[ -e /etc/issue ]] || printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
   [[ -f /home/gnu/.xinitrc ]] && chmod +x /home/gnu/.xinitrc
+  # If OVMF still starts the EFI Shell, it auto-runs startup.nsh on the ESP.
+  if ! mountpoint -q /boot/efi 2>/dev/null; then
+    mkdir -p /boot/efi
+    mount /boot/efi 2>/dev/null || true
+  fi
+  if [[ -d /boot/efi/EFI/BOOT ]] || mountpoint -q /boot/efi 2>/dev/null; then
+    cat > /boot/efi/startup.nsh << 'NSHEOF'
+EFI\BOOT\BOOTX64.EFI
+NSHEOF
+  fi
   write_boot_init_stamp
   ok "/sbin/init pre-mounts proc/sys/dev/run, then execs shepherd (no daemonize)"
 }
