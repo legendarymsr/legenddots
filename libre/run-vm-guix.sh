@@ -328,10 +328,10 @@ run_boot() {
   # Default 1420x842 fills a maximized niri column on Yuki's 1440x900 screen
   # (gaps 10; waybar height 32 + margin-top 6). The GTK menubar is hidden so
   # the guest is 1:1 with that window (keep the menubar and use 1420x815).
-  # Override with VM_RES=WxH. Do not pass zoom-to-fit=on.
+  # Override with VM_RES=WxH. zoom-to-fit=off keeps the guest 1:1 (no stretching).
   local display_opt="${disp:-gtk}"
   if [[ "$display_opt" == gtk ]]; then
-    display_opt="gtk,show-menubar=off"
+    display_opt="gtk,show-menubar=off,zoom-to-fit=off"
   fi
   if [[ "${DISPLAY_GL:-}" == 1 || "${DISPLAY_GL:-}" == on ]]; then
     display_opt+=",gl=on"
