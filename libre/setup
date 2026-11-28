@@ -147,17 +147,18 @@ install_doas() {
     chmod 4755 "$doas_bin"
   fi
 
-  local rule="permit persist :wheel"
+  # setenv keeps DISPLAY and XAUTHORITY so `doas` in X can use gnu's cookie.
+  local rule="permit persist setenv { XAUTHORITY DISPLAY } :wheel"
   if [[ -n "$doas_bin" ]]; then
     local probe
     probe=$(mktemp)
     chown root:root "$probe" 2>/dev/null || true
     chmod 0400 "$probe"
-    printf '%s\n' "permit persist :wheel" > "$probe"
+    printf '%s\n' "$rule" > "$probe"
     if ! "$doas_bin" -C "$probe" >/dev/null 2>&1; then
-      printf '%s\n' "permit :wheel" > "$probe"
+      printf '%s\n' "permit setenv { XAUTHORITY DISPLAY } :wheel" > "$probe"
       if "$doas_bin" -C "$probe" >/dev/null 2>&1; then
-        rule="permit :wheel"
+        rule="permit setenv { XAUTHORITY DISPLAY } :wheel"
       fi
     fi
     rm -f "$probe"
@@ -1774,19 +1775,20 @@ pkg cmake_f   "$SRC/cmake-3.30.2.tar.gz"      bash -c "sed -i '/#include <memory
 pkg doas_f    "$SRC/opendoas-6.8.2.tar.gz"    bash -c "export CFLAGS=\"-O2 -std=gnu17\"; ./configure --prefix=/usr --sysconfdir=/etc --with-timestamp; make \$MAKEFLAGS; make install"
 
 # Permit the wheel group to use doas. persist needs --with-timestamp (set
-# above); drop it if this binary rejects the keyword.
-rule="permit persist :wheel"
+# above); drop it if this binary rejects the keyword. setenv keeps the
+# caller's X cookie so `doas` works inside an X session.
+rule="permit persist setenv { XAUTHORITY DISPLAY } :wheel"
 if [[ -x /usr/bin/doas ]]; then
   chown root:root /usr/bin/doas
   chmod 4755 /usr/bin/doas
   probe=$(mktemp)
   chown root:root "$probe" 2>/dev/null || true
   chmod 0400 "$probe"
-  printf '%s\n' "permit persist :wheel" > "$probe"
+  printf '%s\n' "$rule" > "$probe"
   if ! /usr/bin/doas -C "$probe" >/dev/null 2>&1; then
-    printf '%s\n' "permit :wheel" > "$probe"
+    printf '%s\n' "permit setenv { XAUTHORITY DISPLAY } :wheel" > "$probe"
     if /usr/bin/doas -C "$probe" >/dev/null 2>&1; then
-      rule="permit :wheel"
+      rule="permit setenv { XAUTHORITY DISPLAY } :wheel"
     fi
   fi
   rm -f "$probe"
@@ -3159,6 +3161,9 @@ export XDG_CURRENT_DESKTOP=ratpoison
 export XDG_SESSION_DESKTOP=ratpoison
 export DESKTOP_SESSION=ratpoison
 export XDG_SESSION_TYPE=x11
+# startx otherwise uses a throwaway ~/.serverauth.$$ and may leave
+# XAUTHORITY unset, so doas (as root) would look at /root/.Xauthority.
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
 xrdb -merge ~/.Xresources 2>/dev/null || true
 # Swedish layout (xorg.conf.d also sets XkbLayout se). setxkbmap is optional;
 # it is not built in the default X app set.
@@ -3221,6 +3226,9 @@ EOF
 export BROWSER=eww-open
 # Start the X session automatically on the first console.
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  # So startx uses ~/.Xauthority instead of a per-session ~/.serverauth.$$,
+  # and the variable is present for doas setenv.
+  export XAUTHORITY="$HOME/.Xauthority"
   exec startx
 fi
 EOF
@@ -3292,6 +3300,9 @@ export XDG_CURRENT_DESKTOP=ratpoison
 export XDG_SESSION_DESKTOP=ratpoison
 export DESKTOP_SESSION=ratpoison
 export XDG_SESSION_TYPE=x11
+# startx otherwise uses a throwaway ~/.serverauth.$$ and may leave
+# XAUTHORITY unset, so doas (as root) would look at /root/.Xauthority.
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
 xrdb -merge ~/.Xresources 2>/dev/null || true
 # Swedish layout (xorg.conf.d also sets XkbLayout se). setxkbmap is optional;
 # it is not built in the default X app set.
@@ -3309,6 +3320,18 @@ exec ratpoison
 EOF
     chmod +x /home/gnu/.xinitrc
     chown gnu:gnu /home/gnu/.xinitrc 2>/dev/null || true
+    cat > /home/gnu/.bash_profile << 'EOF'
+[ -f ~/.bashrc ] && . ~/.bashrc
+export BROWSER=eww-open
+# Start the X session automatically on the first console.
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  # So startx uses ~/.Xauthority instead of a per-session ~/.serverauth.$$,
+  # and the variable is present for doas setenv.
+  export XAUTHORITY="$HOME/.Xauthority"
+  exec startx
+fi
+EOF
+    chown gnu:gnu /home/gnu/.bash_profile 2>/dev/null || true
   fi
   groupadd -f input
   if id gnu >/dev/null 2>&1; then
