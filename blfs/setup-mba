@@ -136,7 +136,7 @@ if ! step_done disk; then
       || die "$1 is not a partition — whole disks are refused"
     if [[ "${2:-}" != mounted-ok ]]; then
       if findmnt -rn -S "$d" >/dev/null 2>&1; then die "$1 is mounted — unmount it first"; fi
-      if grep -q "^$d[[:space:]]" /proc/swaps; then die "$1 is active swap — swapoff it first"; fi
+      if grep -q "^${d}[[:space:]]" /proc/swaps; then die "$1 is active swap — swapoff it first"; fi
     fi
     RESULT="$d"
   }
@@ -150,7 +150,7 @@ if ! step_done disk; then
   host_root=$(readlink -f "$(findmnt -no SOURCE /)")
   [[ "$ROOT" != "$host_root" ]] || die "$ROOT is the running host's root partition"
 
-  esp_type=$(lsblk -dno PARTTYPE "$EFI")
+  esp_type=$(blkid -p -s PART_ENTRY_TYPE -o value "$EFI" 2>/dev/null || true)
   [[ "${esp_type,,}" == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" ]] \
     || die "$EFI is not an EFI System Partition (type GUID $esp_type)"
   [[ "$(blkid -p -s TYPE -o value "$EFI" 2>/dev/null || true)" == vfat ]] \
@@ -207,7 +207,7 @@ mkdir -p "$LFS"
 mountpoint -q "$LFS" || mount "$ROOT" "$LFS"
 mkdir -p "$LFS/boot/efi"
 mountpoint -q "$LFS/boot/efi" || mount "$EFI" "$LFS/boot/efi"
-if [[ -n "${SWAP:-}" ]] && ! grep -q "^$(readlink -f "$SWAP")[[:space:]]" /proc/swaps; then swapon "$SWAP"; fi
+if [[ -n "${SWAP:-}" ]] && ! grep -q "^$(readlink -f "$SWAP")[[:space:]]" /proc/swaps; then swapon "$SWAP" || warn "swapon $SWAP failed (already active?) — continuing"; fi
 
 # ── Sources ──────────────────────────────────────────────────────────────────
 if ! step_done sources; then
@@ -385,6 +385,7 @@ MAKEFLAGS="${MAKEFLAGS:--j3}"
 
 STATE="$HOME/.lfs-phase12.state"
 touch "$STATE"
+rm -rf "$SRC"/build.* 2>/dev/null || true
 stepdone() { grep -qx "$1" "$STATE"; }
 mark() { echo "$1" >> "$STATE"; }
 
@@ -689,6 +690,7 @@ SRC=/sources
 
 STATE=/tmp/lfs-chroot.state
 touch "$STATE"
+rm -rf "$SRC"/build.* "$SRC"/llvm-build.* 2>/dev/null || true
 stepdone() { grep -qx "$1" "$STATE"; }
 mark() { echo "$1" >> "$STATE"; }
 
@@ -1505,6 +1507,7 @@ header "Unmounting $LFS"
 umount -R "$LFS/dev" "$LFS/proc" "$LFS/sys" "$LFS/run" 2>/dev/null || true
 umount "$LFS/boot/efi" 2>/dev/null || true
 umount "$LFS"          2>/dev/null || true
+[[ -n "${SWAP:-}" ]] && { swapoff "$SWAP" 2>/dev/null || true; }
 
 echo -e "\n${GREEN}── LFS install finished ──${NC}"
 echo "1. Reboot and pick \"LFS 12.4\" in rEFInd (Gentoo entries are untouched)."
@@ -1528,6 +1531,7 @@ mark_step()  { echo "$1" >> "$STATE_FILE"; }
 
 SOURCES=/sources
 mkdir -p "$SOURCES"
+rm -rf "$SOURCES"/build.* "$SOURCES"/llvm-build.* 2>/dev/null || true
 
 export CC="gcc"
 export CXX="g++"
@@ -2319,6 +2323,7 @@ if ! step_done brightnessctl; then
   header "brightnessctl ${BRIGHTNESSCTL_VER}"
   a=$(fetch "https://github.com/Hummer12007/brightnessctl/archive/refs/tags/${BRIGHTNESSCTL_VER}.tar.gz")
   bpkg "$a" bash -c "make -j${NPROC}; make install PREFIX=/usr"
+  install -dm755 /etc/udev/rules.d
   cat > /etc/udev/rules.d/90-backlight.rules << 'EOF'
 ACTION=="add", SUBSYSTEM=="backlight", \
   RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
