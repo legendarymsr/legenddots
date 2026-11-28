@@ -47,6 +47,86 @@ write_boot_init_stamp() {
   echo "LIBRE-BOOT-INIT: $ver"
 }
 
+# Package set tracks LFS 12.4 (lfs-packages/12.4 and the 12.4 patch set).
+LFS_VERSION="${LFS_VERSION:-12.4}"
+
+# Identity files for the target (fastfetch, login, etc.). No os-release was
+# written before, so fastfetch hid the OS line and used its generic '#' logo.
+install_os_release() {
+  mkdir -p /etc /usr/lib
+  cat > /etc/os-release << EOF
+NAME="Linux From Scratch"
+PRETTY_NAME="Linux From Scratch ${LFS_VERSION}"
+ID=lfs
+VERSION="${LFS_VERSION}"
+VERSION_ID="${LFS_VERSION}"
+ANSI_COLOR="0;36"
+HOME_URL="https://www.linuxfromscratch.org/"
+DOCUMENTATION_URL="https://www.linuxfromscratch.org/lfs/"
+EOF
+  ln -sfn /etc/os-release /usr/lib/os-release
+  cat > /etc/lsb-release << EOF
+DISTRIB_ID=LFS
+DISTRIB_RELEASE=${LFS_VERSION}
+DISTRIB_DESCRIPTION="Linux From Scratch ${LFS_VERSION}"
+EOF
+}
+
+# System-wide fastfetch look: built-in LFS logo (ID=lfs / alias LinuxFromScratch)
+# and Tokyo Night key colours. Written on every resume; do not depend on the
+# checkpointed fastfetch_config step or a repo-relative path in the chroot.
+install_fastfetch_look() {
+  mkdir -p /etc/xdg/fastfetch
+  rm -f /etc/xdg/fastfetch/libre.txt
+  cat > /etc/xdg/fastfetch/config.jsonc << 'EOF'
+// Linux From Scratch — Tokyo Night keys, built-in LFS logo (fastfetch "lfs").
+// Colours are raw truecolor SGR (38;2;R;G;B); older fastfetch rejects #rrggbb.
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "builtin",
+    "source": "lfs",
+    "padding": { "top": 1, "left": 1, "right": 3 }
+  },
+  "display": {
+    "separator": "  ",
+    "color": {
+      "keys": "38;2;122;162;247",
+      "title": "38;2;187;154;247",
+      "output": "38;2;192;202;245",
+      "separator": "38;2;86;95;137"
+    },
+    "key": { "width": 11 }
+  },
+  "modules": [
+    "title",
+    { "type": "separator", "string": "─" },
+    { "type": "os",         "key": "os" },
+    { "type": "host",       "key": "host" },
+    { "type": "kernel",     "key": "kernel" },
+    { "type": "initsystem", "key": "init" },
+    { "type": "uptime",     "key": "uptime" },
+    { "type": "packages",   "key": "packages" },
+    { "type": "shell",      "key": "shell" },
+    { "type": "wm",         "key": "wm" },
+    { "type": "terminal",   "key": "terminal" },
+    { "type": "cpu",        "key": "cpu" },
+    { "type": "gpu",        "key": "gpu" },
+    { "type": "memory",     "key": "memory" },
+    { "type": "swap",       "key": "swap" },
+    { "type": "disk",       "key": "disk" },
+    "break",
+    { "type": "colors", "symbol": "circle" }
+  ]
+}
+EOF
+  if id gnu >/dev/null 2>&1; then
+    mkdir -p /home/gnu/.config/fastfetch
+    install -m644 /etc/xdg/fastfetch/config.jsonc /home/gnu/.config/fastfetch/config.jsonc
+    chown -R gnu:gnu /home/gnu/.config/fastfetch
+  fi
+}
+
 # =============================================================================
 # PHASE DETECTION
 # =============================================================================
@@ -1476,6 +1556,7 @@ ttyS0
 console
 EOF2
   printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
+  install_os_release
 
   mkdir -pv /etc/profile.d
   cat > /etc/profile << 'EOF2'
@@ -3025,6 +3106,8 @@ EOF
     fi
     chown gnu:gnu /home/gnu/.ratpoisonrc
   fi
+  install_os_release
+  install_fastfetch_look
 }
 apply_desktop_fixes
 
@@ -3061,12 +3144,8 @@ fi
 # bash, like legenddots' .zshrc does (guarded: no-op if fastfetch is missing).
 if ! step_done fastfetch_config; then
   header "fastfetch config (/etc/xdg/fastfetch, Tokyo Night)"
-  FF_CONF="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)/fastfetch/config.jsonc"
-  if [ -f "$FF_CONF" ]; then
-    install -Dm644 "$FF_CONF" /etc/xdg/fastfetch/config.jsonc
-  else
-    warn "fastfetch config not found at $FF_CONF — fastfetch will use its built-in defaults"
-  fi
+  install_os_release
+  install_fastfetch_look
   if id gnu >/dev/null 2>&1 && ! grep -q 'legenddots: fastfetch' /home/gnu/.bashrc 2>/dev/null; then
     cat >> /home/gnu/.bashrc << 'EOF'
 # legenddots: fastfetch on interactive shells (skipped on tty1, which execs startx)
@@ -3080,6 +3159,8 @@ EOF
   fi
   mark_step fastfetch_config
 fi
+install_os_release
+install_fastfetch_look
 
 echo ""
 echo -e "${GREEN}── GNU/Linux-libre desktop complete ──${NC}"
