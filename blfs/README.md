@@ -1,5 +1,8 @@
 # LFS 12.4 + BLFS Desktop Setup — KVM/QEMU (x86_64, 2 vCPU, 4 GB) / Niri + Wayland
 
+> This file describes `blfs/setup` (KVM/QEMU). For the MacBook Air 6,2 dual-boot
+> install see [README-mba.md](README-mba.md) and `blfs/setup-mba`.
+
 One script, two phases. Phase 1 runs from a Gentoo host and builds a complete
 Linux From Scratch 12.4 base system on a target disk. Phase 2 runs inside that
 LFS system and builds the full Niri + Wayland desktop stack from source.
@@ -380,11 +383,11 @@ permit persist legend as root
 |--|--------|------------|
 | CPU flags | `-march=haswell` | `-march=x86-64` |
 | Parallel jobs | `-j3` | `-j2` |
-| GPU driver | `iris` + `crocus` (Intel i915) | `virgl` + `swrast` |
-| Vulkan | ANV (Intel) | none |
+| GPU driver | `crocus` + `swrast` (Haswell has no iris/ANV) | `virgl` + `swrast` |
+| Vulkan | none | none |
 | Kernel drivers | i915, HDA Cirrus, SATA AHCI, HID Apple, BCM WiFi | virtio-pci/blk/net/gpu/input |
-| WiFi | BCM4360 (proprietary `wl` module) | virtio-net (no setup needed) |
+| WiFi | BCM4360 (`wl` built from Debian broadcom-sta, wpa_supplicant + dhcpcd) | virtio-net (no setup needed) |
 | Backlight | brightnessctl + udev rules | not applicable |
-| Step 47 | Apple/Broadcom hardware quirks | virtio-gpu udev permissions |
+| Disk | existing partitions via `LFS_PART`/`LFS_ESP` (dual-boot) | whole virtual disk |
 | LLVM build time | ~6–10 h | ~10–16 h |
 | Total build time | ~30–40 h | ~50–70 h |

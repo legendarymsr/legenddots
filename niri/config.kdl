@@ -76,7 +76,7 @@ window-rule {
 binds {
     Mod+Return { spawn "alacritty"; }
     Mod+d { spawn "fuzzel"; }
-    Mod+b { spawn "brave-browser-nightly" "--ozone-platform=wayland"; }
+    Mod+b { spawn "sh" "-c" "if command -v brave-browser-nightly >/dev/null; then exec brave-browser-nightly --ozone-platform=wayland; elif command -v firefox >/dev/null; then exec firefox; else exec alacritty -e links https://duckduckgo.com; fi"; }
     // Mod+E: open your default editor in a terminal (edit = nvim or emacs per use-nvim/use-emacs)
     Mod+e { spawn "alacritty" "-e" "sh" "-c" "exec $HOME/.local/bin/edit"; }
     Mod+Shift+b { spawn "sh" "-c" "pkill waybar; sleep 0.3; waybar"; }
