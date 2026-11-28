@@ -1543,11 +1543,23 @@ FSCKEOF
 ;; "Wrong type argument: getty-tty1").
 (use-modules (shepherd service))
 
+;; udevd and syslogd are their own services so Shepherd supervises a
+;; single process each. sysinit is not one-shot: in Shepherd 0.10 a
+;; one-shot service is marked stopped after start, so every getty that
+;; requires sysinit would run it again (and spawn another udevd/syslogd).
+(define udevd
+  (service '(udevd)
+    #:documentation "eudev daemon"
+    #:requirement '()
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/usr/sbin/udevd"))
+    #:stop (make-kill-destructor)))
+
 (define sysinit
   (service '(sysinit)
-    #:documentation "Mount remaining filesystems, swap, udev, and network."
-    #:requirement '()
-    #:one-shot? #t
+    #:documentation "Mount remaining filesystems, swap, udev settle, and network."
+    #:requirement '(udevd)
     #:start (lambda ()
               ;; ESP may be dirty if the VM was cut off; fsck.vfat is optional
               ;; (dosfstools is not built in the target by default).
@@ -1556,15 +1568,24 @@ FSCKEOF
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
               (system "/bin/sh -c '. /etc/sysconfig/console 2>/dev/null; map=${KEYMAP:-sv-latin1}; command -v loadkeys >/dev/null && loadkeys \"$map\" || true'")
-              (system "/usr/sbin/udevd --daemon")
               (system "/usr/sbin/udevadm trigger --action=add")
               (system "/usr/sbin/udevadm settle --timeout=30")
               (system "/usr/sbin/ip link set lo up")
               ;; No DHCP client is built. QEMU user-net (slirp) defaults:
               ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
               (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
-              (system "/usr/sbin/syslogd")
-              #t)))
+              #t)
+    #:stop (lambda _
+             #f)))
+
+(define syslogd
+  (service '(syslogd)
+    #:documentation "sysklogd"
+    #:requirement '(sysinit)
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/usr/sbin/syslogd" "-F"))
+    #:stop (make-kill-destructor)))
 
 (define (make-getty tty)
   (service (list (string->symbol (string-append "getty-" tty)))
@@ -1590,13 +1611,14 @@ FSCKEOF
 (define getty-ttyS0 (make-serial-getty "ttyS0"))
 
 (register-services
- (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+ (list udevd sysinit syslogd getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
 ;; start-service takes a service object. start-in-the-background takes one
 ;; list of symbols; (for-each start-in-the-background names) passed a bare
 ;; symbol and start-in-parallel's map raised "Wrong type argument: getty-tty1".
-;; Start sysinit first; each getty requires it.
+;; Start sysinit first (it starts udevd); then syslogd; each getty requires sysinit.
 (start-service sysinit)
+(start-service syslogd)
 (start-service getty-tty1)
 (start-service getty-tty2)
 (start-service getty-tty3)
@@ -2213,11 +2235,23 @@ FSCKEOF
 ;; "Wrong type argument: getty-tty1").
 (use-modules (shepherd service))
 
+;; udevd and syslogd are their own services so Shepherd supervises a
+;; single process each. sysinit is not one-shot: in Shepherd 0.10 a
+;; one-shot service is marked stopped after start, so every getty that
+;; requires sysinit would run it again (and spawn another udevd/syslogd).
+(define udevd
+  (service '(udevd)
+    #:documentation "eudev daemon"
+    #:requirement '()
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/usr/sbin/udevd"))
+    #:stop (make-kill-destructor)))
+
 (define sysinit
   (service '(sysinit)
-    #:documentation "Mount remaining filesystems, swap, udev, and network."
-    #:requirement '()
-    #:one-shot? #t
+    #:documentation "Mount remaining filesystems, swap, udev settle, and network."
+    #:requirement '(udevd)
     #:start (lambda ()
               ;; ESP may be dirty if the VM was cut off; fsck.vfat is optional
               ;; (dosfstools is not built in the target by default).
@@ -2226,15 +2260,24 @@ FSCKEOF
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
               (system "/bin/sh -c '. /etc/sysconfig/console 2>/dev/null; map=${KEYMAP:-sv-latin1}; command -v loadkeys >/dev/null && loadkeys \"$map\" || true'")
-              (system "/usr/sbin/udevd --daemon")
               (system "/usr/sbin/udevadm trigger --action=add")
               (system "/usr/sbin/udevadm settle --timeout=30")
               (system "/usr/sbin/ip link set lo up")
               ;; No DHCP client is built. QEMU user-net (slirp) defaults:
               ;; guest 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3.
               (system "/bin/sh -c 'for d in /sys/class/net/*; do n=${d##*/}; [ \"$n\" = lo ] && continue; /usr/sbin/ip link set \"$n\" up || continue; /usr/sbin/ip addr add 10.0.2.15/24 dev \"$n\" 2>/dev/null || true; /usr/sbin/ip route add default via 10.0.2.2 dev \"$n\" 2>/dev/null || true; grep -q \"^nameserver\" /etc/resolv.conf 2>/dev/null || echo nameserver 10.0.2.3 > /etc/resolv.conf; break; done'")
-              (system "/usr/sbin/syslogd")
-              #t)))
+              #t)
+    #:stop (lambda _
+             #f)))
+
+(define syslogd
+  (service '(syslogd)
+    #:documentation "sysklogd"
+    #:requirement '(sysinit)
+    #:respawn? #t
+    #:start (make-forkexec-constructor
+             (list "/usr/sbin/syslogd" "-F"))
+    #:stop (make-kill-destructor)))
 
 (define (make-getty tty)
   (service (list (string->symbol (string-append "getty-" tty)))
@@ -2260,13 +2303,14 @@ FSCKEOF
 (define getty-ttyS0 (make-serial-getty "ttyS0"))
 
 (register-services
- (list sysinit getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
+ (list udevd sysinit syslogd getty-tty1 getty-tty2 getty-tty3 getty-ttyS0))
 
 ;; start-service takes a service object. start-in-the-background takes one
 ;; list of symbols; (for-each start-in-the-background names) passed a bare
 ;; symbol and start-in-parallel's map raised "Wrong type argument: getty-tty1".
-;; Start sysinit first; each getty requires it.
+;; Start sysinit first (it starts udevd); then syslogd; each getty requires sysinit.
 (start-service sysinit)
+(start-service syslogd)
 (start-service getty-tty1)
 (start-service getty-tty2)
 (start-service getty-tty3)
