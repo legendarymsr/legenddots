@@ -35,8 +35,8 @@ warn()   { echo -e "${YELLOW}  ! $*${NC}" >&2; }
 die()    { echo -e "${RED}  ✗ $*${NC}" >&2; exit 1; }
 
 # Bump libre/boot-init.version when the generated grub/init/fstab refresh
-# changes. The launcher compares that to $VM_DIR/work/boot-init.version so a
-# plain ./run-vm-guix.sh (or ./run-vm.sh) resumes just to rewrite boot files.
+# changes, or when a finished image needs a resume to apply a desktop/boot
+# fix (the launcher compares it to $VM_DIR/work/boot-init.version).
 write_boot_init_stamp() {
   local src ver
   src="$(dirname "${BASH_SOURCE[0]}")/boot-init.version"
@@ -1819,6 +1819,57 @@ for s in xdm fastfetch; do
   fi
 done
 
+# Xorg loads input modules from pkg-config's moduledir (often
+# /usr/lib64/xorg/modules: meson on this x86_64 tree uses lib64).
+# xf86-input-libinput was configured without --libdir, so
+# libinput_drv.so may have landed in /usr/lib while 40-libinput.conf
+# still matches keyboards and mice — X then logs
+# "Failed to load module libinput (module does not exist)".
+xorg_moduledir() {
+  local m
+  m=$(pkg-config --variable=moduledir xorg-server 2>/dev/null || true)
+  if [[ -n "$m" ]]; then
+    printf '%s\n' "$m"
+    return 0
+  fi
+  for m in /usr/lib64/xorg/modules /usr/lib/xorg/modules; do
+    if [[ -d "$m" ]]; then
+      printf '%s\n' "$m"
+      return 0
+    fi
+  done
+  printf '%s\n' /usr/lib/xorg/modules
+}
+
+place_libinput_drv() {
+  local dest src
+  dest="$(xorg_moduledir)/input"
+  mkdir -p "$dest"
+  [[ -f "$dest/libinput_drv.so" ]] && return 0
+  src=$(find /usr/lib64 /usr/lib -name libinput_drv.so 2>/dev/null | head -n1 || true)
+  if [[ -n "$src" && "$src" != "$dest/libinput_drv.so" ]]; then
+    ln -sf "$src" "$dest/libinput_drv.so"
+    return 0
+  fi
+  return 1
+}
+
+unmark_step() { sed -i "/^${1}\$/d" "$STATE_FILE"; }
+
+# Drop checkpoints if the libraries or the X driver module are missing, so
+# a resume rebuilds them (same idea as the xdm/fastfetch retry above).
+if command -v pkg-config >/dev/null 2>&1; then
+  pkg-config --exists mtdev    2>/dev/null || unmark_step mtdev
+  pkg-config --exists libevdev 2>/dev/null || unmark_step libevdev
+  pkg-config --exists libinput 2>/dev/null || unmark_step libinput
+fi
+if ! place_libinput_drv; then
+  if step_done xf86_input_libinput; then
+    unmark_step xf86_input_libinput
+    warn "xf86-input-libinput was marked done but libinput_drv.so is not in $(xorg_moduledir)/input — will retry"
+  fi
+fi
+
 # On Guix the 'networking' service is up before DHCP has a lease. Phase 1
 # already waits; a resume skips phase 1, so the first phase-2 fetches (xdm,
 # fastfetch, …) can fail instantly. Wait here too. If the chroot's resolv.conf
@@ -2478,7 +2529,10 @@ if ! step_done xorg_server; then
 fi
 if ! step_done xf86_input_libinput; then
   header "xf86-input-libinput"
-  xbuild driver "xf86-input-libinput-1.5.0.tar.xz"
+  libdir="$(xorg_moduledir)"
+  libdir="${libdir%/xorg/modules}"
+  xbuild driver "xf86-input-libinput-1.5.0.tar.xz" "--libdir=$libdir"
+  place_libinput_drv || die "xf86-input-libinput did not install libinput_drv.so into $(xorg_moduledir)/input"
   mark_step xf86_input_libinput
 fi
 if ! step_done xinit; then
@@ -2941,6 +2995,38 @@ EOF
   chown -R gnu:gnu /home/gnu
   mark_step user_setup
 fi
+
+# Apply even when user_setup is already checkpointed (a finished image
+# resumes through here without rebuilding the user).
+apply_desktop_fixes() {
+  mkdir -p /var/lib/xkb /etc/X11/xorg.conf.d
+  # virtio-gpu uses the built-in modesetting driver. Do not probe fbdev/vesa
+  # (those DDX modules are not built; the (EE) lines were harmless).
+  cat > /etc/X11/xorg.conf.d/10-disable-fbdev-vesa.conf << 'EOF'
+Section "Module"
+    Disable "fbdev"
+    Disable "vesa"
+EndSection
+EOF
+  place_libinput_drv || true
+  groupadd -f input
+  if id gnu >/dev/null 2>&1; then
+    usermod -aG input,video,audio gnu 2>/dev/null || true
+  fi
+  # C-t d starts Dillo; use an absolute path so the binding works even if
+  # the X session's PATH is short.
+  if command -v dillo >/dev/null 2>&1 && [[ -f /home/gnu/.ratpoisonrc ]]; then
+    if grep -qE '^bind d ' /home/gnu/.ratpoisonrc; then
+      sed -i 's|^bind d exec dillo$|bind d exec /usr/bin/dillo|' /home/gnu/.ratpoisonrc
+    elif grep -qE '^bind b ' /home/gnu/.ratpoisonrc; then
+      sed -i '/^bind b /a bind d exec /usr/bin/dillo' /home/gnu/.ratpoisonrc
+    else
+      printf '\nbind d exec /usr/bin/dillo\n' >> /home/gnu/.ratpoisonrc
+    fi
+    chown gnu:gnu /home/gnu/.ratpoisonrc
+  fi
+}
+apply_desktop_fixes
 
 # =============================================================================
 # 15. fastfetch — SLFS 13.1 (Supplemental LFS, ch. 3), system info tool.
