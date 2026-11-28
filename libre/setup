@@ -2215,13 +2215,15 @@ install_boot_init
 # defaults to n, and FRAMEBUFFER_CONSOLE defaults to n. After GRUB hands off
 # from efi_gop, there is no fbcon and the graphical window stays blank.
 # Rebuild only the kernel, and only if /boot/config-6.16-libre lacks these.
+# CONFIG_VIRTIO_INPUT is already turned on in both build paths (needed for
+# QEMU's virtio-tablet-pci absolute pointer; no USB host required).
 kernel_console_ok() {
   local c=/boot/config-6.16-libre s
   [[ -f "$c" ]] || return 1
   for s in CONFIG_VIRTIO_PCI=y CONFIG_VIRTIO_BLK=y CONFIG_EXT4_FS=y \
            CONFIG_DRM_VIRTIO_GPU=y CONFIG_SERIAL_8250_CONSOLE=y \
            CONFIG_VGA_CONSOLE=y CONFIG_FB=y CONFIG_FRAMEBUFFER_CONSOLE=y \
-           CONFIG_DRM_FBDEV_EMULATION=y; do
+           CONFIG_DRM_FBDEV_EMULATION=y CONFIG_VIRTIO_INPUT=y; do
     grep -qx "$s" "$c" || return 1
   done
   return 0
@@ -3011,6 +3013,9 @@ if ! step_done user_setup; then
 #!/bin/sh
 # Free desktop session: ratpoison window manager.
 xrdb -merge ~/.Xresources 2>/dev/null || true
+# Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres; default 1440x900).
+xrandr --auto >/dev/null 2>&1 || true
+xrandr --output Virtual-1 --mode 1440x900 >/dev/null 2>&1 || true
 exec ratpoison
 EOF
 
@@ -3090,6 +3095,60 @@ Section "Module"
 EndSection
 EOF
   place_libinput_drv || true
+  # Pointer + tablet catchalls so the virtio tablet (and leftover PS/2 mouse)
+  # use libinput. Keyboard catchall too, in case the packaged 40-libinput.conf
+  # is not on Xorg's path.
+  mkdir -p /etc/X11/xorg.conf.d
+  cat > /etc/X11/xorg.conf.d/40-libinput.conf << 'EOF'
+Section "InputClass"
+    Identifier "libinput keyboard catchall"
+    MatchIsKeyboard "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+Section "InputClass"
+    Identifier "libinput pointer catchall"
+    MatchIsPointer "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+Section "InputClass"
+    Identifier "libinput tablet catchall"
+    MatchIsTablet "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+EOF
+  # Default guest mode for a 13-inch MacBook Air; QEMU virtio-vga,xres,yres
+  # is the real source of the preferred mode (override with VM_RES=WxH).
+  cat > /etc/X11/xorg.conf.d/20-screen.conf << 'EOF'
+Section "Monitor"
+    Identifier "Virtual-1"
+    Option "PreferredMode" "1440x900"
+EndSection
+Section "Screen"
+    Identifier "Screen0"
+    Monitor "Virtual-1"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "1440x900"
+    EndSubSection
+EndSection
+EOF
+  if [[ -d /home/gnu ]]; then
+    cat > /home/gnu/.xinitrc << 'EOF'
+#!/bin/sh
+# Free desktop session: ratpoison window manager.
+xrdb -merge ~/.Xresources 2>/dev/null || true
+# Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres; default 1440x900).
+xrandr --auto >/dev/null 2>&1 || true
+xrandr --output Virtual-1 --mode 1440x900 >/dev/null 2>&1 || true
+exec ratpoison
+EOF
+    chmod +x /home/gnu/.xinitrc
+    chown gnu:gnu /home/gnu/.xinitrc 2>/dev/null || true
+  fi
   groupadd -f input
   if id gnu >/dev/null 2>&1; then
     usermod -aG input,video,audio gnu 2>/dev/null || true

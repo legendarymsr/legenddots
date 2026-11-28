@@ -31,7 +31,7 @@
 #   ./run-vm.sh watch    tail the live build log
 #
 # Tunables (env): VM_DIR TARGET_SIZE MEM CPUS JOBS CLOUD_IMG_URL SHARE ACCEL ALLOW_TCG
-#                 (and for boot: FW_CODE FW_VARS DISPLAY_TYPE DISPLAY_GL)
+#                 (and for boot: FW_CODE FW_VARS DISPLAY_TYPE DISPLAY_GL VM_RES=WxH)
 #   SHARE=auto  (default) offer 9p too if this QEMU has virtio-9p
 #   SHARE=9p    require 9p in QEMU (errors out if it's missing)
 #   SHARE=copy  never offer 9p: repo -> read-only tar disk, log -> virtio-serial
@@ -315,19 +315,32 @@ run_boot() {
   # Never default to gl=on: QEMU built without OpenGL (typical Gentoo) dies
   # with "OpenGL support was not enabled in this build of QEMU". Opt in with
   # DISPLAY_GL=on if your QEMU has virgl/gtk-gl.
+  # Default 1440x900 matches a 13-inch MacBook Air; override with VM_RES=WxH.
+  # Do not pass zoom-to-fit=on — the guest runs at that resolution instead of
+  # stretching a smaller mode.
   local display_opt="${disp:-gtk}"
   if [[ "${DISPLAY_GL:-}" == 1 || "${DISPLAY_GL:-}" == on ]]; then
     display_opt+=",gl=on"
   fi
+  local vm_xres=1440 vm_yres=900
+  local res="${VM_RES:-1440x900}"
+  if [[ "$res" =~ ^([0-9]{3,5})x([0-9]{3,5})$ ]]; then
+    vm_xres="${BASH_REMATCH[1]}"
+    vm_yres="${BASH_REMATCH[2]}"
+  else
+    die "VM_RES must be WxH (e.g. 1440x900), got: $res"
+  fi
   header "Booting the libre system (login: gnu / libre — X starts into ratpoison)"
   echo -e "  video is the QEMU window; kernel and console also go to this terminal"
   echo -e "  (serial).  ${CYAN}Ctrl-A c${NC} switches to the QEMU monitor and back."
+  echo -e "  display ${vm_xres}x${vm_yres} (override with ${GRN}VM_RES=WxH${NC}); absolute tablet (no Ctrl-Alt-G grab)"
   exec qemu-system-x86_64 \
     "${ACCEL_ARGS[@]}" -m "$MEM" -smp "$CPUS" \
     -drive "if=pflash,format=raw,readonly=on,file=$FW_CODE" \
     -drive "if=pflash,format=raw,file=$nvram" \
     -drive "file=$TARGET,if=virtio" \
-    -device virtio-vga -display "$display_opt" \
+    -device "virtio-vga,xres=$vm_xres,yres=$vm_yres" -display "$display_opt" \
+    -device virtio-tablet-pci \
     -serial mon:stdio \
     -netdev user,id=n0 -device virtio-net,netdev=n0 -device virtio-rng \
     -device virtio-balloon,free-page-reporting=on
