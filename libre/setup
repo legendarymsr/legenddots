@@ -3012,6 +3012,13 @@ if ! step_done user_setup; then
   cat > /home/gnu/.xinitrc << 'EOF'
 #!/bin/sh
 # Free desktop session: ratpoison window manager.
+# ratpoison is not EWMH-compliant, and /proc/*/loginuid is unset on this
+# system (no pam_loginuid), so fastfetch cannot detect the WM from X or
+# from a process scan. These are how it (and similar tools) recognize it.
+export XDG_CURRENT_DESKTOP=ratpoison
+export XDG_SESSION_DESKTOP=ratpoison
+export DESKTOP_SESSION=ratpoison
+export XDG_SESSION_TYPE=x11
 xrdb -merge ~/.Xresources 2>/dev/null || true
 # Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres; default 1440x900).
 xrandr --auto >/dev/null 2>&1 || true
@@ -3140,6 +3147,13 @@ EOF
     cat > /home/gnu/.xinitrc << 'EOF'
 #!/bin/sh
 # Free desktop session: ratpoison window manager.
+# ratpoison is not EWMH-compliant, and /proc/*/loginuid is unset on this
+# system (no pam_loginuid), so fastfetch cannot detect the WM from X or
+# from a process scan. These are how it (and similar tools) recognize it.
+export XDG_CURRENT_DESKTOP=ratpoison
+export XDG_SESSION_DESKTOP=ratpoison
+export DESKTOP_SESSION=ratpoison
+export XDG_SESSION_TYPE=x11
 xrdb -merge ~/.Xresources 2>/dev/null || true
 # Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres; default 1440x900).
 xrandr --auto >/dev/null 2>&1 || true
