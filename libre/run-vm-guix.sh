@@ -325,20 +325,24 @@ run_boot() {
   # Never default to gl=on: QEMU built without OpenGL (typical Gentoo) dies
   # with "OpenGL support was not enabled in this build of QEMU". Opt in with
   # DISPLAY_GL=on if your QEMU has virgl/gtk-gl.
-  # Default 1440x900 matches a 13-inch MacBook Air; override with VM_RES=WxH.
-  # Do not pass zoom-to-fit=on — the guest runs at that resolution instead of
-  # stretching a smaller mode.
+  # Default 1420x842 fills a maximized niri column on Yuki's 1440x900 screen
+  # (gaps 10; waybar height 32 + margin-top 6). The GTK menubar is hidden so
+  # the guest is 1:1 with that window (keep the menubar and use 1420x815).
+  # Override with VM_RES=WxH. Do not pass zoom-to-fit=on.
   local display_opt="${disp:-gtk}"
+  if [[ "$display_opt" == gtk ]]; then
+    display_opt="gtk,show-menubar=off"
+  fi
   if [[ "${DISPLAY_GL:-}" == 1 || "${DISPLAY_GL:-}" == on ]]; then
     display_opt+=",gl=on"
   fi
-  local vm_xres=1440 vm_yres=900
-  local res="${VM_RES:-1440x900}"
+  local vm_xres=1420 vm_yres=842
+  local res="${VM_RES:-1420x842}"
   if [[ "$res" =~ ^([0-9]{3,5})x([0-9]{3,5})$ ]]; then
     vm_xres="${BASH_REMATCH[1]}"
     vm_yres="${BASH_REMATCH[2]}"
   else
-    die "VM_RES must be WxH (e.g. 1440x900), got: $res"
+    die "VM_RES must be WxH (e.g. 1420x842), got: $res"
   fi
   header "Booting the libre system (login: gnu / libre — X starts into ratpoison)"
   echo -e "  video is the QEMU window; kernel and console also go to this terminal"
