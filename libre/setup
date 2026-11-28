@@ -127,6 +127,47 @@ EOF
   fi
 }
 
+# OpenDoas: /etc/doas.conf for wheel, setuid bit, gnu in wheel.
+# The phase-1 build uses --with-timestamp, so persist should work; fall back
+# if this binary rejects it.
+install_doas() {
+  groupadd -f wheel
+  if id gnu >/dev/null 2>&1; then
+    usermod -aG wheel gnu 2>/dev/null || true
+  fi
+
+  local doas_bin=""
+  if [[ -x /usr/bin/doas ]]; then
+    doas_bin=/usr/bin/doas
+  elif command -v doas >/dev/null 2>&1; then
+    doas_bin=$(command -v doas)
+  fi
+  if [[ -n "$doas_bin" ]]; then
+    chown root:root "$doas_bin"
+    chmod 4755 "$doas_bin"
+  fi
+
+  local rule="permit persist :wheel"
+  if [[ -n "$doas_bin" ]]; then
+    local probe
+    probe=$(mktemp)
+    chown root:root "$probe" 2>/dev/null || true
+    chmod 0400 "$probe"
+    printf '%s\n' "permit persist :wheel" > "$probe"
+    if ! "$doas_bin" -C "$probe" >/dev/null 2>&1; then
+      printf '%s\n' "permit :wheel" > "$probe"
+      if "$doas_bin" -C "$probe" >/dev/null 2>&1; then
+        rule="permit :wheel"
+      fi
+    fi
+    rm -f "$probe"
+  fi
+
+  printf '%s\n' "$rule" > /etc/doas.conf
+  chown root:root /etc/doas.conf
+  chmod 0400 /etc/doas.conf
+}
+
 # Swedish keyboard: Xkb "se" for X, kbd "sv-latin1" for the VTs (kbd 2.8.0
 # ships /usr/share/keymaps/i386/qwerty/sv-latin1.map.gz).
 install_swedish_keyboard() {
@@ -1710,6 +1751,29 @@ pkg zsh_f     "$SRC/zsh-5.9.tar.xz"           bash -c "sed -e 's/^main/int &/' -
 pkg cmake_f   "$SRC/cmake-3.30.2.tar.gz"      bash -c "sed -i '/#include <memory>/a #include <cstdint>' Utilities/cmcppdap/include/dap/network.h; ./configure --prefix=/usr --parallel=3 -- -DCMAKE_USE_OPENSSL=ON; make \$MAKEFLAGS; make install"
 pkg doas_f    "$SRC/opendoas-6.8.2.tar.gz"    bash -c "export CFLAGS=\"-O2 -std=gnu17\"; ./configure --prefix=/usr --sysconfdir=/etc --with-timestamp; make \$MAKEFLAGS; make install"
 
+# Permit the wheel group to use doas. persist needs --with-timestamp (set
+# above); drop it if this binary rejects the keyword.
+rule="permit persist :wheel"
+if [[ -x /usr/bin/doas ]]; then
+  chown root:root /usr/bin/doas
+  chmod 4755 /usr/bin/doas
+  probe=$(mktemp)
+  chown root:root "$probe" 2>/dev/null || true
+  chmod 0400 "$probe"
+  printf '%s\n' "permit persist :wheel" > "$probe"
+  if ! /usr/bin/doas -C "$probe" >/dev/null 2>&1; then
+    printf '%s\n' "permit :wheel" > "$probe"
+    if /usr/bin/doas -C "$probe" >/dev/null 2>&1; then
+      rule="permit :wheel"
+    fi
+  fi
+  rm -f "$probe"
+fi
+printf '%s\n' "$rule" > /etc/doas.conf
+chown root:root /etc/doas.conf
+chmod 0400 /etc/doas.conf
+
+
 echo "==> LFS chroot build complete."
 CHROOT
 
@@ -2233,6 +2297,7 @@ EFI\BOOT\BOOTX64.EFI
 NSHEOF
   fi
   install_swedish_keyboard
+  install_doas
   write_boot_init_stamp
   ok "/sbin/init pre-mounts proc/sys/dev/run, then execs shepherd (no daemonize)"
 }
@@ -3035,7 +3100,7 @@ if ! step_done user_setup; then
   header "Creating user 'gnu' and desktop config"
   grep -q '^gnu:' /etc/passwd || {
     groupadd -f gnu
-    useradd -m -g gnu -G audio,video,users -s /bin/bash gnu
+    useradd -m -g gnu -G audio,video,users,wheel -s /bin/bash gnu
     echo 'gnu:libre' | chpasswd
   }
 
@@ -3203,7 +3268,7 @@ EOF
   fi
   groupadd -f input
   if id gnu >/dev/null 2>&1; then
-    usermod -aG input,video,audio gnu 2>/dev/null || true
+    usermod -aG input,video,audio,wheel gnu 2>/dev/null || true
   fi
   # C-t d starts Dillo; use an absolute path so the binding works even if
   # the X session's PATH is short.
@@ -3220,6 +3285,7 @@ EOF
   install_os_release
   install_fastfetch_look
   install_swedish_keyboard
+  install_doas
 }
 apply_desktop_fixes
 
@@ -3274,6 +3340,7 @@ fi
 install_os_release
 install_fastfetch_look
 install_swedish_keyboard
+install_doas
 
 echo ""
 echo -e "${GREEN}── GNU/Linux-libre desktop complete ──${NC}"
