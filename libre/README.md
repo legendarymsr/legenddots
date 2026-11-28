@@ -229,7 +229,8 @@ reading pages, not web apps.
 ## Using it
 
 Boot the VM, log in as **`gnu`** (password `libre`) on tty1. X starts
-automatically into **ratpoison**. Ratpoison is keyboard-driven; the prefix key
+automatically into **ratpoison**. The keyboard layout is Swedish (`se` in
+X, `sv-latin1` on the virtual consoles). Ratpoison is keyboard-driven; the prefix key
 is **C-t** (Control-t), screen-style:
 
 | Key | Action |

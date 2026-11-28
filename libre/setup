@@ -127,6 +127,23 @@ EOF
   fi
 }
 
+# Swedish keyboard: Xkb "se" for X, kbd "sv-latin1" for the VTs (kbd 2.8.0
+# ships /usr/share/keymaps/i386/qwerty/sv-latin1.map.gz).
+install_swedish_keyboard() {
+  mkdir -p /etc/sysconfig /etc/X11/xorg.conf.d
+  cat > /etc/sysconfig/console << 'EOF'
+KEYMAP=sv-latin1
+EOF
+  cat > /etc/X11/xorg.conf.d/00-keyboard.conf << 'EOF'
+Section "InputClass"
+    Identifier "system-keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbLayout" "se"
+    Option "XkbModel" "pc105"
+EndSection
+EOF
+}
+
 # =============================================================================
 # PHASE DETECTION
 # =============================================================================
@@ -1497,6 +1514,7 @@ FSCKEOF
               (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
+              (system "/bin/sh -c '. /etc/sysconfig/console 2>/dev/null; map=${KEYMAP:-sv-latin1}; command -v loadkeys >/dev/null && loadkeys \"$map\" || true'")
               (system "/usr/sbin/udevd --daemon")
               (system "/usr/sbin/udevadm trigger --action=add")
               (system "/usr/sbin/udevadm settle --timeout=30")
@@ -1557,6 +1575,7 @@ console
 EOF2
   printf '%s\n' 'GNU/Linux-libre' '' 'login: gnu / libre  (root / legendary123)' '' > /etc/issue
   install_os_release
+  install_swedish_keyboard
 
   mkdir -pv /etc/profile.d
   cat > /etc/profile << 'EOF2'
@@ -2142,6 +2161,7 @@ FSCKEOF
               (system "/usr/bin/mount -a")
               (system "/usr/sbin/swapon -a")
               (system "/usr/bin/hostname -F /etc/hostname")
+              (system "/bin/sh -c '. /etc/sysconfig/console 2>/dev/null; map=${KEYMAP:-sv-latin1}; command -v loadkeys >/dev/null && loadkeys \"$map\" || true'")
               (system "/usr/sbin/udevd --daemon")
               (system "/usr/sbin/udevadm trigger --action=add")
               (system "/usr/sbin/udevadm settle --timeout=30")
@@ -2212,6 +2232,7 @@ SECEOF
 EFI\BOOT\BOOTX64.EFI
 NSHEOF
   fi
+  install_swedish_keyboard
   write_boot_init_stamp
   ok "/sbin/init pre-mounts proc/sys/dev/run, then execs shepherd (no daemonize)"
 }
@@ -3030,6 +3051,9 @@ export XDG_SESSION_DESKTOP=ratpoison
 export DESKTOP_SESSION=ratpoison
 export XDG_SESSION_TYPE=x11
 xrdb -merge ~/.Xresources 2>/dev/null || true
+# Swedish layout (xorg.conf.d also sets XkbLayout se). setxkbmap is optional;
+# it is not built in the default X app set.
+command -v setxkbmap >/dev/null 2>&1 && setxkbmap se || true
 # Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres).
 # GTK without zoom-to-fit pushes a new preferred size when the window is
 # resized; re-run xrandr --auto so X tracks it. The loop exits when X dies.
@@ -3128,6 +3152,8 @@ Section "InputClass"
     MatchIsKeyboard "on"
     MatchDevicePath "/dev/input/event*"
     Driver "libinput"
+    Option "XkbLayout" "se"
+    Option "XkbModel" "pc105"
 EndSection
 Section "InputClass"
     Identifier "libinput pointer catchall"
@@ -3158,6 +3184,9 @@ export XDG_SESSION_DESKTOP=ratpoison
 export DESKTOP_SESSION=ratpoison
 export XDG_SESSION_TYPE=x11
 xrdb -merge ~/.Xresources 2>/dev/null || true
+# Swedish layout (xorg.conf.d also sets XkbLayout se). setxkbmap is optional;
+# it is not built in the default X app set.
+command -v setxkbmap >/dev/null 2>&1 && setxkbmap se || true
 # Follow the virtio-gpu preferred mode (QEMU virtio-vga,xres,yres).
 # GTK without zoom-to-fit pushes a new preferred size when the window is
 # resized; re-run xrandr --auto so X tracks it. The loop exits when X dies.
@@ -3190,6 +3219,7 @@ EOF
   fi
   install_os_release
   install_fastfetch_look
+  install_swedish_keyboard
 }
 apply_desktop_fixes
 
@@ -3243,6 +3273,7 @@ EOF
 fi
 install_os_release
 install_fastfetch_look
+install_swedish_keyboard
 
 echo ""
 echo -e "${GREEN}── GNU/Linux-libre desktop complete ──${NC}"
